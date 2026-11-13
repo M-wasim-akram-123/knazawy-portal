@@ -1,0 +1,15 @@
+@import '@knazawy/design-system/styles/tokens.css';
+@import '@knazawy/design-system/styles/base.css';
+@import '@knazawy/ui-shell/styles.css';
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: var(--kz-brand-strong);
+}

@@ -1,0 +1,23 @@
+.kz-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--kz-brand);
+  color: #fff;
+  font: 600 15px/1 var(--kz-font);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.kz-button:hover {
+  background: var(--kz-brand-strong);
+}
+
+.kz-button:focus-visible {
+  outline: 3px solid #fdba74;
+  outline-offset: 2px;
+}

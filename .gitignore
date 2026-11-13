@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Test
+coverage/
+.nyc_output/
+
+# Environment
+.env
+.env.local
+.env.development
+.env.staging
+.env.production
+.env.*.local
+
+# Secrets / certificates
+certs/
+*.pem
+*.p8
+*.p12
+secrets/
+
+# Local data
+/tmp/
+/uploads/
+*.local.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Editor / OS
+~$*
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+Thumbs.db
+
+# Extracted PRD working copy
+_prd_extract.txt

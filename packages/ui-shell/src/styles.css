@@ -1,0 +1,124 @@
+.kz-shell {
+  min-height: 100vh;
+  background: var(--kz-paper);
+  color: var(--kz-ink);
+  font-family: var(--kz-font);
+}
+
+.kz-header {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 24px 8px;
+}
+
+.kz-eyebrow {
+  margin: 0;
+  color: var(--kz-brand);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kz-product {
+  margin: 6px 0 0;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.kz-alt {
+  width: fit-content;
+  margin: 4px 0 0;
+  color: var(--kz-ink-soft);
+  font-size: 20px;
+}
+
+.kz-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px 24px 64px;
+}
+
+.kz-hero {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.kz-hero p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--kz-ink-soft);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.kz-hero .kz-button,
+.kz-hero p[dir='rtl'] {
+  justify-self: start;
+  width: fit-content;
+}
+
+.kz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kz-card {
+  padding: 18px;
+  border: 1px solid var(--kz-line);
+  border-radius: var(--kz-radius);
+  background: var(--kz-card);
+  box-shadow: var(--kz-shadow);
+}
+
+.kz-card h2,
+.kz-card p {
+  margin: 8px 0 0;
+}
+
+.kz-card h2 {
+  font-size: 18px;
+}
+
+.kz-card p,
+.kz-api {
+  color: var(--kz-ink-soft);
+  line-height: 1.45;
+}
+
+.kz-phase {
+  color: var(--kz-brand);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kz-status-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kz-status-list li {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--kz-line);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.kz-tone-draft { color: var(--kz-draft); }
+.kz-tone-progress { color: var(--kz-progress); }
+.kz-tone-done { color: var(--kz-done); }
+.kz-tone-problem { color: var(--kz-problem); }

@@ -1,0 +1,20 @@
+{
+  "name": "@knazawy/i18n",
+  "version": "0.1.0",
+  "private": true,
+  "description": "English and Urdu copy for the Karam Restaurant Platform.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node -e \"process.exit(0)\""
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

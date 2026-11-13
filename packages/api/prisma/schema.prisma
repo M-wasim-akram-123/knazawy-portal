@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrganisationType {
+  KARAM
+  AIRLINE
+  HOTEL
+  SUPPLIER
+}
+
+enum UserRole {
+  AIRLINE_REQUESTER
+  AIRLINE_FINANCE
+  HOTEL_COORDINATOR
+  OPERATIONS_MANAGER
+  STOREKEEPER
+  KITCHEN_LEAD
+  FINANCE_OFFICER
+  ADMINISTRATOR
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+/// Tenancy spine. Items, requests, invoices, and journal lines attach here in later phases.
+model Organisation {
+  id        String             @id @default(cuid())
+  code      String             @unique
+  type      OrganisationType
+  name      String
+  taxNumber String?            @map("tax_number")
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+  users     User[]
+
+  @@map("organisations")
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organisationId String       @map("organisation_id")
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  name           String
+  email          String       @unique
+  role           UserRole
+  status         UserStatus   @default(INVITED)
+  passwordHash   String       @map("password_hash")
+  lastLoginAt    DateTime?    @map("last_login_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@index([organisationId])
+  @@map("users")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  entity    String
+  entityId  String   @map("entity_id")
+  action    String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
