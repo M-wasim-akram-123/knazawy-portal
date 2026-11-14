@@ -1,6 +1,7 @@
 import type { TokenStore } from '@knazawy/auth-client';
 import type {
   AccountRecord,
+  AirlineOption,
   AirlineRecord,
   AirlineRole,
   DeliveryPoint,
@@ -11,6 +12,7 @@ import type {
   MealCostRecord,
   MenuItemRecord,
   ProductionRecord,
+  RateCardRecord,
   PurchaseRecord,
   RecipeKind,
   RecipeRecord,
@@ -184,6 +186,14 @@ export interface ServiceRequestInput {
   lines: Array<{ recipeId: string; quantity: number }>;
 }
 
+export interface RateCardInput {
+  airlineId: string;
+  validFrom: string;
+  validTo?: string;
+  note?: string;
+  lines: Array<{ recipeId: string; unitPrice: string; minimumQuantity: number }>;
+}
+
 export class ApiClient {
   constructor(
     private readonly baseUrl: string,
@@ -256,6 +266,41 @@ export class ApiClient {
 
   rejectRequest(id: string, reason: string): Promise<ServiceRequestRecord> {
     return this.request('POST', `/v1/requests/${id}/reject`, { reason });
+  }
+
+  listRateCardAirlines(): Promise<AirlineOption[]> {
+    return this.request('GET', '/v1/rate-cards/airlines');
+  }
+
+  listRateCards(airlineId?: string): Promise<RateCardRecord[]> {
+    const query = airlineId ? `?airlineId=${encodeURIComponent(airlineId)}` : '';
+    return this.request('GET', `/v1/rate-cards${query}`);
+  }
+
+  async currentRateCard(serviceDate: string, airlineId?: string): Promise<RateCardRecord | null> {
+    const query = new URLSearchParams({ serviceDate });
+    if (airlineId) query.set('airlineId', airlineId);
+    const result = await this.request<{ card: RateCardRecord | null }>(
+      'GET',
+      `/v1/rate-cards/current?${query.toString()}`,
+    );
+    return result.card;
+  }
+
+  createRateCard(input: RateCardInput): Promise<RateCardRecord> {
+    return this.request('POST', '/v1/rate-cards', input);
+  }
+
+  updateRateCard(id: string, input: RateCardInput): Promise<RateCardRecord> {
+    return this.request('PATCH', `/v1/rate-cards/${id}`, input);
+  }
+
+  approveRateCard(id: string): Promise<RateCardRecord> {
+    return this.request('POST', `/v1/rate-cards/${id}/approve`);
+  }
+
+  endRateCard(id: string, validTo: string): Promise<RateCardRecord> {
+    return this.request('POST', `/v1/rate-cards/${id}/end`, { validTo });
   }
 
   listItems(): Promise<ItemRecord[]> {

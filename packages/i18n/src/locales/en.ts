@@ -14,6 +14,8 @@ export const en = {
     locations: 'Locations',
     airlines: 'Airlines',
     requests: 'Requests',
+    home: 'Home',
+    rateCards: 'Rate cards',
     purchases: 'Purchases',
     scanBill: 'Scan bill',
     issueStock: 'Issue stock',

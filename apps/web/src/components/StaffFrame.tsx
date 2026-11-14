@@ -20,6 +20,7 @@ const links = [
   { href: '/production', label: messages.en.common.production },
   { href: '/meal-cost', label: messages.en.common.mealCost },
   { href: '/requests', label: messages.en.common.requests },
+  { href: '/rates', label: messages.en.common.rateCards },
   { href: '/items', label: messages.en.common.items },
   { href: '/suppliers', label: messages.en.common.suppliers },
   { href: '/locations', label: messages.en.common.locations },

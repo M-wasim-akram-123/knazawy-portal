@@ -14,6 +14,8 @@ export const ur = {
     locations: 'جگہیں',
     airlines: 'ایئرلائنز',
     requests: 'درخواستیں',
+    home: 'ہوم',
+    rateCards: 'نرخ نامے',
     purchases: 'خریداری',
     scanBill: 'بل اسکین کریں',
     issueStock: 'اسٹاک نکالیں',

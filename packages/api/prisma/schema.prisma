@@ -55,6 +55,7 @@ model Organisation {
   recipes           Recipe[]
   productionBatches ProductionBatch[]
   serviceRequests   ServiceRequest[]
+  rateCards         RateCard[]
   payables          SupplierPayable[]
 
   @@map("organisations")
@@ -69,6 +70,8 @@ model User {
   role              UserRole
   requestsCreated   ServiceRequest[] @relation("RequestCreatedBy")
   requestsDecided   ServiceRequest[] @relation("RequestDecidedBy")
+  rateCardsCreated  RateCard[]       @relation("RateCardCreatedBy")
+  rateCardsApproved RateCard[]       @relation("RateCardApprovedBy")
   status            UserStatus       @default(INVITED)
   passwordHash      String           @map("password_hash")
   lastLoginAt       DateTime?        @map("last_login_at")
@@ -571,6 +574,7 @@ model Recipe {
   lines               RecipeLine[]
   productionBatches   ProductionBatch[]
   serviceRequestLines ServiceRequestLine[]
+  rateCardLines       RateCardLine[]
 
   @@unique([organisationId, code])
   @@index([organisationId])
@@ -658,6 +662,48 @@ model ServiceRequestLine {
   @@index([requestId])
   @@index([recipeId])
   @@map("service_request_lines")
+}
+
+enum RateCardStatus {
+  DRAFT
+  APPROVED
+}
+
+/// Sale prices for one airline over a date range. Approved cards for one airline never overlap.
+model RateCard {
+  id             String         @id @default(cuid())
+  organisationId String         @map("organisation_id")
+  organisation   Organisation   @relation(fields: [organisationId], references: [id])
+  number         String         @unique
+  status         RateCardStatus @default(DRAFT)
+  validFrom      DateTime       @map("valid_from") @db.Date
+  validTo        DateTime?      @map("valid_to") @db.Date
+  note           String?
+  createdById    String         @map("created_by_id")
+  createdBy      User           @relation("RateCardCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedAt     DateTime?      @map("approved_at")
+  approvedById   String?        @map("approved_by_id")
+  approvedBy     User?          @relation("RateCardApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  lines          RateCardLine[]
+
+  @@index([organisationId, status])
+  @@map("rate_cards")
+}
+
+model RateCardLine {
+  id              String   @id @default(cuid())
+  rateCardId      String   @map("rate_card_id")
+  rateCard        RateCard @relation(fields: [rateCardId], references: [id], onDelete: Restrict)
+  recipeId        String   @map("recipe_id")
+  recipe          Recipe   @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  unitPrice       Decimal  @map("unit_price") @db.Decimal(12, 2)
+  minimumQuantity Int      @default(0) @map("minimum_quantity")
+
+  @@unique([rateCardId, recipeId])
+  @@index([recipeId])
+  @@map("rate_card_lines")
 }
 
 /// A batch of one approved recipe. Its ingredients leave stock, oldest cost layer first, when the batch is recorded.

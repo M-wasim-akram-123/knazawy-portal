@@ -22,7 +22,7 @@ A meal or snack request is fulfilled from stock and a recipe. A hotel request (P
 
 ## Data
 
-PostgreSQL via Prisma. The tenancy spine is `Organisation`, `User`, and `AuditLog`. Phase 1A adds items, suppliers, stock locations, purchases, goods receipts, supplier bills, payables, FIFO stock layers, stock issues, stock transfers, stock counts, recipes, and production batches on that spine. Meal cost is calculated from those records when it is opened. Phase 1B adds airline organisations and their users on the same spine. Phase 1B requests add service requests and their lines, numbered from the restaurant's sequence. Invoices and journal lines land with the feature that posts them.
+PostgreSQL via Prisma. The tenancy spine is `Organisation`, `User`, and `AuditLog`. Phase 1A adds items, suppliers, stock locations, purchases, goods receipts, supplier bills, payables, FIFO stock layers, stock issues, stock transfers, stock counts, recipes, and production batches on that spine. Meal cost is calculated from those records when it is opened. Phase 1B adds airline organisations and their users on the same spine. Phase 1B requests add service requests and their lines, numbered from the restaurant's sequence. Rate cards and their lines hold each airline's dated prices and minimum portions; approved cards for one airline never overlap. Invoices and journal lines land with the feature that posts them.
 
 Redis is started locally and is unused until a feature needs a cache or a queue.
 

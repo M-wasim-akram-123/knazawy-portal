@@ -8,6 +8,7 @@ const PREFIX = {
   STOCK_COUNT: 'SC',
   PRODUCTION: 'PB',
   SERVICE_REQUEST: 'RQ',
+  RATE_CARD: 'RC',
 } as const;
 
 export async function nextDocumentNumber(

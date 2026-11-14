@@ -3,6 +3,13 @@ import { moneyMatches, supplierBillOwed } from './bills';
 import { costDifference, costOnePortion } from './costing';
 import { formatDisplayDate, todayInKarachi } from './dates';
 import { can, canReadOrganisation } from './rbac';
+import {
+  billedQuantity,
+  chargeFor,
+  previewCharges,
+  rateCardCovers,
+  rateCardsOverlap,
+} from './rates';
 import { recipeIngredientQuantity } from './recipes';
 import { isRequestEditable, nextRequestStatus, passengerTotal } from './requests';
 import { purchaseStatusTone, statusTone } from './status';
@@ -151,6 +158,49 @@ describe('meal cost', () => {
     expect(costDifference('33', '30.08')).toBe('2.92');
     expect(costDifference('30', '33')).toBe('-3');
     expect(costDifference('33', '33')).toBe('0');
+  });
+});
+
+describe('rate cards', () => {
+  it('uses the card whose dates include the service date', () => {
+    const card = { validFrom: '2026-12-01', validTo: '2026-12-31' };
+    expect(rateCardCovers(card, '2026-12-01')).toBe(true);
+    expect(rateCardCovers(card, '2026-12-31')).toBe(true);
+    expect(rateCardCovers(card, '2027-01-01')).toBe(false);
+    expect(rateCardCovers({ validFrom: '2026-12-01', validTo: null }, '2030-06-01')).toBe(true);
+  });
+
+  it('spots overlapping periods, including open-ended cards', () => {
+    const december = { validFrom: '2026-12-01', validTo: '2026-12-31' };
+    expect(rateCardsOverlap(december, { validFrom: '2027-01-01', validTo: null })).toBe(false);
+    expect(rateCardsOverlap(december, { validFrom: '2026-12-31', validTo: null })).toBe(true);
+    expect(rateCardsOverlap({ validFrom: '2026-01-01', validTo: null }, december)).toBe(true);
+  });
+
+  it('bills at least the minimum and prices in paisa', () => {
+    expect(billedQuantity(8, 10)).toBe(10);
+    expect(billedQuantity(140, 10)).toBe(140);
+    expect(chargeFor(3, '450.50')).toBe('1351.50');
+    expect(chargeFor(3, '12.345')).toBeNull();
+  });
+
+  it('previews a request total, or none when an item has no price', () => {
+    const card = {
+      lines: [
+        {
+          recipeId: 'biryani',
+          recipeName: 'Chicken biryani',
+          kind: 'MEAL' as const,
+          unitPrice: '650',
+          minimumQuantity: 20,
+        },
+      ],
+    };
+    const priced = previewCharges([{ recipeId: 'biryani', quantity: 10 }], card);
+    expect(priced.lines[0]?.billedQuantity).toBe(20);
+    expect(priced.total).toBe('13000.00');
+    expect(previewCharges([{ recipeId: 'samosa', quantity: 5 }], card).total).toBeNull();
+    expect(previewCharges([{ recipeId: 'biryani', quantity: 5 }], null).total).toBeNull();
   });
 });
 

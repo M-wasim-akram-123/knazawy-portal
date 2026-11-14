@@ -1,8 +1,8 @@
-import { messages } from '@knazawy/i18n';
 import { PRODUCT_NAME } from '@knazawy/shared';
-import { AppShell } from '@knazawy/ui-shell';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+
+import { PortalFrame } from '../components/PortalFrame';
 
 import './globals.css';
 
@@ -15,13 +15,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <AppShell
-          productName={messages.en.common.productName}
-          surface={messages.en.common.portalSurface}
-          alternateName={messages.ur.common.portalSurface}
-        >
-          {children}
-        </AppShell>
+        <PortalFrame>{children}</PortalFrame>
       </body>
     </html>
   );

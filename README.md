@@ -10,7 +10,7 @@ Product behaviour is specified in the Product Requirements Document v0.1 (5 Nove
 
 ## Project status
 
-**Phase 1A recipes.** Staff can sign in, keep items, suppliers, and locations, send a purchase, receive it, post a supplier bill, issue stock, transfer stock, count a location, keep a meal or snack recipe, record a production batch that uses stock, and compare a meal's standard cost with what batches actually cost. An administrator can open an airline account and its users can sign in on the portal. An airline can send meal and snack requests for a flight, and operations accepts or rejects them. Automatic bill reading (waiting for the restaurant's bill copies), rate cards, and invoicing are still ahead.
+**Phase 1A recipes.** Staff can sign in, keep items, suppliers, and locations, send a purchase, receive it, post a supplier bill, issue stock, transfer stock, count a location, keep a meal or snack recipe, record a production batch that uses stock, and compare a meal's standard cost with what batches actually cost. An administrator can open an airline account and its users can sign in on the portal. An airline can send meal and snack requests for a flight, and operations accepts or rejects them. Finance keeps dated rate cards for each airline, and the airline sees its prices and an estimated charge while it builds a request. Automatic bill reading (waiting for the restaurant's bill copies), distribution, and invoicing are still ahead.
 
 ## Branches
 

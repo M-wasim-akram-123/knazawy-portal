@@ -1,76 +1,75 @@
 'use client';
 
 import { messages } from '@knazawy/i18n';
-import { isAirlineRole, type AccountRecord } from '@knazawy/shared';
+import { can, isAirlineRole, type AccountRecord } from '@knazawy/shared';
 import { useEffect, useState } from 'react';
 
-import { api, clearSession, readSessionUser } from '../lib/session';
+import { ApiError, api, clearSession } from '../lib/session';
 
 export default function HomePage() {
   const [account, setAccount] = useState<AccountRecord | null>(null);
   const [error, setError] = useState('');
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const session = readSessionUser();
-    if (!session) {
-      setReady(true);
-      return;
-    }
     void api
       .account()
       .then(setAccount)
       .catch((caught: unknown) => {
-        setError(caught instanceof Error ? caught.message : 'Sign in to continue.');
-      })
-      .finally(() => setReady(true));
+        if (caught instanceof ApiError && caught.status === 401) {
+          clearSession();
+          window.location.assign('/login');
+          return;
+        }
+        setError(caught instanceof Error ? caught.message : 'The portal could not load.');
+      });
   }, []);
 
-  if (!ready) return <p>Loading</p>;
-  if (!account) {
+  if (error) {
     return (
-      <section className="kz-hero">
-        <h1>{messages.en.common.portalSurface}</h1>
-        <p>Sign in to see your airline. Requests, rates, and invoices follow on this portal.</p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.portalSurface}
-        </p>
-        {error ? <p className="kz-error">{error}</p> : null}
-        <a className="kz-button" href="/login">
-          {messages.en.common.signIn}
-        </a>
+      <p className="kz-error" role="alert">
+        {error}
+      </p>
+    );
+  }
+  if (!account) return <p>Loading</p>;
+
+  if (!isAirlineRole(account.role)) {
+    return (
+      <section className="kz-stack">
+        <div className="kz-page-head">
+          <h1>{account.organisationName}</h1>
+          <p>This portal is for airline staff. Karam staff use the staff app.</p>
+        </div>
       </section>
     );
   }
 
-  const airline = isAirlineRole(account.role);
-
   return (
-    <section className="kz-hero">
-      <h1>{account.organisationName}</h1>
-      <p>
-        Signed in as {account.name}
-        {airline ? ` for ${account.organisationCode}` : ''}.
-      </p>
-      {airline ? (
+    <section className="kz-stack">
+      <div className="kz-page-head">
+        <h1>{account.organisationName}</h1>
         <p>
-          <a className="kz-button" href="/requests">
-            {messages.en.common.requests}
-          </a>
+          Signed in as {account.name} for {account.organisationCode}. You only see this
+          airline&apos;s requests, rates, and invoices.
         </p>
-      ) : (
-        <p>This portal is for airline staff. Karam staff use the staff app.</p>
-      )}
-      <button
-        type="button"
-        className="kz-button"
-        onClick={() => {
-          clearSession();
-          setAccount(null);
-        }}
-      >
-        {messages.en.common.signOut}
-      </button>
+        <p lang="ur" dir="rtl">
+          {messages.ur.common.portalSurface}
+        </p>
+      </div>
+      <div className="kz-home-grid">
+        {can(account.role, 'service_requests', 'R') ? (
+          <a className="kz-panel kz-home-card" href="/requests">
+            <h2>{messages.en.common.requests}</h2>
+            <p>Ask for meals and snacks for a flight and follow each request.</p>
+          </a>
+        ) : null}
+        {can(account.role, 'service_rates', 'R') ? (
+          <a className="kz-panel kz-home-card" href="/rates">
+            <h2>{messages.en.common.rateCards}</h2>
+            <p>See the prices agreed with Karam and the dates they apply.</p>
+          </a>
+        ) : null}
+      </div>
     </section>
   );
 }

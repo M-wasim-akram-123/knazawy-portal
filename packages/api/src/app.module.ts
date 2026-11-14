@@ -12,6 +12,7 @@ import { MealCostsModule } from './meal-costs/meal-costs.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductionModule } from './production/production.module';
 import { PurchasesModule } from './purchases/purchases.module';
+import { RateCardsModule } from './rate-cards/rate-cards.module';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { RecipesModule } from './recipes/recipes.module';
 import { RequestsModule } from './requests/requests.module';
@@ -39,6 +40,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     ProductionModule,
     MealCostsModule,
     RequestsModule,
+    RateCardsModule,
     StockModule,
   ],
 })

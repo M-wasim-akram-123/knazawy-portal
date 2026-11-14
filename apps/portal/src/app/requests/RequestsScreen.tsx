@@ -10,10 +10,13 @@ import {
   REQUEST_STATUS_LABELS,
   formatDisplayDate,
   isAirlineRole,
+  previewCharges,
   statusTone,
   todayInKarachi,
+  type ChargePreviewLine,
   type DeliveryPoint,
   type MenuItemRecord,
+  type RateCardRecord,
   type ServiceRequestRecord,
 } from '@knazawy/shared';
 import { useEffect, useState } from 'react';
@@ -66,6 +69,7 @@ export function RequestsScreen() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
+  const [card, setCard] = useState<RateCardRecord | null>(null);
 
   useEffect(() => {
     const session = readSessionUser();
@@ -79,6 +83,28 @@ export function RequestsScreen() {
       })
       .catch((caught: unknown) => handleFailure(caught));
   }, []);
+
+  const serviceDate = form.serviceDate;
+  const airlineUser = user !== null && isAirlineRole(user.role);
+
+  useEffect(() => {
+    if (!airlineUser || !/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) {
+      setCard(null);
+      return;
+    }
+    let live = true;
+    void api
+      .currentRateCard(serviceDate)
+      .then((next) => {
+        if (live) setCard(next);
+      })
+      .catch(() => {
+        if (live) setCard(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [airlineUser, serviceDate]);
 
   function handleFailure(caught: unknown) {
     if (caught instanceof ApiError && caught.status === 401) {
@@ -176,6 +202,9 @@ export function RequestsScreen() {
   if (!isAirlineRole(user.role)) {
     return <p>This page is for airline staff. Karam staff use the staff app.</p>;
   }
+
+  const preview = previewCharges(toInput(form, quantities).lines, card);
+  const ordered = preview.lines.length > 0;
 
   return (
     <section className="kz-stack">
@@ -294,6 +323,8 @@ export function RequestsScreen() {
                     <th>Item</th>
                     <th>Type</th>
                     <th>Portions</th>
+                    <th>Price</th>
+                    <th>Charge</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -318,12 +349,25 @@ export function RequestsScreen() {
                           }
                         />
                       </td>
+                      <PriceCells
+                        rate={card?.lines.find((line) => line.recipeId === item.id) ?? null}
+                        charge={preview.lines.find((line) => line.recipeId === item.id) ?? null}
+                      />
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+          {ordered ? (
+            <p>
+              {preview.total !== null && card
+                ? `Estimated charge: ${preview.total} PKR on ${card.number}. The invoice uses the portions delivered.`
+                : card
+                  ? `One of these items has no price on ${card.number}. Karam will confirm the charge.`
+                  : 'No rate card covers this service date yet. Karam will confirm the charge.'}
+            </p>
+          ) : null}
           <Field label="Note for Karam">
             <input
               value={form.note}
@@ -410,6 +454,31 @@ export function RequestsScreen() {
         </div>
       </div>
     </section>
+  );
+}
+
+function PriceCells({
+  rate,
+  charge,
+}: {
+  rate: RateCardRecord['lines'][number] | null;
+  charge: ChargePreviewLine | null;
+}) {
+  return (
+    <>
+      <td>
+        {rate ? `${rate.unitPrice} PKR` : '—'}
+        {rate && rate.minimumQuantity > 0 ? (
+          <span className="kz-help"> · at least {rate.minimumQuantity}</span>
+        ) : null}
+      </td>
+      <td>
+        {charge?.amount ? `${charge.amount} PKR` : '—'}
+        {charge && charge.billedQuantity > charge.quantity ? (
+          <span className="kz-help"> · billed as {charge.billedQuantity}</span>
+        ) : null}
+      </td>
+    </>
   );
 }
 

@@ -2,6 +2,12 @@
 
 Newest entry at the top.
 
+## 2026-11-14 — Rate cards
+
+A rate card holds the price an airline pays for each meal and snack, in PKR, over a range of dates. A card can be left open-ended. Each priced item can carry a minimum number of portions. The airline pays for the portions delivered, but never fewer than that minimum. Finance writes a card as a draft and approves it. An administrator can correct a draft. Once approved, a card's prices cannot change. Two approved cards for the same airline can never share a date, so exactly one card applies to any service date. To change prices, finance ends the current card on a date (today or later, so past days keep their prices) and approves a new one. Cards are numbered RC-00001 from the restaurant's sequence. An airline sees only its own approved cards, on a Rate cards page in the portal. Its request form shows the price of each item, the charge after the minimum, and an estimated total from the card that covers the service date. Invoicing will use the same rule on delivered portions.
+
+The airline portal now uses the same frame as the staff app: a top bar with the user and sign-out, a side menu that shows only what the role can open, and the same sign-in layout.
+
 ## 2026-11-14 — Requests
 
 An airline user asks for meals and snacks for one flight. The request gives the flight number, route, service date, delivery time, and delivery point (gate, lounge, aircraft, or hotel), plus the passenger split (adults, children, infants, crew, and special diets, which sit inside the total). It lists menu items as portions. Only approved, active meals and snacks appear on the menu, and costs are never sent to the airline. A draft can be changed, sent, or cancelled. Once sent, the request is locked to the airline's view. Operations accepts it or rejects it, and a rejection needs a reason. Karam sees a request only after it is sent. Each request gets a number from the restaurant's sequence (RQ-00001), so numbers are unique across airlines. The service date must be today or later, and the menu is checked again when the request is sent. Rate preview, amendments, cut-off, and invoicing are still ahead.
