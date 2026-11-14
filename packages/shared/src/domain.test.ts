@@ -2,7 +2,13 @@ import { isAirlineRole } from './airlines';
 import { moneyMatches, supplierBillOwed } from './bills';
 import { costDifference, costOnePortion } from './costing';
 import { formatDisplayDate, formatKarachiDateTime, todayInKarachi } from './dates';
-import { canDecideDispute, canDisputeInvoice, canOpenDispute, nextDisputeStatus } from './disputes';
+import {
+  canDecideDispute,
+  canDisputeInvoice,
+  canDisputeRoomInvoice,
+  canOpenDispute,
+  nextDisputeStatus,
+} from './disputes';
 import {
   deliveredQuantityError,
   dispatchQuantityError,
@@ -35,6 +41,29 @@ import {
   nextRequestStatus,
   passengerTotal,
 } from './requests';
+import { canRaiseRoomInvoice, roomBillError, roomCreditError } from './room-billing';
+import {
+  canDecideRoomRequest,
+  canRequestRooms,
+  isRoomRequestEditable,
+  nextRoomRequestStatus,
+  chargeAmountError,
+  nightlyChargeTotal,
+  canManageRoomStays,
+  roomAvailabilityError,
+  roomLineError,
+  peakRoomsNeeded,
+  roomNights,
+  roomRemovalError,
+  roomStayWindowError,
+  roomStockError,
+  roomsStillFree,
+  roomsToCheckIn,
+  setupNameError,
+  stayLineAmount,
+  stayTotal,
+  staysOverlap,
+} from './rooms';
 import { purchaseStatusTone, statusTone } from './status';
 import { countStatusTone } from './stock';
 
@@ -61,6 +90,8 @@ describe('permissions', () => {
     expect(can('ADMINISTRATOR', 'users', 'C')).toBe(true);
     expect(can('OPERATIONS_MANAGER', 'users', 'R')).toBe(false);
     expect(can('AIRLINE_REQUESTER', 'users', 'R')).toBe(false);
+    expect(can('HOTEL_COORDINATOR', 'service_requests', 'R')).toBe(false);
+    expect(can('HOTEL_COORDINATOR', 'invoices', 'R')).toBe(false);
     expect(isAirlineRole('AIRLINE_FINANCE')).toBe(true);
     expect(isAirlineRole('STOREKEEPER')).toBe(false);
   });
@@ -406,6 +437,143 @@ describe('disputes', () => {
     expect(canDisputeInvoice('CANCELLATION', 'ISSUED')).toBe(true);
     expect(canDisputeInvoice('CREDIT_NOTE', 'ISSUED')).toBe(false);
     expect(canDisputeInvoice('INVOICE', 'DRAFT')).toBe(false);
+    expect(canDisputeRoomInvoice('INVOICE')).toBe(true);
+    expect(canDisputeRoomInvoice('CREDIT_NOTE')).toBe(false);
+  });
+});
+
+describe('room requests', () => {
+  it('counts a stay in nights, and refuses a stay that ends before it starts', () => {
+    expect(roomNights('2026-12-20', '2026-12-22')).toBe(2);
+    expect(roomNights('2026-12-31', '2027-01-01')).toBe(1);
+    expect(roomNights('2026-12-20', '2026-12-20')).toBeNull();
+    expect(roomNights('2026-12-22', '2026-12-20')).toBeNull();
+    expect(roomNights('2026-02-30', '2026-03-01')).toBeNull();
+  });
+
+  it('moves a room request like a service request, and only the airline sends it', () => {
+    expect(nextRoomRequestStatus('DRAFT', 'submit')).toBe('SUBMITTED');
+    expect(nextRoomRequestStatus('SUBMITTED', 'accept')).toBe('ACCEPTED');
+    expect(nextRoomRequestStatus('SUBMITTED', 'reject')).toBe('REJECTED');
+    expect(nextRoomRequestStatus('ACCEPTED', 'cancel')).toBeNull();
+    expect(isRoomRequestEditable('SUBMITTED')).toBe(false);
+    expect(canRequestRooms('AIRLINE_REQUESTER')).toBe(true);
+    expect(canRequestRooms('OPERATIONS_MANAGER')).toBe(false);
+    expect(canDecideRoomRequest('OPERATIONS_MANAGER')).toBe(true);
+    expect(canDecideRoomRequest('FINANCE_OFFICER')).toBe(false);
+    expect(canDecideRoomRequest('AIRLINE_REQUESTER')).toBe(false);
+  });
+
+  it('prices a night from the charges an administrator has set', () => {
+    expect(
+      nightlyChargeTotal([
+        { amountPerNight: '8000', active: true },
+        { amountPerNight: '500.50', active: true },
+        { amountPerNight: '200', active: false },
+      ]),
+    ).toBe('8500.50');
+    expect(nightlyChargeTotal([])).toBe('0.00');
+    expect(nightlyChargeTotal([{ amountPerNight: 'free', active: true }])).toBeNull();
+    expect(chargeAmountError('8000.50')).toBeNull();
+    expect(chargeAmountError('eight thousand')).toMatch(/PKR/);
+    expect(setupNameError('  ', 'floor')).toBe('Enter a floor.');
+    expect(setupNameError('Ground', 'floor')).toBeNull();
+  });
+
+  it('lets an administrator set up rooms and keeps operations to reading them', () => {
+    expect(can('ADMINISTRATOR', 'rooms', 'C')).toBe(true);
+    expect(can('ADMINISTRATOR', 'rooms', 'U')).toBe(true);
+    expect(can('OPERATIONS_MANAGER', 'rooms', 'R')).toBe(true);
+    expect(can('OPERATIONS_MANAGER', 'rooms', 'C')).toBe(false);
+    expect(can('FINANCE_OFFICER', 'rooms', 'R')).toBe(true);
+    expect(can('AIRLINE_REQUESTER', 'rooms', 'R')).toBe(false);
+  });
+
+  it('keeps a checkout morning free, and prices the stay from the nightly charges', () => {
+    expect(staysOverlap('2026-12-20', '2026-12-22', '2026-12-22', '2026-12-23')).toBe(false);
+    expect(staysOverlap('2026-12-20', '2026-12-22', '2026-12-21', '2026-12-23')).toBe(true);
+    expect(roomsStillFree(3, 1)).toBe(2);
+    expect(roomStockError('Single', 1, 2)).toBe('Karam has only 1 Single room.');
+    expect(roomAvailabilityError('Single', 0, 1)).toBe(
+      'No Single rooms are free for those nights.',
+    );
+    expect(stayLineAmount(1, 2, '8500.00')).toBe('17000.00');
+    expect(
+      stayTotal(
+        [
+          { rooms: 1, nightly: '8000.00' },
+          { rooms: 1, nightly: '500.00' },
+        ],
+        2,
+      ),
+    ).toBe('17000.00');
+  });
+
+  it('checks guests in from the first night until the morning the stay ends', () => {
+    expect(roomStayWindowError('2026-12-19', '2026-12-20', '2026-12-22')).toBe(
+      'Check-in opens on the first night of the stay.',
+    );
+    expect(roomStayWindowError('2026-12-20', '2026-12-20', '2026-12-22')).toBeNull();
+    expect(roomStayWindowError('2026-12-21', '2026-12-20', '2026-12-22')).toBeNull();
+    expect(roomStayWindowError('2026-12-22', '2026-12-20', '2026-12-22')).toBe(
+      'This stay has ended.',
+    );
+    expect(roomsToCheckIn(2, 1)).toBe(1);
+    expect(roomsToCheckIn(1, 3)).toBe(0);
+    expect(canManageRoomStays('OPERATIONS_MANAGER')).toBe(true);
+    expect(canManageRoomStays('ADMINISTRATOR')).toBe(false);
+    expect(canManageRoomStays('AIRLINE_REQUESTER')).toBe(false);
+  });
+
+  it('asks for at least one room and at least one night', () => {
+    expect(roomLineError(0, 2)).toBe('Ask for at least one room.');
+    expect(roomLineError(100, 2)).toBe('Ask for no more than 99 rooms.');
+    expect(roomLineError(2, 0)).toBe('A stay is at least one night.');
+    expect(roomLineError(2, 3)).toBeNull();
+  });
+});
+
+describe('room removal', () => {
+  const stays = [
+    { checkIn: '2026-12-20', checkOut: '2026-12-22', rooms: 2 },
+    { checkIn: '2026-12-21', checkOut: '2026-12-23', rooms: 1 },
+  ];
+
+  it('finds the most rooms needed on one night, counting only nights still to come', () => {
+    expect(peakRoomsNeeded(stays, '2026-12-20')).toBe(3);
+    expect(peakRoomsNeeded(stays, '2026-12-22')).toBe(1);
+    expect(peakRoomsNeeded(stays, '2026-12-23')).toBe(0);
+  });
+
+  it('refuses to leave accepted stays short of rooms, and allows it when they still fit', () => {
+    expect(roomRemovalError('Single', 2, 3)).toBe(
+      'Accepted stays need 3 Single rooms. Keep this room, or move those stays first.',
+    );
+    expect(roomRemovalError('Single', 3, 3)).toBeNull();
+    expect(roomRemovalError('Single', 0, 0)).toBeNull();
+  });
+});
+
+describe('room billing', () => {
+  it('bills only an accepted stay, once, and only at a fixed price', () => {
+    expect(roomBillError('SUBMITTED', false, true)).toBe(
+      'Only an accepted room stay can be billed.',
+    );
+    expect(roomBillError('ACCEPTED', true, true)).toBe('This stay is already billed.');
+    expect(roomBillError('ACCEPTED', false, false)).toBe('This stay has no fixed price to bill.');
+    expect(roomBillError('ACCEPTED', false, true)).toBeNull();
+  });
+
+  it('credits a whole room bill once, and never a credit note', () => {
+    expect(roomCreditError('CREDIT_NOTE', false)).toBe('Only a room bill can be credited.');
+    expect(roomCreditError('INVOICE', true)).toBe('This room bill is already credited.');
+    expect(roomCreditError('INVOICE', false)).toBeNull();
+  });
+
+  it('lets only finance raise a room bill', () => {
+    expect(canRaiseRoomInvoice('FINANCE_OFFICER')).toBe(true);
+    expect(canRaiseRoomInvoice('OPERATIONS_MANAGER')).toBe(false);
+    expect(canRaiseRoomInvoice('AIRLINE_FINANCE')).toBe(false);
   });
 });
 

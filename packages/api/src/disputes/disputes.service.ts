@@ -1,6 +1,7 @@
 import {
   canDecideDispute,
   canDisputeInvoice,
+  canDisputeRoomInvoice,
   canOpenDispute,
   isKaramRole,
   nextDisputeStatus,
@@ -8,6 +9,7 @@ import {
   type Actor,
   type DisputeAction,
   type DisputeRecord,
+  type DisputeSource,
 } from '@knazawy/shared';
 import {
   BadRequestException,
@@ -28,6 +30,7 @@ import type { DecideDisputeDto, OpenDisputeDto } from './disputes.dto';
 const disputeInclude = {
   organisation: { select: { name: true } },
   invoice: { select: { number: true, lines: { select: { amount: true } } } },
+  roomInvoice: { select: { number: true, lines: { select: { amount: true } } } },
   openedBy: { select: { name: true } },
   decidedBy: { select: { name: true } },
 } satisfies Prisma.DisputeInclude;
@@ -53,34 +56,28 @@ export class DisputesService {
     return rows.map(toDispute);
   }
 
-  /** Airline finance opens one dispute on an issued invoice. The invoice is not changed. */
+  /** Airline finance opens one dispute on an issued bill. The bill is not changed. */
   async open(actor: Actor, input: OpenDisputeDto): Promise<DisputeRecord> {
     if (!canOpenDispute(actor.role)) {
       throw new ForbiddenException('You cannot open a dispute.');
     }
     const reason = input.reason.trim();
     if (reason.length < 3) throw new BadRequestException('Give a reason for this dispute.');
+    if (Boolean(input.invoiceId) === Boolean(input.roomInvoiceId)) {
+      throw new BadRequestException('Choose one bill to dispute.');
+    }
     const karamOrgId = await this.karamOrganisationId();
 
     const id = await this.prisma.$transaction(async (tx) => {
-      const invoice = await tx.invoice.findUnique({
-        where: { id: input.invoiceId },
-        include: { dispute: { select: { number: true } } },
-      });
-      if (!invoice || invoice.organisationId !== actor.organisationId) {
-        throw new NotFoundException('That invoice was not found.');
-      }
-      if (!canDisputeInvoice(invoice.kind, invoice.status)) {
-        throw new BadRequestException('Dispute an invoice that has been issued.');
-      }
-      if (invoice.dispute) {
-        throw new BadRequestException(`${invoice.dispute.number} already covers this invoice.`);
-      }
+      const target = input.invoiceId
+        ? await this.mealTarget(tx, actor.organisationId, input.invoiceId)
+        : await this.roomTarget(tx, actor.organisationId, input.roomInvoiceId ?? '');
       const number = await nextDocumentNumber(tx, karamOrgId, 'DISPUTE');
       const dispute = await tx.dispute.create({
         data: {
-          organisationId: invoice.organisationId,
-          invoiceId: invoice.id,
+          organisationId: target.organisationId,
+          invoiceId: target.source === 'INVOICE' ? target.id : null,
+          roomInvoiceId: target.source === 'ROOM_INVOICE' ? target.id : null,
           number,
           reason,
           openedById: actor.id,
@@ -91,12 +88,12 @@ export class DisputesService {
         entity: 'Dispute',
         entityId: dispute.id,
         action: 'open',
-        after: { number, invoiceId: invoice.id, reason },
+        after: { number, source: target.source, billId: target.id, reason },
       });
       await this.notifications.notify(tx, {
         organisationId: karamOrgId,
         role: 'FINANCE_OFFICER',
-        title: `${number} disputes ${invoice.number}`,
+        title: `${number} disputes ${target.number}`,
         body: reason,
         entity: 'Dispute',
         entityId: dispute.id,
@@ -130,7 +127,10 @@ export class DisputesService {
     await this.prisma.$transaction(async (tx) => {
       const existing = await tx.dispute.findUnique({
         where: { id },
-        include: { invoice: { select: { number: true } } },
+        include: {
+          invoice: { select: { number: true } },
+          roomInvoice: { select: { number: true } },
+        },
       });
       if (!existing) throw new NotFoundException('That dispute was not found.');
       const next = nextDisputeStatus(existing.status, action);
@@ -152,13 +152,55 @@ export class DisputesService {
         organisationId: existing.organisationId,
         role: 'AIRLINE_FINANCE',
         title: `${existing.number} was ${outcome}`,
-        body: `${existing.invoice.number}: ${resolution}`,
+        body: `${existing.invoice?.number ?? existing.roomInvoice?.number}: ${resolution}`,
         entity: 'Dispute',
         entityId: id,
         exceptUserId: actor.id,
       });
     });
     return this.load(id);
+  }
+
+  private async mealTarget(
+    tx: Prisma.TransactionClient,
+    organisationId: string,
+    invoiceId: string,
+  ): Promise<BillTarget> {
+    const invoice = await tx.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { dispute: { select: { number: true } } },
+    });
+    if (!invoice || invoice.organisationId !== organisationId) {
+      throw new NotFoundException('That invoice was not found.');
+    }
+    if (!canDisputeInvoice(invoice.kind, invoice.status)) {
+      throw new BadRequestException('Dispute an invoice that has been issued.');
+    }
+    if (invoice.dispute) {
+      throw new BadRequestException(`${invoice.dispute.number} already covers this invoice.`);
+    }
+    return { source: 'INVOICE', id: invoice.id, organisationId, number: invoice.number };
+  }
+
+  private async roomTarget(
+    tx: Prisma.TransactionClient,
+    organisationId: string,
+    roomInvoiceId: string,
+  ): Promise<BillTarget> {
+    const bill = await tx.roomInvoice.findUnique({
+      where: { id: roomInvoiceId },
+      include: { dispute: { select: { number: true } } },
+    });
+    if (!bill || bill.organisationId !== organisationId) {
+      throw new NotFoundException('That room bill was not found.');
+    }
+    if (!canDisputeRoomInvoice(bill.kind)) {
+      throw new BadRequestException('Dispute a room bill. A credit note is not disputed.');
+    }
+    if (bill.dispute) {
+      throw new BadRequestException(`${bill.dispute.number} already covers this room bill.`);
+    }
+    return { source: 'ROOM_INVOICE', id: bill.id, organisationId, number: bill.number };
   }
 
   private async karamOrganisationId(): Promise<string> {
@@ -177,16 +219,27 @@ export class DisputesService {
   }
 }
 
+interface BillTarget {
+  source: DisputeSource;
+  id: string;
+  organisationId: string;
+  number: string;
+}
+
 function toDispute(row: DisputeRow): DisputeRecord {
-  const total = sumMoney(row.invoice.lines.map((line) => line.amount.toFixed(2))) ?? '0.00';
+  const lines = row.invoice?.lines ?? row.roomInvoice?.lines ?? [];
+  const total = sumMoney(lines.map((line) => line.amount.toFixed(2))) ?? '0.00';
+  const source: DisputeSource = row.roomInvoiceId ? 'ROOM_INVOICE' : 'INVOICE';
   return {
     id: row.id,
     number: row.number,
     status: row.status,
     airlineId: row.organisationId,
     airlineName: row.organisation.name,
+    source,
     invoiceId: row.invoiceId,
-    invoiceNumber: row.invoice.number,
+    roomInvoiceId: row.roomInvoiceId,
+    invoiceNumber: row.invoice?.number ?? row.roomInvoice?.number ?? '',
     invoiceTotal: total,
     reason: row.reason,
     resolution: row.resolution,

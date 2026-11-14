@@ -3,9 +3,11 @@
 import { messages } from '@knazawy/i18n';
 import {
   INVOICE_KIND_LABELS,
+  ROOM_INVOICE_KIND_LABELS,
   formatDisplayDate,
   invoiceStatusTone,
   type InvoiceRecord,
+  type RoomInvoiceRecord,
 } from '@knazawy/shared';
 import { useEffect, useState } from 'react';
 
@@ -13,12 +15,15 @@ import { ApiError, api, clearSession } from '../../lib/session';
 
 export function InvoicesScreen() {
   const [invoices, setInvoices] = useState<InvoiceRecord[] | null>(null);
+  const [roomBills, setRoomBills] = useState<RoomInvoiceRecord[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    void api
-      .listInvoices()
-      .then(setInvoices)
+    void Promise.all([api.listInvoices(), api.listRoomInvoices()])
+      .then(([rows, rooms]) => {
+        setInvoices(rows);
+        setRoomBills(rooms);
+      })
       .catch((caught: unknown) => {
         if (caught instanceof ApiError && caught.status === 401) {
           clearSession();
@@ -47,7 +52,50 @@ export function InvoicesScreen() {
         </p>
       ) : null}
       {invoices === null && !error ? <p>Loading</p> : null}
-      {invoices !== null && invoices.length === 0 ? (
+      {roomBills.length > 0 ? (
+        <section className="kz-stack">
+          <h2>Room bills</h2>
+          {roomBills.map((bill) => (
+            <article key={bill.id} className="kz-panel kz-stack">
+              <h3>
+                {bill.number} · {ROOM_INVOICE_KIND_LABELS[bill.kind]}
+              </h3>
+              <p className="kz-help">
+                {bill.roomRequestNumber}, {formatDisplayDate(bill.checkIn)} to{' '}
+                {formatDisplayDate(bill.checkOut)}, {bill.nights} nights
+                {bill.sourceInvoiceNumber ? `, credits ${bill.sourceInvoiceNumber}` : ''}
+              </p>
+              <div className="kz-table-wrap">
+                <table className="kz-table">
+                  <thead>
+                    <tr>
+                      <th>Room type</th>
+                      <th>Rooms</th>
+                      <th>Nights</th>
+                      <th>Nightly</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bill.lines.map((line) => (
+                      <tr key={line.roomTypeName}>
+                        <td>{line.roomTypeName}</td>
+                        <td>{line.rooms}</td>
+                        <td>{line.nights}</td>
+                        <td>{line.nightly} PKR</td>
+                        <td>{line.amount} PKR</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p>Total {bill.total} PKR.</p>
+              {bill.reason ? <p>Reason: {bill.reason}</p> : null}
+            </article>
+          ))}
+        </section>
+      ) : null}
+      {invoices !== null && invoices.length === 0 && roomBills.length === 0 ? (
         <p className="kz-empty">No invoices have been issued yet.</p>
       ) : null}
       {invoices?.map((invoice) => (

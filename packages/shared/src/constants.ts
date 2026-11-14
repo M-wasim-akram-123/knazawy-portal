@@ -34,7 +34,7 @@ export const MODULES = [
     id: 'hotel',
     phase: '2',
     title: 'Hotel coordination',
-    summary: 'Room requests, hotel rates, acceptance, and hotel invoicing.',
+    summary: 'Room requests, room prices, acceptance, check-in, and room bills.',
   },
   {
     id: 'growth',

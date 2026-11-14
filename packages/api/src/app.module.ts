@@ -21,6 +21,9 @@ import { RateCardsModule } from './rate-cards/rate-cards.module';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { RecipesModule } from './recipes/recipes.module';
 import { RequestsModule } from './requests/requests.module';
+import { RoomInvoicesModule } from './room-invoices/room-invoices.module';
+import { RoomRequestsModule } from './room-requests/room-requests.module';
+import { RoomSetupModule } from './room-setup/room-setup.module';
 import { StockModule } from './stock/stock.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 
@@ -50,6 +53,9 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     ProductionModule,
     MealCostsModule,
     RequestsModule,
+    RoomSetupModule,
+    RoomRequestsModule,
+    RoomInvoicesModule,
     RateCardsModule,
     StockModule,
   ],

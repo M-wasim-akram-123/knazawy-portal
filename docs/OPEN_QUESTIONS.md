@@ -30,14 +30,6 @@ Which package does Karam use today? Phase 1B exports CSV or Excel. A direct inte
 
 Sales-tax registration status, and which rates apply to meals and to hotel services.
 
-## OQ-009 — Hotel margin
-
-Does Karam take a margin on hotel rooms, a fixed service fee, or both? Phase 2.
-
 ## OQ-010 — Urdu at launch
 
 The interface ships with English and Urdu strings from the scaffold. Confirm that Urdu is required on day one, including printed invoices and dispatch notes.
-
-## OQ-011 — Hotel partners
-
-Who are the Phase 2 hotel partners?

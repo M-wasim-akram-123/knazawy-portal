@@ -25,7 +25,7 @@ PostgreSQL is the system of record (Prisma). The PRD requires a relational stock
 | App | Audience | Port | Phase |
 | --- | --- | --- | --- |
 | `apps/web` | Operations, store, kitchen, finance, administrator | 3000 | 1A then 1B |
-| `apps/portal` | Airline requester, airline finance, hotel coordinator | 3002 | 1B, hotel in 2 |
+| `apps/portal` | Airline requester, airline finance | 3002 | 1B, hotel in 2 |
 
 Native mobile apps are out of scope. Both surfaces are responsive. Store, kitchen, and drivers are mobile-first.
 

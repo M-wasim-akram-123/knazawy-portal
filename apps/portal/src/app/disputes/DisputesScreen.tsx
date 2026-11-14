@@ -5,11 +5,13 @@ import { messages } from '@knazawy/i18n';
 import {
   DISPUTE_STATUS_LABELS,
   canDisputeInvoice,
+  canDisputeRoomInvoice,
   canOpenDispute,
   disputeStatusTone,
   formatDisplayDate,
   type DisputeRecord,
   type InvoiceRecord,
+  type RoomInvoiceRecord,
 } from '@knazawy/shared';
 import { useEffect, useState } from 'react';
 
@@ -20,7 +22,8 @@ export function DisputesScreen() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [rows, setRows] = useState<DisputeRecord[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
-  const [invoiceId, setInvoiceId] = useState('');
+  const [roomBills, setRoomBills] = useState<RoomInvoiceRecord[]>([]);
+  const [billKey, setBillKey] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
@@ -32,10 +35,11 @@ export function DisputesScreen() {
     setUser(session);
     setReady(true);
     if (!session) return;
-    void Promise.all([api.listDisputes(), api.listInvoices()])
-      .then(([nextRows, nextInvoices]) => {
+    void Promise.all([api.listDisputes(), api.listInvoices(), api.listRoomInvoices()])
+      .then(([nextRows, nextInvoices, nextRoomBills]) => {
         setRows(nextRows);
         setInvoices(nextInvoices);
+        setRoomBills(nextRoomBills);
       })
       .catch((caught: unknown) => {
         if (caught instanceof ApiError && caught.status === 401) {
@@ -56,21 +60,41 @@ export function DisputesScreen() {
     );
   }
 
-  const openable = invoices.filter(
-    (invoice) =>
-      canDisputeInvoice(invoice.kind, invoice.status) &&
-      !rows.some((row) => row.invoiceId === invoice.id),
-  );
+  const openable = [
+    ...invoices
+      .filter(
+        (invoice) =>
+          canDisputeInvoice(invoice.kind, invoice.status) &&
+          !rows.some((row) => row.invoiceId === invoice.id),
+      )
+      .map((invoice) => ({
+        key: `invoice:${invoice.id}`,
+        label: `${invoice.number} · ${invoice.total} PKR · ${formatDisplayDate(invoice.serviceDate)}`,
+      })),
+    ...roomBills
+      .filter(
+        (bill) =>
+          canDisputeRoomInvoice(bill.kind) && !rows.some((row) => row.roomInvoiceId === bill.id),
+      )
+      .map((bill) => ({
+        key: `room:${bill.id}`,
+        label: `Room bill ${bill.number} · ${bill.total} PKR · ${formatDisplayDate(bill.checkIn)}`,
+      })),
+  ];
 
   async function openDispute() {
+    const invoiceId = billKey.startsWith('invoice:') ? billKey.slice('invoice:'.length) : '';
+    const roomInvoiceId = billKey.startsWith('room:') ? billKey.slice('room:'.length) : '';
     setBusy(true);
     setError('');
     setSaved('');
     try {
-      const record = await api.openDispute(invoiceId, reason.trim());
+      const record = invoiceId
+        ? await api.openDispute(invoiceId, reason.trim())
+        : await api.openRoomDispute(roomInvoiceId, reason.trim());
       setRows((current) => [record, ...current]);
       setReason('');
-      setInvoiceId('');
+      setBillKey('');
       setSaved(`${record.number} is open. Karam will decide it. The bill is unchanged.`);
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : 'The dispute could not be opened.');
@@ -100,16 +124,12 @@ export function DisputesScreen() {
           }}
         >
           <h2>Open a dispute</h2>
-          <Field label="Invoice">
-            <select
-              value={invoiceId}
-              onChange={(event) => setInvoiceId(event.target.value)}
-              required
-            >
+          <Field label="Bill">
+            <select value={billKey} onChange={(event) => setBillKey(event.target.value)} required>
               <option value="">Choose a bill</option>
-              {openable.map((invoice) => (
-                <option key={invoice.id} value={invoice.id}>
-                  {invoice.number} · {invoice.total} PKR · {formatDisplayDate(invoice.serviceDate)}
+              {openable.map((bill) => (
+                <option key={bill.key} value={bill.key}>
+                  {bill.label}
                 </option>
               ))}
             </select>
@@ -143,8 +163,8 @@ export function DisputesScreen() {
             </span>
           </h2>
           <p>
-            {row.invoiceNumber} · {row.invoiceTotal} PKR ·{' '}
-            {formatDisplayDate(row.createdAt.slice(0, 10))}
+            {row.source === 'ROOM_INVOICE' ? `Room bill ${row.invoiceNumber}` : row.invoiceNumber} ·{' '}
+            {row.invoiceTotal} PKR · {formatDisplayDate(row.createdAt.slice(0, 10))}
           </p>
           <p>{row.reason}</p>
           {row.resolution ? <p>Decision: {row.resolution}</p> : null}

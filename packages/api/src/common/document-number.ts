@@ -15,6 +15,7 @@ const PREFIX = {
   JOURNAL: 'JE',
   AMENDMENT: 'AM',
   DISPUTE: 'DP',
+  ROOM_REQUEST: 'RR',
 } as const;
 
 export async function nextDocumentNumber(

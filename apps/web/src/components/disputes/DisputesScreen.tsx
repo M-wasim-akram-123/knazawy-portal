@@ -97,7 +97,7 @@ export function DisputesScreen() {
             </span>
           </h2>
           <p>
-            {row.airlineName} · {row.invoiceNumber} · {row.invoiceTotal} PKR · opened{' '}
+            {row.airlineName} · {billLabel(row)} · {row.invoiceTotal} PKR · opened{' '}
             {formatDisplayDate(row.createdAt.slice(0, 10))} by {row.openedByName}
           </p>
           <p>{row.reason}</p>
@@ -139,4 +139,8 @@ export function DisputesScreen() {
       ))}
     </section>
   );
+}
+
+function billLabel(row: DisputeRecord): string {
+  return row.source === 'ROOM_INVOICE' ? `Room bill ${row.invoiceNumber}` : row.invoiceNumber;
 }

@@ -2,6 +2,44 @@
 
 Newest entry at the top.
 
+## 2026-11-14 — A room cannot leave while a guest is in it or accepted stays need it
+
+Archiving a room, or moving it to another room type, is refused in two cases. A guest is checked into the room, or the accepted stays of that type would be left short of rooms on any night from today on. The message says how many rooms the stays need. The check runs under the same lock as check-in and acceptance, so a stay cannot be accepted while the room is leaving. Reactivating a room is not limited. Before this, an archived room could leave accepted stays with no room behind them.
+
+## 2026-11-14 — A credited stay can be billed again, room bills can be disputed, and there is no hotel partner
+
+A credit note reverses the whole room bill and takes it out of force. Finance can raise a new bill for that stay, at the nightly price still fixed on acceptance. The old bill and the credit note stay. Only one bill is in force at a time, and each bill is credited once.
+
+Airline finance can dispute a room bill the same way as a meal invoice: one dispute per bill, Karam finance accepts or rejects it, and the bill does not change. A credit note is still how money goes back, and a credit note cannot be disputed.
+
+OQ-011 is closed. Karam owns the rooms, so there is no hotel partner and no hotel coordinator login. Operations accepts stays and checks guests in and out. Finance bills them. The administrator sets the rooms up. The hotel coordinator role remains in the role list so an old account still loads, and it can do nothing.
+
+## 2026-11-14 — Room bills: finance bills an accepted stay, and a credit note reverses it
+
+Finance bills an accepted room stay for every booked night, at the nightly price fixed when the stay was accepted. Each room type on the stay is one line: rooms, nights, nightly price, and amount. The bill is issued at once with the next IN number, and is posted to the ledger the same way as a meal invoice. A stay is billed once. A correction is a credit note (CN number) for the whole bill. It is issued once, and a credit note itself cannot be credited. A stay that has been credited stays billed, so it is not billed again. The airline sees its room bills on its Invoices page, with room type names and amounts, not floor or room names. Only finance can raise a bill or a credit note. Operations and administrators cannot. Early departure is billed for the booked nights, as decided before this slice.
+
+## 2026-11-14 — Check-in and check-out: Karam moves each guest into a room
+
+Once a stay is accepted, Karam operations moves each guest into a named room of the right type, from the first night until the morning the stay ends. A room holds one guest at a time, and a room already in use is refused. Checking out releases that room and keeps the stay and its nightly price. The airline sees how many rooms are checked in, not which rooms. Only operations can check guests in or out. Billing for the room nights is the next slice. Decided by the product owner: a guest who leaves early is billed for every booked night, because the room stayed reserved for the stay.
+
+## 2026-11-14 — An airline asks for rooms, and Karam accepts against availability
+
+An airline drafts a stay: check-in, check-out, who the rooms are for, and how many rooms of each type. The nightly price is the room type's charges added together. Sending the request tells Karam operations. Accepting it keeps the nightly price as it was then, and only when enough rooms of that type are free for those nights. A checkout morning is free for the next guest. A sent request can be cancelled by the airline until it is accepted. Rejecting needs a reason. The airline sees room types and prices, not floor or room names. Check-in, check-out, and room invoices are still ahead. The hotel coordinator role is still an open question.
+
+## 2026-11-14 — Rooms, floors, and nightly charges are set by the administrator
+
+The building is not fixed in the software. An administrator names each floor and the order it is listed in, names each room on a floor, and names each room type. A night's price is whatever charges the administrator adds to that type, in PKR per night, added together. A charge can be archived, and so can a floor, a type, or a room. A floor or a type with a room still in use cannot be archived until those rooms are. The same room name can be used on another floor. Operations and finance can read the setup. An airline cannot. Room requests, availability, and room invoices are still ahead.
+
+## 2026-11-14 — Phase 2 started: room requests (shared rules)
+
+Phase 2 is on `feature/phase-2-hotels`, cut from `feature/phase-1b-airline-accounts` because Phase 1 is not merged into `staging` yet. Karam owns the rooms it offers. An airline asks for rooms for a stay of nights, and Karam accepts or rejects against its own availability. Room prices come from a Karam rate card, billed per room night, the same way meals are priced. There is no outside hotel to pay and no hotel margin, so OQ-009 is closed on that basis.
+
+This first slice adds only the shared rules: room request statuses and moves (same shape as service requests), counting a stay in nights, the room and night limits, and who may request or decide. The `room_requests` area is added to the permission table. Still to build: the room request API, room types and availability, room rate cards, check-in and check-out, and room invoices. Open for the next slice: whether the hotel coordinator role (OQ-011 and the architecture role table) is a Karam role or a partner role.
+
+## 2026-11-14 — Phase 1A and 1B signed off
+
+The product owner signed off Phase 1A (restaurant core) and Phase 1B (airline portal and billing) as built. Two items are carried forward, not blocking: automatic bill reading (OCR) waits for the restaurant's bill copies, and staff and portal screens still need a browser pass. Phase 2 (hotel coordination) starts now.
+
 ## 2026-11-14 — Amendments, cancellation charges, notifications, disputes
 
 A request can be changed after it is sent, until 24 hours before delivery in Karachi time. The airline does that itself. After the cut-off, only Karam can change it, and only until production starts. Each change keeps a number (AM-00001) and a reason. The request keeps its own number. Sending a request inside the cut-off is refused.

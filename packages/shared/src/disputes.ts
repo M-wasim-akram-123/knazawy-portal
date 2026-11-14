@@ -1,6 +1,7 @@
 import type { Role } from './enums';
 import type { InvoiceKind, InvoiceStatus } from './invoices';
 import { can, isKaramRole } from './rbac';
+import type { RoomInvoiceKind } from './room-billing';
 import type { StatusTone } from './status';
 
 export const DISPUTE_STATUSES = ['OPEN', 'ACCEPTED', 'REJECTED'] as const;
@@ -48,13 +49,24 @@ export function canDisputeInvoice(kind: InvoiceKind, status: InvoiceStatus): boo
   return status === 'ISSUED' && kind !== 'CREDIT_NOTE';
 }
 
+/** A room credit note is a correction, so it is not disputed. A room bill is issued when it is raised. */
+export function canDisputeRoomInvoice(kind: RoomInvoiceKind): boolean {
+  return kind === 'INVOICE';
+}
+
+export const DISPUTE_SOURCES = ['INVOICE', 'ROOM_INVOICE'] as const;
+
+export type DisputeSource = (typeof DISPUTE_SOURCES)[number];
+
 export interface DisputeRecord {
   id: string;
   number: string;
   status: DisputeStatus;
   airlineId: string;
   airlineName: string;
-  invoiceId: string;
+  source: DisputeSource;
+  invoiceId: string | null;
+  roomInvoiceId: string | null;
   invoiceNumber: string;
   invoiceTotal: string;
   reason: string;

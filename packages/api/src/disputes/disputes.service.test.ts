@@ -143,6 +143,67 @@ describe('DisputesService', () => {
     expect(mocks.invoice.update).not.toHaveBeenCalled();
   });
 
+  it('opens one dispute on a room bill and refuses a second', async () => {
+    const mocks = {
+      organisation: { findFirst: jest.fn().mockResolvedValue({ id: 'org-karam' }) },
+      documentSequence: { upsert: jest.fn().mockResolvedValue({ lastNumber: 4 }) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+      roomInvoice: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'ri-1',
+          number: 'IN-00004',
+          organisationId: 'air-1',
+          kind: 'INVOICE',
+          dispute: null,
+        }),
+      },
+      dispute: {
+        create: jest.fn().mockResolvedValue({ id: 'dp-4' }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'dp-4',
+          number: 'DP-00004',
+          status: 'OPEN',
+          organisationId: 'air-1',
+          organisation: { name: 'Sample Air' },
+          invoiceId: null,
+          invoice: null,
+          roomInvoiceId: 'ri-1',
+          roomInvoice: { number: 'IN-00004', lines: [{ amount: { toFixed: () => '17000.00' } }] },
+          reason: 'The stay was billed twice',
+          resolution: null,
+          openedBy: { name: 'Airline Finance' },
+          decidedBy: null,
+          decidedAt: null,
+          createdAt: new Date('2026-12-01T00:00:00.000Z'),
+        }),
+      },
+    };
+    const service = serviceFor(mocks);
+    const opened = await service.open(airlineFinance, {
+      roomInvoiceId: 'ri-1',
+      reason: 'The stay was billed twice',
+    });
+    expect(opened.source).toBe('ROOM_INVOICE');
+    expect(opened.invoiceNumber).toBe('IN-00004');
+    expect(opened.invoiceTotal).toBe('17000.00');
+    expect(mocks.dispute.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ invoiceId: null, roomInvoiceId: 'ri-1' }),
+      }),
+    );
+
+    mocks.roomInvoice.findUnique.mockResolvedValue({
+      id: 'ri-1',
+      number: 'IN-00004',
+      organisationId: 'air-1',
+      kind: 'INVOICE',
+      dispute: { number: 'DP-00004' },
+    });
+    await expect(
+      service.open(airlineFinance, { roomInvoiceId: 'ri-1', reason: 'Still wrong' }),
+    ).rejects.toThrow('DP-00004 already covers this room bill.');
+  });
+
   it('needs a reason before a dispute can be rejected', async () => {
     const service = serviceFor({});
     await expect(service.reject(finance, 'dp-1', { resolution: '  ' })).rejects.toBeInstanceOf(

@@ -1,9 +1,15 @@
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class OpenDisputeDto {
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  invoiceId!: string;
+  invoiceId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  roomInvoiceId?: string;
 
   @IsString()
   @MaxLength(300)

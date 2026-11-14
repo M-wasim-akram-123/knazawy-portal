@@ -18,7 +18,7 @@ Both Next.js apps rewrite `/v1/:path*` to the API, so the browser stays on the p
 
 `REJECTED` and `CANCELLED` are terminal problem states. Every change is time-stamped with the user. The tone of each status (draft, progress, done, problem) lives in `@knazawy/shared` so both apps colour it the same way.
 
-A meal or snack request is fulfilled from stock and a recipe. A hotel request (Phase 2) is fulfilled by a hotel response. Both paths end on the same invoice and journal.
+A meal or snack request is fulfilled from stock and a recipe. A room request (Phase 2) is fulfilled from rooms Karam owns. An administrator names the floors, the rooms, the room types, and every per-night charge. An airline asks for a number of rooms of a type over a stay, and Karam accepts only when those rooms are free. The accepted stay keeps that nightly price. Both paths end on the same invoice and journal.
 
 ## Data
 
@@ -41,7 +41,7 @@ The API must apply that check on every partner query. Hiding a row in the UI is 
 | --- | --- | --- |
 | Airline requester | Airline | Submit requests, track status, confirm delivery |
 | Airline finance | Airline | Rates, invoices, statements, disputes |
-| Hotel coordinator | Hotel | Room availability, rates, check-in (Phase 2) |
+| Hotel coordinator | Unused | Karam owns the rooms. Operations coordinates stays and finance bills them. The role can do nothing. |
 | Operations manager | Karam | Accept requests, plan production, assign distribution |
 | Storekeeper | Karam | Purchases, bill scan, receipts, stock |
 | Kitchen lead | Karam | Production batches, usage, wastage |

@@ -21,14 +21,17 @@ const links = [
   { href: '/production', label: messages.en.common.production },
   { href: '/meal-cost', label: messages.en.common.mealCost },
   { href: '/requests', label: messages.en.common.requests },
+  { href: '/room-requests', label: messages.en.common.roomRequests },
   { href: '/deliveries', label: messages.en.common.deliveries },
   { href: '/invoices', label: messages.en.common.invoices },
+  { href: '/room-bills', label: messages.en.common.roomBills },
   { href: '/disputes', label: messages.en.common.disputes },
   { href: '/ledger', label: messages.en.common.ledger },
   { href: '/rates', label: messages.en.common.rateCards },
   { href: '/items', label: messages.en.common.items },
   { href: '/suppliers', label: messages.en.common.suppliers },
   { href: '/locations', label: messages.en.common.locations },
+  { href: '/rooms', label: messages.en.common.rooms },
   { href: '/airlines', label: messages.en.common.airlines },
 ];
 

@@ -107,6 +107,8 @@ export type RecipeStatus = (typeof RECIPE_STATUSES)[number];
 
 export const AREAS = [
   'service_requests',
+  'room_requests',
+  'rooms',
   'service_rates',
   'purchases',
   'stock',

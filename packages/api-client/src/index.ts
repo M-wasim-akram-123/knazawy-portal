@@ -18,6 +18,14 @@ import type {
   NotificationRecord,
   ProductionRecord,
   RateCardRecord,
+  RoomFloorRecord,
+  RoomTypeRecord,
+  HotelRoomRecord,
+  FreeRoomRecord,
+  RoomOfferRecord,
+  RoomBillableRecord,
+  RoomInvoiceRecord,
+  RoomRequestRecord,
   PurchaseRecord,
   RecipeKind,
   RecipeRecord,
@@ -174,6 +182,14 @@ export interface BillInput {
   lines: BillLineInput[];
 }
 
+export interface RoomRequestInput {
+  checkIn: string;
+  checkOut: string;
+  party?: string;
+  note?: string;
+  lines: Array<{ roomTypeId: string; rooms: number }>;
+}
+
 export interface ServiceRequestInput {
   flightNumber: string;
   route: string;
@@ -286,6 +302,10 @@ export class ApiClient {
 
   openDispute(invoiceId: string, reason: string): Promise<DisputeRecord> {
     return this.request('POST', '/v1/disputes', { invoiceId, reason });
+  }
+
+  openRoomDispute(roomInvoiceId: string, reason: string): Promise<DisputeRecord> {
+    return this.request('POST', '/v1/disputes', { roomInvoiceId, reason });
   }
 
   acceptDispute(id: string, resolution: string): Promise<DisputeRecord> {
@@ -508,6 +528,130 @@ export class ApiClient {
 
   receiveTransfer(id: string, receivedOn: string): Promise<StockTransferRecord> {
     return this.request('POST', `/v1/stock/transfers/${id}/receive`, { receivedOn });
+  }
+
+  listRoomFloors(): Promise<RoomFloorRecord[]> {
+    return this.request('GET', '/v1/room-floors');
+  }
+
+  createRoomFloor(input: { name: string; sortOrder?: number }): Promise<RoomFloorRecord> {
+    return this.request('POST', '/v1/room-floors', input);
+  }
+
+  updateRoomFloor(
+    id: string,
+    input: { name?: string; sortOrder?: number; active?: boolean },
+  ): Promise<RoomFloorRecord> {
+    return this.request('PATCH', `/v1/room-floors/${id}`, input);
+  }
+
+  listRoomTypes(): Promise<RoomTypeRecord[]> {
+    return this.request('GET', '/v1/room-types');
+  }
+
+  createRoomType(input: { name: string; note?: string }): Promise<RoomTypeRecord> {
+    return this.request('POST', '/v1/room-types', input);
+  }
+
+  updateRoomType(
+    id: string,
+    input: { name?: string; note?: string; active?: boolean },
+  ): Promise<RoomTypeRecord> {
+    return this.request('PATCH', `/v1/room-types/${id}`, input);
+  }
+
+  addRoomCharge(
+    typeId: string,
+    input: { name: string; amountPerNight: string },
+  ): Promise<RoomTypeRecord> {
+    return this.request('POST', `/v1/room-types/${typeId}/charges`, input);
+  }
+
+  updateRoomCharge(
+    typeId: string,
+    chargeId: string,
+    input: { name?: string; amountPerNight?: string; active?: boolean },
+  ): Promise<RoomTypeRecord> {
+    return this.request('PATCH', `/v1/room-types/${typeId}/charges/${chargeId}`, input);
+  }
+
+  listHotelRooms(): Promise<HotelRoomRecord[]> {
+    return this.request('GET', '/v1/hotel-rooms');
+  }
+
+  createHotelRoom(input: {
+    floorId: string;
+    roomTypeId: string;
+    name: string;
+  }): Promise<HotelRoomRecord> {
+    return this.request('POST', '/v1/hotel-rooms', input);
+  }
+
+  updateHotelRoom(
+    id: string,
+    input: { floorId?: string; roomTypeId?: string; name?: string; active?: boolean },
+  ): Promise<HotelRoomRecord> {
+    return this.request('PATCH', `/v1/hotel-rooms/${id}`, input);
+  }
+
+  listRoomRequests(): Promise<RoomRequestRecord[]> {
+    return this.request('GET', '/v1/room-requests');
+  }
+
+  listRoomOffers(): Promise<RoomOfferRecord[]> {
+    return this.request('GET', '/v1/room-requests/offers');
+  }
+
+  createRoomRequest(input: RoomRequestInput): Promise<RoomRequestRecord> {
+    return this.request('POST', '/v1/room-requests', input);
+  }
+
+  updateRoomRequest(id: string, input: RoomRequestInput): Promise<RoomRequestRecord> {
+    return this.request('PATCH', `/v1/room-requests/${id}`, input);
+  }
+
+  submitRoomRequest(id: string): Promise<RoomRequestRecord> {
+    return this.request('POST', `/v1/room-requests/${id}/submit`);
+  }
+
+  cancelRoomRequest(id: string): Promise<RoomRequestRecord> {
+    return this.request('POST', `/v1/room-requests/${id}/cancel`);
+  }
+
+  acceptRoomRequest(id: string): Promise<RoomRequestRecord> {
+    return this.request('POST', `/v1/room-requests/${id}/accept`);
+  }
+
+  rejectRoomRequest(id: string, reason: string): Promise<RoomRequestRecord> {
+    return this.request('POST', `/v1/room-requests/${id}/reject`, { reason });
+  }
+
+  freeRoomsForRequest(id: string): Promise<FreeRoomRecord[]> {
+    return this.request('GET', `/v1/room-requests/${id}/free-rooms`);
+  }
+
+  checkInRoomRequest(id: string, hotelRoomIds: string[]): Promise<RoomRequestRecord> {
+    return this.request('POST', `/v1/room-requests/${id}/check-in`, { hotelRoomIds });
+  }
+
+  checkOutRoomStay(requestId: string, stayId: string): Promise<RoomRequestRecord> {
+    return this.request('POST', `/v1/room-requests/${requestId}/stays/${stayId}/check-out`);
+  }
+
+  listRoomBillable(): Promise<RoomBillableRecord[]> {
+    return this.request('GET', '/v1/room-invoices/billable');
+  }
+
+  listRoomInvoices(): Promise<RoomInvoiceRecord[]> {
+    return this.request('GET', '/v1/room-invoices');
+  }
+
+  raiseRoomInvoice(roomRequestId: string): Promise<RoomInvoiceRecord> {
+    return this.request('POST', '/v1/room-invoices', { roomRequestId });
+  }
+
+  creditRoomInvoice(id: string, reason: string): Promise<RoomInvoiceRecord> {
+    return this.request('POST', `/v1/room-invoices/${id}/credit`, { reason });
   }
 
   listRecipes(): Promise<RecipeRecord[]> {
