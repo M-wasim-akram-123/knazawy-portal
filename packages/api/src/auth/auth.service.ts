@@ -1,5 +1,5 @@
-import type { LoginResult } from '@knazawy/shared';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import type { AccountRecord, Actor, LoginResult } from '@knazawy/shared';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -19,7 +19,8 @@ export class AuthService {
     const email = input.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
     const passwordMatches =
-      user?.status === UserStatus.ACTIVE && (await bcrypt.compare(input.password, user.passwordHash));
+      user?.status === UserStatus.ACTIVE &&
+      (await bcrypt.compare(input.password, user.passwordHash));
     if (!user || !passwordMatches) {
       throw new UnauthorizedException('Email or password is wrong.');
     }
@@ -34,6 +35,23 @@ export class AuthService {
         role: user.role,
         organisationId: user.organisationId,
       },
+    };
+  }
+
+  async account(actor: Actor): Promise<AccountRecord> {
+    const organisation = await this.prisma.organisation.findUnique({
+      where: { id: actor.organisationId },
+    });
+    if (!organisation) throw new NotFoundException('That account was not found.');
+    return {
+      id: actor.id,
+      email: actor.email,
+      name: actor.name,
+      role: actor.role,
+      organisationId: organisation.id,
+      organisationCode: organisation.code,
+      organisationName: organisation.name,
+      organisationType: organisation.type,
     };
   }
 }

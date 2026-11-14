@@ -1,3 +1,4 @@
+import { isAirlineRole } from './airlines';
 import { moneyMatches, supplierBillOwed } from './bills';
 import { costDifference, costOnePortion } from './costing';
 import { formatDisplayDate, todayInKarachi } from './dates';
@@ -26,6 +27,11 @@ describe('permissions', () => {
     expect(can('KITCHEN_LEAD', 'stock', 'R')).toBe(true);
     expect(can('FINANCE_OFFICER', 'recipes', 'R')).toBe(true);
     expect(can('FINANCE_OFFICER', 'recipes', 'C')).toBe(false);
+    expect(can('ADMINISTRATOR', 'users', 'C')).toBe(true);
+    expect(can('OPERATIONS_MANAGER', 'users', 'R')).toBe(false);
+    expect(can('AIRLINE_REQUESTER', 'users', 'R')).toBe(false);
+    expect(isAirlineRole('AIRLINE_FINANCE')).toBe(true);
+    expect(isAirlineRole('STOREKEEPER')).toBe(false);
   });
 
   it('lets Karam staff read another organisation and keeps airlines on their own', () => {

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
+import { AirlinesModule } from './airlines/airlines.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BillsModule } from './bills/bills.module';
@@ -25,6 +26,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     PrismaModule,
     AuditModule,
     AuthModule,
+    AirlinesModule,
     HealthModule,
     ItemsModule,
     SuppliersModule,

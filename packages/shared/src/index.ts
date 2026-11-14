@@ -1,3 +1,4 @@
+export * from './airlines';
 export * from './constants';
 export * from './enums';
 export * from './dates';

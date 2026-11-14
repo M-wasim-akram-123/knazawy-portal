@@ -2,6 +2,10 @@
 
 Newest entry at the top.
 
+## 2026-11-14 — Airline accounts
+
+An administrator opens an airline account and adds its users. Each user belongs to one airline and holds either the requester role or the finance role. A disabled user cannot sign in. The airline portal shows that airline's name after sign-in. An airline user cannot open another airline's account, and a Karam role cannot be placed on an airline. Requests, rate cards, and invoices are still ahead.
+
 ## 2026-11-14 — Meal cost
 
 Meal cost is worked out when it is opened. It is not a document and it does not change stock. The standard cost of one portion is each ingredient's latest purchase price, with the recipe's wastage added. The actual cost is the ingredient cost of every batch of that recipe, divided by the portions cooked. The difference is actual minus standard. A recipe stays without a standard cost until every ingredient has a price. Finance can read it, along with the kitchen, operations, and an administrator. A sale rate and a margin wait for the airline rate card.

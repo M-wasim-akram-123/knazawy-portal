@@ -13,3 +13,55 @@ body {
 a {
   color: var(--kz-brand-strong);
 }
+
+.kz-form,
+.kz-field {
+  display: grid;
+  gap: 12px;
+}
+
+.kz-field span {
+  font-weight: 650;
+}
+
+.kz-field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--kz-line);
+  border-radius: 12px;
+  background: white;
+  color: var(--kz-ink);
+  font: inherit;
+}
+
+.kz-panel {
+  padding: 20px;
+  border: 1px solid var(--kz-line);
+  border-radius: var(--kz-radius);
+  background: var(--kz-card);
+}
+
+.kz-signin-card {
+  width: min(440px, 100%);
+  margin: 24px auto;
+}
+
+.kz-page-head h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.kz-page-head p {
+  margin: 6px 0 0;
+  color: var(--kz-ink-soft);
+}
+
+.kz-button-block {
+  width: 100%;
+}
+
+.kz-error {
+  margin: 0;
+  color: var(--kz-problem);
+}

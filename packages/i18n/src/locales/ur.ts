@@ -12,6 +12,7 @@ export const ur = {
     items: 'اشیاء',
     suppliers: 'سپلائرز',
     locations: 'جگہیں',
+    airlines: 'ایئرلائنز',
     purchases: 'خریداری',
     scanBill: 'بل اسکین کریں',
     issueStock: 'اسٹاک نکالیں',

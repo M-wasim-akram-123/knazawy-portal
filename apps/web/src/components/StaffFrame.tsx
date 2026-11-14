@@ -22,6 +22,7 @@ const links = [
   { href: '/items', label: messages.en.common.items },
   { href: '/suppliers', label: messages.en.common.suppliers },
   { href: '/locations', label: messages.en.common.locations },
+  { href: '/airlines', label: messages.en.common.airlines },
 ];
 
 export function StaffFrame({ children }: { children: ReactNode }) {

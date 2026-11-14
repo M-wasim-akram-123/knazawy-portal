@@ -1,5 +1,8 @@
 import type { TokenStore } from '@knazawy/auth-client';
 import type {
+  AccountRecord,
+  AirlineRecord,
+  AirlineRole,
   GoodsReceiptRecord,
   ItemRecord,
   LocationRecord,
@@ -24,6 +27,27 @@ export class ApiError extends Error {
   ) {
     super(message);
   }
+}
+
+export interface AirlineInput {
+  code: string;
+  name: string;
+  taxNumber?: string;
+}
+
+export interface AirlineUserInput {
+  name: string;
+  email: string;
+  role: AirlineRole;
+  password: string;
+}
+
+export interface AirlineUserChange {
+  name?: string;
+  email?: string;
+  role?: AirlineRole;
+  status?: 'ACTIVE' | 'DISABLED';
+  password?: string;
 }
 
 export interface ItemInput {
@@ -152,6 +176,34 @@ export class ApiClient {
 
   login(email: string, password: string): Promise<LoginResult> {
     return this.request('POST', '/v1/auth/login', { email, password });
+  }
+
+  account(): Promise<AccountRecord> {
+    return this.request('GET', '/v1/auth/me');
+  }
+
+  listAirlines(): Promise<AirlineRecord[]> {
+    return this.request('GET', '/v1/airlines');
+  }
+
+  createAirline(input: AirlineInput): Promise<AirlineRecord> {
+    return this.request('POST', '/v1/airlines', input);
+  }
+
+  updateAirline(id: string, input: Partial<AirlineInput>): Promise<AirlineRecord> {
+    return this.request('PATCH', `/v1/airlines/${id}`, input);
+  }
+
+  createAirlineUser(airlineId: string, input: AirlineUserInput): Promise<AirlineRecord> {
+    return this.request('POST', `/v1/airlines/${airlineId}/users`, input);
+  }
+
+  updateAirlineUser(
+    airlineId: string,
+    userId: string,
+    input: AirlineUserChange,
+  ): Promise<AirlineRecord> {
+    return this.request('PATCH', `/v1/airlines/${airlineId}/users/${userId}`, input);
   }
 
   listItems(): Promise<ItemRecord[]> {
