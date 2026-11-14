@@ -10,6 +10,7 @@ const admin = {
   name: 'Karam Administrator',
   role: 'ADMINISTRATOR' as const,
   organisationId: 'org-karam',
+  branchId: 'branch-main',
 };
 
 const operations = {
@@ -53,7 +54,7 @@ describe('RoomSetupService', () => {
     const created = await service.createFloor(admin, { name: '  Ground  ' });
     expect(created.name).toBe('Ground');
     expect(mocks.roomFloor.create).toHaveBeenCalledWith({
-      data: { organisationId: 'org-karam', name: 'Ground', sortOrder: 0 },
+      data: { organisationId: 'org-karam', branchId: 'branch-main', name: 'Ground', sortOrder: 0 },
     });
   });
 

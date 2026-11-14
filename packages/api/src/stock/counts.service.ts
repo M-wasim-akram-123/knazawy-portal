@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { formatIsoDate, parseIsoDate } from '../common/date';
 import { parseNonNegativeDecimal } from '../common/decimal';
 import { nextDocumentNumber } from '../common/document-number';
@@ -37,7 +38,7 @@ export class CountsService {
   async list(actor: Actor): Promise<StockCountRecord[]> {
     assertCan(actor, 'stock', 'R', 'view stock counts');
     const rows = await this.prisma.stockCount.findMany({
-      where: { organisationId: actor.organisationId },
+      where: { organisationId: actor.organisationId, location: { branchId: requireBranch(actor) } },
       include: countInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -51,7 +52,12 @@ export class CountsService {
 
     const countId = await this.prisma.$transaction(async (tx) => {
       const location = await tx.stockLocation.findFirst({
-        where: { id: input.locationId, organisationId: actor.organisationId, active: true },
+        where: {
+          id: input.locationId,
+          organisationId: actor.organisationId,
+          branchId: requireBranch(actor),
+          active: true,
+        },
       });
       if (!location) throw new BadRequestException('Choose an open location.');
 
@@ -90,7 +96,10 @@ export class CountsService {
         });
       }
 
-      const full = await tx.stockCount.findUnique({ where: { id: count.id }, include: countInclude });
+      const full = await tx.stockCount.findUnique({
+        where: { id: count.id },
+        include: countInclude,
+      });
       if (!full) throw new NotFoundException('That count was not found.');
       await this.audit.record(tx, {
         userId: actor.id,
@@ -132,7 +141,9 @@ export class CountsService {
       }
 
       const books = await booksAt(tx, actor.organisationId, count.locationId);
-      const moved = count.lines.some((line) => !sameQty(line.bookQuantity, bookFor(books, line.itemId)));
+      const moved = count.lines.some(
+        (line) => !sameQty(line.bookQuantity, bookFor(books, line.itemId)),
+      );
       if (moved) {
         for (const line of count.lines) {
           await tx.stockCountLine.update({
@@ -173,7 +184,10 @@ export class CountsService {
         });
       }
       await tx.stockCount.update({ where: { id: count.id }, data: { status: 'WAITING' } });
-      const full = await tx.stockCount.findUnique({ where: { id: count.id }, include: countInclude });
+      const full = await tx.stockCount.findUnique({
+        where: { id: count.id },
+        include: countInclude,
+      });
       if (!full) throw new NotFoundException('That count was not found.');
       await this.audit.record(tx, {
         userId: actor.id,
@@ -202,7 +216,9 @@ export class CountsService {
         throw new BadRequestException('This count is not waiting for approval.');
       }
       const books = await booksAt(tx, actor.organisationId, count.locationId);
-      const moved = count.lines.some((line) => !sameQty(line.bookQuantity, bookFor(books, line.itemId)));
+      const moved = count.lines.some(
+        (line) => !sameQty(line.bookQuantity, bookFor(books, line.itemId)),
+      );
       if (moved) {
         throw new ConflictException(
           'Stock changed while this count was waiting. Send it back and count again.',
@@ -219,7 +235,8 @@ export class CountsService {
 
       for (const line of count.lines) {
         const counted = line.countedQuantity;
-        if (!counted) throw new BadRequestException(`Enter the counted quantity for ${line.item.name}.`);
+        if (!counted)
+          throw new BadRequestException(`Enter the counted quantity for ${line.item.name}.`);
         const variance = counted.minus(line.bookQuantity);
         const varianceCost = variance.isZero()
           ? new Prisma.Decimal(0)
@@ -232,7 +249,10 @@ export class CountsService {
         });
       }
 
-      const full = await tx.stockCount.findUnique({ where: { id: count.id }, include: countInclude });
+      const full = await tx.stockCount.findUnique({
+        where: { id: count.id },
+        include: countInclude,
+      });
       if (!full) throw new NotFoundException('That count was not found.');
       await this.audit.record(tx, {
         userId: actor.id,
@@ -268,7 +288,10 @@ export class CountsService {
           data: { bookQuantity: bookFor(books, line.itemId) },
         });
       }
-      const full = await tx.stockCount.findUnique({ where: { id: count.id }, include: countInclude });
+      const full = await tx.stockCount.findUnique({
+        where: { id: count.id },
+        include: countInclude,
+      });
       if (!full) throw new NotFoundException('That count was not found.');
       await this.audit.record(tx, {
         userId: actor.id,

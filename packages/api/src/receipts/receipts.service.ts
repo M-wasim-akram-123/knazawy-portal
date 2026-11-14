@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { parseIsoDate } from '../common/date';
 import { parsePositiveDecimal } from '../common/decimal';
 import { nextDocumentNumber } from '../common/document-number';
@@ -22,7 +23,7 @@ export class ReceiptsService {
   async list(actor: Actor): Promise<GoodsReceiptRecord[]> {
     assertCan(actor, 'stock', 'R', 'view goods received');
     const rows = await this.prisma.goodsReceipt.findMany({
-      where: { organisationId: actor.organisationId },
+      where: { organisationId: actor.organisationId, location: { branchId: requireBranch(actor) } },
       include: receiptInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -39,7 +40,11 @@ export class ReceiptsService {
 
     const created = await this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findFirst({
-        where: { id: input.purchaseId, organisationId: actor.organisationId },
+        where: {
+          id: input.purchaseId,
+          organisationId: actor.organisationId,
+          branchId: requireBranch(actor),
+        },
         include: { lines: { include: { item: true } } },
       });
       if (!purchase) throw new NotFoundException('That purchase was not found.');
@@ -47,7 +52,12 @@ export class ReceiptsService {
         throw new BadRequestException('Send the purchase before receiving goods.');
       }
       const location = await tx.stockLocation.findFirst({
-        where: { id: input.locationId, organisationId: actor.organisationId, active: true },
+        where: {
+          id: input.locationId,
+          organisationId: actor.organisationId,
+          branchId: requireBranch(actor),
+          active: true,
+        },
       });
       if (!location) throw new BadRequestException('Choose an open location.');
 

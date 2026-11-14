@@ -34,6 +34,7 @@ export class AuthService {
         name: user.name,
         role: user.role,
         organisationId: user.organisationId,
+        branchId: user.branchId,
       },
     };
   }
@@ -43,6 +44,9 @@ export class AuthService {
       where: { id: actor.organisationId },
     });
     if (!organisation) throw new NotFoundException('That account was not found.');
+    const branch = actor.branchId
+      ? await this.prisma.branch.findUnique({ where: { id: actor.branchId } })
+      : null;
     return {
       id: actor.id,
       email: actor.email,
@@ -52,6 +56,8 @@ export class AuthService {
       organisationCode: organisation.code,
       organisationName: organisation.name,
       organisationType: organisation.type,
+      branchId: branch?.id ?? null,
+      branchName: branch?.name ?? null,
     };
   }
 }

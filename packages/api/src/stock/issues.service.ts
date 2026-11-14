@@ -1,8 +1,4 @@
-import {
-  BASE_UNIT_LABELS,
-  type Actor,
-  type StockIssueRecord,
-} from '@knazawy/shared';
+import { BASE_UNIT_LABELS, type Actor, type StockIssueRecord } from '@knazawy/shared';
 import {
   BadRequestException,
   ConflictException,
@@ -13,6 +9,7 @@ import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { formatIsoDate, parseIsoDate } from '../common/date';
 import { parsePositiveDecimal } from '../common/decimal';
 import { nextDocumentNumber } from '../common/document-number';
@@ -38,7 +35,7 @@ export class IssuesService {
   async list(actor: Actor): Promise<StockIssueRecord[]> {
     assertCan(actor, 'stock', 'R', 'view stock issues');
     const rows = await this.prisma.stockIssue.findMany({
-      where: { organisationId: actor.organisationId },
+      where: { organisationId: actor.organisationId, location: { branchId: requireBranch(actor) } },
       include: issueInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -65,7 +62,12 @@ export class IssuesService {
 
     const issueId = await this.prisma.$transaction(async (tx) => {
       const location = await tx.stockLocation.findFirst({
-        where: { id: input.locationId, organisationId: actor.organisationId, active: true },
+        where: {
+          id: input.locationId,
+          organisationId: actor.organisationId,
+          branchId: requireBranch(actor),
+          active: true,
+        },
       });
       if (!location) throw new BadRequestException('Choose an open location.');
 
@@ -142,7 +144,10 @@ export class IssuesService {
         }
       }
 
-      const full = await tx.stockIssue.findUnique({ where: { id: issue.id }, include: issueInclude });
+      const full = await tx.stockIssue.findUnique({
+        where: { id: issue.id },
+        include: issueInclude,
+      });
       if (!full) throw new NotFoundException('That issue was not found.');
       await this.audit.record(tx, {
         userId: actor.id,

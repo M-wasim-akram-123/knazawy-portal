@@ -11,6 +11,7 @@ const actor = {
   name: 'Kitchen Lead',
   role: 'KITCHEN_LEAD' as const,
   organisationId: 'org-1',
+  branchId: 'branch-1',
 };
 
 const input = {

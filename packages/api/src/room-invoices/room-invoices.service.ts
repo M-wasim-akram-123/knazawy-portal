@@ -24,6 +24,7 @@ import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { formatIsoDate } from '../common/date';
 import { nextDocumentNumber } from '../common/document-number';
 import { rethrowUnique } from '../common/prisma-error';
@@ -73,7 +74,9 @@ export class RoomInvoicesService {
   async list(actor: Actor): Promise<RoomInvoiceRecord[]> {
     assertCan(actor, 'invoices', 'R', 'view invoices');
     const rows = await this.prisma.roomInvoice.findMany({
-      where: isKaramRole(actor.role) ? {} : { organisationId: actor.organisationId },
+      where: isKaramRole(actor.role)
+        ? { roomRequest: { branchId: requireBranch(actor) } }
+        : { organisationId: actor.organisationId },
       include: invoiceInclude,
       orderBy: { issuedAt: 'desc' },
     });
@@ -84,7 +87,11 @@ export class RoomInvoicesService {
   async billable(actor: Actor): Promise<RoomBillableRecord[]> {
     this.assertCanRaise(actor);
     const rows = await this.prisma.roomRequest.findMany({
-      where: { status: 'ACCEPTED', roomInvoices: { none: { openRequestId: { not: null } } } },
+      where: {
+        status: 'ACCEPTED',
+        branchId: requireBranch(actor),
+        roomInvoices: { none: { openRequestId: { not: null } } },
+      },
       include: stayInclude,
       orderBy: { checkIn: 'asc' },
     });

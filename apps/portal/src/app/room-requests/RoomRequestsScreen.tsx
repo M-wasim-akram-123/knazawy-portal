@@ -12,6 +12,7 @@ import {
   roomRequestStatusTone,
   stayTotal,
   todayInKarachi,
+  type BranchRecord,
   type RoomOfferRecord,
   type RoomRequestRecord,
 } from '@knazawy/shared';
@@ -31,6 +32,8 @@ export function RoomRequestsScreen() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
   const [offers, setOffers] = useState<RoomOfferRecord[]>([]);
+  const [branches, setBranches] = useState<BranchRecord[]>([]);
+  const [branchId, setBranchId] = useState('');
   const [requests, setRequests] = useState<RoomRequestRecord[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [checkIn, setCheckIn] = useState(todayInKarachi());
@@ -51,11 +54,15 @@ export function RoomRequestsScreen() {
     setError(caught instanceof Error ? caught.message : 'Something went wrong. Try again.');
   }
 
-  async function reload(): Promise<RoomRequestRecord[]> {
+  async function reload(chosenBranch?: string): Promise<RoomRequestRecord[]> {
+    const nextBranches = await api.listStayBranches();
+    const chosen = chosenBranch || branchId || nextBranches[0]?.id || '';
     const [nextOffers, nextRequests] = await Promise.all([
-      api.listRoomOffers(),
+      chosen ? api.listRoomOffers(chosen) : Promise.resolve([]),
       api.listRoomRequests(),
     ]);
+    setBranches(nextBranches);
+    setBranchId(chosen);
     setOffers(nextOffers);
     setRequests(nextRequests);
     return nextRequests;
@@ -103,6 +110,7 @@ export function RoomRequestsScreen() {
 
   function edit(request: RoomRequestRecord): void {
     setEditingId(request.id);
+    setBranchId(request.branchId);
     setCheckIn(request.checkIn);
     setCheckOut(request.checkOut);
     setParty(request.party ?? '');
@@ -122,6 +130,7 @@ export function RoomRequestsScreen() {
       const input = {
         checkIn,
         checkOut,
+        branchId,
         party: party.trim(),
         note: note.trim(),
         lines: lines.map((line) => ({ roomTypeId: line.roomTypeId, rooms: Number(line.rooms) })),
@@ -181,6 +190,23 @@ export function RoomRequestsScreen() {
         >
           <h2>{editingId ? 'Edit draft' : 'New stay'}</h2>
           <div className="kz-form-grid">
+            <Field label="Branch">
+              <select
+                value={branchId}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setBranchId(next);
+                  void api.listRoomOffers(next).then(setOffers).catch(handleFailure);
+                }}
+                required
+              >
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="Check-in" hint="Shown as DD/MM/YYYY.">
               <input
                 type="date"
@@ -304,8 +330,8 @@ export function RoomRequestsScreen() {
             </span>
           </h2>
           <p>
-            {formatDisplayDate(request.checkIn)} to {formatDisplayDate(request.checkOut)} ·{' '}
-            {request.nights} nights · {request.total} PKR
+            {request.branchName} · {formatDisplayDate(request.checkIn)} to{' '}
+            {formatDisplayDate(request.checkOut)} · {request.nights} nights · {request.total} PKR
             {request.lines.some((line) => line.quoted) ? '' : ' at current charges'}
           </p>
           {request.party ? <p>{request.party}</p> : null}

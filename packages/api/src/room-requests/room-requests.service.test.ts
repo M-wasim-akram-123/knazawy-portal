@@ -19,11 +19,13 @@ const operations = {
   name: 'Operations',
   role: 'OPERATIONS_MANAGER' as const,
   organisationId: 'org-karam',
+  branchId: 'branch-main',
 };
 
 const submitted = {
   id: 'rr-1',
   organisationId: 'org-pia',
+  branchId: 'branch-main',
   number: 'RR-00001',
   status: 'SUBMITTED' as const,
   checkIn: new Date('2026-12-20T00:00:00.000Z'),
@@ -34,6 +36,7 @@ const submitted = {
   submittedAt: new Date('2026-12-01T00:00:00.000Z'),
   decidedAt: null,
   organisation: { name: 'Sample Air' },
+  branch: { name: 'Main' },
   createdBy: { name: 'Requester' },
   lines: [
     {
@@ -96,6 +99,7 @@ describe('RoomRequestsService', () => {
       service.create(operations, {
         checkIn: '2026-12-20',
         checkOut: '2026-12-22',
+        branchId: 'branch-main',
         lines: [{ roomTypeId: 'type-1', rooms: 1 }],
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);

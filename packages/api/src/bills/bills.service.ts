@@ -1,9 +1,15 @@
-import { moneyMatches, supplierBillOwed, type Actor, type GoodsReceiptRecord } from '@knazawy/shared';
+import {
+  moneyMatches,
+  supplierBillOwed,
+  type Actor,
+  type GoodsReceiptRecord,
+} from '@knazawy/shared';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { parseIsoDate } from '../common/date';
 import { parseNonNegativeDecimal, parsePositiveDecimal } from '../common/decimal';
 import { nextDocumentNumber } from '../common/document-number';
@@ -43,7 +49,11 @@ export class BillsService {
     private readonly files: BillFiles,
   ) {}
 
-  async post(actor: Actor, input: PostBillDto, file: IncomingBill | undefined): Promise<GoodsReceiptRecord> {
+  async post(
+    actor: Actor,
+    input: PostBillDto,
+    file: IncomingBill | undefined,
+  ): Promise<GoodsReceiptRecord> {
     assertCan(actor, 'stock', 'C', 'post a supplier bill');
     const bill = requireBill(file);
     const receivedOn = parseIsoDate(input.billedOn);
@@ -65,7 +75,12 @@ export class BillsService {
       });
       if (!supplier) throw new BadRequestException('Choose a supplier that exists.');
       const location = await this.prisma.stockLocation.findFirst({
-        where: { id: input.locationId, organisationId: actor.organisationId, active: true },
+        where: {
+          id: input.locationId,
+          organisationId: actor.organisationId,
+          branchId: requireBranch(actor),
+          active: true,
+        },
       });
       if (!location) throw new BadRequestException('Choose an open location.');
       const itemIds = [...new Set(posted.map((line) => line.itemId))];

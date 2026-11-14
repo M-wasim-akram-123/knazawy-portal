@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class StockService {
     const layers = await this.prisma.stockLayer.findMany({
       where: {
         organisationId: actor.organisationId,
+        location: { branchId: requireBranch(actor) },
         quantityBase: { gt: 0 },
       },
       include: { item: true, location: true },

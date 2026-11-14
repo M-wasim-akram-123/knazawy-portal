@@ -8,6 +8,7 @@ const finance = {
   name: 'Finance',
   role: 'FINANCE_OFFICER' as const,
   organisationId: 'org-karam',
+  branchId: 'branch-main',
 };
 
 const requester = {

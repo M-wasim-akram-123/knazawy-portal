@@ -15,6 +15,7 @@ import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { formatIsoDate, parseIsoDate } from '../common/date';
 import { rethrowUnique } from '../common/prisma-error';
 import { PrismaService } from '../prisma/prisma.service';
@@ -37,7 +38,7 @@ const typeInclude = {
 type TypeRow = Prisma.RoomTypeGetPayload<{ include: typeof typeInclude }>;
 
 const roomInclude = {
-  floor: { select: { name: true } },
+  floor: { select: { name: true, branchId: true } },
   roomType: { select: { name: true } },
 } satisfies Prisma.HotelRoomInclude;
 
@@ -53,7 +54,7 @@ export class RoomSetupService {
   async listFloors(actor: Actor): Promise<RoomFloorRecord[]> {
     assertCan(actor, 'rooms', 'R', 'view rooms');
     const rows = await this.prisma.roomFloor.findMany({
-      where: { organisationId: actor.organisationId },
+      where: { organisationId: actor.organisationId, branchId: requireBranch(actor) },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
     return rows.map(toFloor);
@@ -61,12 +62,18 @@ export class RoomSetupService {
 
   async createFloor(actor: Actor, input: CreateFloorDto): Promise<RoomFloorRecord> {
     assertCan(actor, 'rooms', 'C', 'add a floor');
+    const branchId = requireBranch(actor);
     const name = requireName(input.name, 'floor');
-    await this.assertNameFree('roomFloor', actor.organisationId, name);
+    await this.assertNameFree('roomFloor', actor.organisationId, name, undefined, branchId);
     try {
       const created = await this.prisma.$transaction(async (tx) => {
         const floor = await tx.roomFloor.create({
-          data: { organisationId: actor.organisationId, name, sortOrder: input.sortOrder ?? 0 },
+          data: {
+            organisationId: actor.organisationId,
+            branchId,
+            name,
+            sortOrder: input.sortOrder ?? 0,
+          },
         });
         await this.audit.record(tx, {
           userId: actor.id,
@@ -85,9 +92,10 @@ export class RoomSetupService {
 
   async updateFloor(actor: Actor, id: string, input: UpdateFloorDto): Promise<RoomFloorRecord> {
     assertCan(actor, 'rooms', 'U', 'change a floor');
-    const existing = await this.requireFloor(actor.organisationId, id);
+    const branchId = requireBranch(actor);
+    const existing = await this.requireFloor(actor.organisationId, branchId, id);
     const name = input.name === undefined ? undefined : requireName(input.name, 'floor');
-    if (name) await this.assertNameFree('roomFloor', actor.organisationId, name, id);
+    if (name) await this.assertNameFree('roomFloor', actor.organisationId, name, id, branchId);
     if (input.active === false) {
       const rooms = await this.prisma.hotelRoom.count({
         where: { floorId: id, active: true },
@@ -277,7 +285,7 @@ export class RoomSetupService {
   async listRooms(actor: Actor): Promise<HotelRoomRecord[]> {
     assertCan(actor, 'rooms', 'R', 'view rooms');
     const rows = await this.prisma.hotelRoom.findMany({
-      where: { organisationId: actor.organisationId },
+      where: { organisationId: actor.organisationId, floor: { branchId: requireBranch(actor) } },
       include: roomInclude,
       orderBy: [{ floor: { sortOrder: 'asc' } }, { floor: { name: 'asc' } }, { name: 'asc' }],
     });
@@ -287,7 +295,8 @@ export class RoomSetupService {
   async createRoom(actor: Actor, input: CreateHotelRoomDto): Promise<HotelRoomRecord> {
     assertCan(actor, 'rooms', 'C', 'add a room');
     const name = requireName(input.name, 'room');
-    const floor = await this.requireActiveFloor(actor.organisationId, input.floorId);
+    const branchId = requireBranch(actor);
+    const floor = await this.requireActiveFloor(actor.organisationId, branchId, input.floorId);
     await this.requireActiveType(actor.organisationId, input.roomTypeId);
     await this.assertRoomNameFree(floor.id, name);
     try {
@@ -318,10 +327,11 @@ export class RoomSetupService {
 
   async updateRoom(actor: Actor, id: string, input: UpdateHotelRoomDto): Promise<HotelRoomRecord> {
     assertCan(actor, 'rooms', 'U', 'change a room');
-    const existing = await this.requireRoom(actor.organisationId, id);
+    const branchId = requireBranch(actor);
+    const existing = await this.requireRoom(actor.organisationId, branchId, id);
     const name = input.name === undefined ? undefined : requireName(input.name, 'room');
     const floorId = input.floorId ?? existing.floorId;
-    if (input.floorId) await this.requireActiveFloor(actor.organisationId, input.floorId);
+    if (input.floorId) await this.requireActiveFloor(actor.organisationId, branchId, input.floorId);
     if (input.roomTypeId) await this.requireActiveType(actor.organisationId, input.roomTypeId);
     if (name || input.floorId) await this.assertRoomNameFree(floorId, name ?? existing.name, id);
     const leavesType =
@@ -332,7 +342,14 @@ export class RoomSetupService {
       const updated = await this.prisma.$transaction(async (tx) => {
         if (leavesType) {
           // Same lock as check-in and acceptance, so a stay cannot be accepted while this room leaves.
-          await tx.$queryRaw`SELECT id FROM hotel_rooms WHERE room_type_id = ${existing.roomTypeId} AND active = true FOR UPDATE`;
+          await tx.$queryRaw`
+            SELECT hotel_rooms.id FROM hotel_rooms
+            INNER JOIN room_floors ON room_floors.id = hotel_rooms.floor_id
+            WHERE hotel_rooms.room_type_id = ${existing.roomTypeId}
+              AND hotel_rooms.active = true
+              AND room_floors.branch_id = ${branchId}
+            FOR UPDATE
+          `;
           await this.assertRoomCanLeave(tx, actor.organisationId, existing);
         }
         const room = await tx.hotelRoom.update({
@@ -366,9 +383,11 @@ export class RoomSetupService {
     organisationId: string,
     name: string,
     exceptId?: string,
+    branchId?: string,
   ): Promise<void> {
     const where = {
       organisationId,
+      ...(branchId ? { branchId } : {}),
       name: { equals: name, mode: 'insensitive' as const },
       ...(exceptId ? { NOT: { id: exceptId } } : {}),
     };
@@ -401,14 +420,16 @@ export class RoomSetupService {
     if (existing) throw new BadRequestException('That room name is already used on this floor.');
   }
 
-  private async requireFloor(organisationId: string, id: string) {
-    const floor = await this.prisma.roomFloor.findFirst({ where: { id, organisationId } });
+  private async requireFloor(organisationId: string, branchId: string, id: string) {
+    const floor = await this.prisma.roomFloor.findFirst({
+      where: { id, organisationId, branchId },
+    });
     if (!floor) throw new NotFoundException('That floor was not found.');
     return floor;
   }
 
-  private async requireActiveFloor(organisationId: string, id: string) {
-    const floor = await this.requireFloor(organisationId, id);
+  private async requireActiveFloor(organisationId: string, branchId: string, id: string) {
+    const floor = await this.requireFloor(organisationId, branchId, id);
     if (!floor.active) throw new BadRequestException('That floor is archived.');
     return floor;
   }
@@ -449,6 +470,7 @@ export class RoomSetupService {
         organisationId,
         roomTypeId: room.roomTypeId,
         active: true,
+        floor: { branchId: room.floor.branchId },
         NOT: { id: room.id },
       },
     });
@@ -457,6 +479,7 @@ export class RoomSetupService {
         roomTypeId: room.roomTypeId,
         request: {
           status: 'ACCEPTED',
+          branchId: room.floor.branchId,
           checkOut: { gt: parseIsoDate(today) },
         },
       },
@@ -474,9 +497,13 @@ export class RoomSetupService {
     if (error) throw new BadRequestException(error);
   }
 
-  private async requireRoom(organisationId: string, id: string): Promise<RoomRow> {
+  private async requireRoom(
+    organisationId: string,
+    branchId: string,
+    id: string,
+  ): Promise<RoomRow> {
     const room = await this.prisma.hotelRoom.findFirst({
-      where: { id, organisationId },
+      where: { id, organisationId, floor: { branchId } },
       include: roomInclude,
     });
     if (!room) throw new NotFoundException('That room was not found.');

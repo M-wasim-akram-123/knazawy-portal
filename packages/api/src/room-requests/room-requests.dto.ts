@@ -36,6 +36,10 @@ export class RoomRequestDto {
   @MaxLength(10)
   checkOut!: string;
 
+  @IsString()
+  @MinLength(1)
+  branchId!: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(120)

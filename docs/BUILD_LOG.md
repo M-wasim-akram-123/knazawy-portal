@@ -2,6 +2,20 @@
 
 Newest entry at the top.
 
+## 2026-11-14 — Rooms and room requests belong to a branch
+
+Floors and the rooms on them belong to the branch the user is working in. Room types and the charges that make a night's price stay shared, so every branch offers the same kinds of room. An airline chooses a branch when it asks for rooms, and it only sees how many rooms that branch has, never the floor or the room name. Karam staff see and accept only the requests for the branch they are working in, and check guests into that branch's rooms. A room bill follows the request's branch. Existing floors and requests sit on MAIN.
+
+WhatsApp or SMS, and a direct link to an accounting package, are still open. Messages were left for later, and the accounting package is still unnamed (OQ-006). The ledger spreadsheet export remains the way entries leave the platform.
+
+## 2026-11-14 — Stock and purchases stay with the branch
+
+Locations and purchases belong to the branch the user is working in. Goods received, issues, counts, production, and the stock on hand use that branch's locations. A transfer can leave for a location in another branch, and only that branch can confirm it arrived. Items, suppliers, and recipes stay shared across Karam. Existing locations and purchases sit on the MAIN branch. A user with no branch is asked to choose one before any of this work.
+
+## 2026-11-14 — Karam branches, with airlines left whole
+
+Karam can have more than one branch. An administrator adds a branch with a short code and a name, and can close one while another stays open. The last open branch cannot be closed. Each Karam user works in one branch and can move to another open branch. The migration gives the existing Karam organisation one branch, named after it, and puts every Karam user on it. An airline is not split into branches, and an airline user has none. Stock, rooms, and requests still belong to the organisation. Putting them on a branch is the next cut.
+
 ## 2026-11-14 — Forecast of meals and snacks for the next seven days
 
 Operations, the kitchen lead, and administrators see the expected meals and snacks for today and the next six days, per airline and item, with a total per item across airlines. The expected number for a day is the average of the same weekday over the last four weeks. Only accepted requests count, so drafts, submitted, rejected, and cancelled requests are left out. The page also shows what is already booked for each day. Nothing is stored: the forecast is worked out when the page loads. Airlines and finance cannot see it. Stock needs and billing forecasts are not built yet.

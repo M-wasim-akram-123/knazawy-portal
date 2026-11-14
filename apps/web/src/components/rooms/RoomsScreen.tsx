@@ -85,8 +85,8 @@ export function RoomsScreen() {
       <div className="kz-page-head">
         <h1>{messages.en.common.rooms}</h1>
         <p>
-          Name the floors, the rooms on each floor, the room types, and every charge that makes up a
-          night&apos;s price. Nothing here is fixed.
+          Floors and rooms belong to the branch you are working in. Room types and the charges that
+          make up a night&apos;s price are shared by every branch.
         </p>
         <p lang="ur" dir="rtl">
           {messages.ur.common.rooms}

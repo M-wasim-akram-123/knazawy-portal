@@ -7,6 +7,7 @@ import type {
   AirlineRecord,
   AirlineRole,
   DeliveryPoint,
+  BranchRecord,
   ForecastRecord,
   GoodsReceiptRecord,
   InvoiceRecord,
@@ -186,6 +187,7 @@ export interface BillInput {
 export interface RoomRequestInput {
   checkIn: string;
   checkOut: string;
+  branchId: string;
   party?: string;
   note?: string;
   lines: Array<{ roomTypeId: string; rooms: number }>;
@@ -599,8 +601,12 @@ export class ApiClient {
     return this.request('GET', '/v1/room-requests');
   }
 
-  listRoomOffers(): Promise<RoomOfferRecord[]> {
-    return this.request('GET', '/v1/room-requests/offers');
+  listRoomOffers(branchId: string): Promise<RoomOfferRecord[]> {
+    return this.request('GET', `/v1/room-requests/offers?branchId=${encodeURIComponent(branchId)}`);
+  }
+
+  listStayBranches(): Promise<BranchRecord[]> {
+    return this.request('GET', '/v1/branches/for-stays');
   }
 
   createRoomRequest(input: RoomRequestInput): Promise<RoomRequestRecord> {
@@ -680,6 +686,26 @@ export class ApiClient {
 
   getForecast(): Promise<ForecastRecord> {
     return this.request('GET', '/v1/forecast');
+  }
+
+  listBranches(): Promise<BranchRecord[]> {
+    return this.request('GET', '/v1/branches');
+  }
+
+  listOpenBranches(): Promise<BranchRecord[]> {
+    return this.request('GET', '/v1/branches/open');
+  }
+
+  createBranch(input: { code: string; name: string }): Promise<BranchRecord> {
+    return this.request('POST', '/v1/branches', input);
+  }
+
+  updateBranch(id: string, input: { name?: string; active?: boolean }): Promise<BranchRecord> {
+    return this.request('PATCH', `/v1/branches/${id}`, input);
+  }
+
+  useBranch(branchId: string): Promise<BranchRecord> {
+    return this.request('POST', '/v1/branches/current', { branchId });
   }
 
   listProduction(): Promise<ProductionRecord[]> {

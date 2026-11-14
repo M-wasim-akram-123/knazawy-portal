@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { rethrowUnique } from '../common/prisma-error';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -26,9 +27,11 @@ export class LocationsService {
 
   async list(actor: Actor, includeArchived: boolean): Promise<LocationRecord[]> {
     assertCan(actor, 'stock', 'R', 'view locations');
+    const branchId = requireBranch(actor);
     const rows = await this.prisma.stockLocation.findMany({
       where: {
         organisationId: actor.organisationId,
+        branchId,
         ...(includeArchived ? {} : { active: true }),
       },
       orderBy: { name: 'asc' },
@@ -38,13 +41,15 @@ export class LocationsService {
 
   async create(actor: Actor, input: CreateLocationDto): Promise<LocationRecord> {
     assertCan(actor, 'stock', 'C', 'add locations');
+    const branchId = requireBranch(actor);
     const parentId = blankToNull(input.parentId);
-    if (parentId) await this.ancestorIds(actor.organisationId, parentId);
+    if (parentId) await this.ancestorIds(actor.organisationId, branchId, parentId);
     try {
       const created = await this.prisma.$transaction(async (tx) => {
         const location = await tx.stockLocation.create({
           data: {
             organisationId: actor.organisationId,
+            branchId,
             name: input.name.trim(),
             type: input.type,
             parentId,
@@ -67,7 +72,8 @@ export class LocationsService {
 
   async update(actor: Actor, id: string, input: UpdateLocationDto): Promise<LocationRecord> {
     assertCan(actor, 'stock', 'U', 'change locations');
-    const existing = await this.requireLocation(actor.organisationId, id);
+    const branchId = requireBranch(actor);
+    const existing = await this.requireLocation(actor.organisationId, branchId, id);
     let parentId: string | null | undefined;
     if (input.parentId !== undefined) {
       parentId = blankToNull(input.parentId);
@@ -75,7 +81,7 @@ export class LocationsService {
         throw new BadRequestException('A location cannot sit inside itself.');
       }
       if (parentId) {
-        const ancestors = await this.ancestorIds(actor.organisationId, parentId);
+        const ancestors = await this.ancestorIds(actor.organisationId, branchId, parentId);
         if (parentCreatesCycle(id, ancestors)) {
           throw new BadRequestException('A location cannot sit inside itself.');
         }
@@ -112,15 +118,23 @@ export class LocationsService {
     return toLocation(updated);
   }
 
-  private async requireLocation(organisationId: string, id: string): Promise<LocationRow> {
+  private async requireLocation(
+    organisationId: string,
+    branchId: string,
+    id: string,
+  ): Promise<LocationRow> {
     const location = await this.prisma.stockLocation.findFirst({
-      where: { id, organisationId },
+      where: { id, organisationId, branchId },
     });
     if (!location) throw new NotFoundException('That location is not on the list.');
     return location;
   }
 
-  private async ancestorIds(organisationId: string, parentId: string): Promise<string[]> {
+  private async ancestorIds(
+    organisationId: string,
+    branchId: string,
+    parentId: string,
+  ): Promise<string[]> {
     const ids: string[] = [];
     let current: string | null = parentId;
     const seen = new Set<string>();
@@ -131,7 +145,7 @@ export class LocationsService {
       seen.add(current);
       const row: { parentId: string | null; active: boolean } | null =
         await this.prisma.stockLocation.findFirst({
-          where: { id: current, organisationId },
+          where: { id: current, organisationId, branchId },
           select: { parentId: true, active: true },
         });
       if (!row || !row.active) throw new BadRequestException('Choose an open location.');

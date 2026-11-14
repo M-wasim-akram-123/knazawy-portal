@@ -33,6 +33,7 @@ import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { formatIsoDate, parseIsoDate } from '../common/date';
 import { nextDocumentNumber } from '../common/document-number';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -42,6 +43,7 @@ import type { RoomRequestDto } from './room-requests.dto';
 
 const requestInclude = {
   organisation: { select: { name: true } },
+  branch: { select: { name: true } },
   createdBy: { select: { name: true } },
   lines: {
     include: {
@@ -85,7 +87,7 @@ export class RoomRequestsService {
     assertCan(actor, 'room_requests', 'R', 'view room requests');
     const rows = await this.prisma.roomRequest.findMany({
       where: isKaramRole(actor.role)
-        ? { status: { not: 'DRAFT' } }
+        ? { status: { not: 'DRAFT' }, branchId: requireBranch(actor) }
         : { organisationId: actor.organisationId },
       include: requestInclude,
       orderBy: { createdAt: 'desc' },
@@ -96,15 +98,16 @@ export class RoomRequestsService {
     });
   }
 
-  /** Active room types and how many rooms Karam has. Floors and room names stay private. */
-  async offers(actor: Actor): Promise<RoomOfferRecord[]> {
+  /** Active room types and how many rooms that branch has. Floors and room names stay private. */
+  async offers(actor: Actor, branchId: string): Promise<RoomOfferRecord[]> {
     assertCan(actor, 'room_requests', 'R', 'view room types');
+    await this.requireOpenBranch(branchId);
     const karamOrgId = await this.karamOrganisationId();
     const types = await this.prisma.roomType.findMany({
       where: { organisationId: karamOrgId, active: true },
       include: {
         charges: true,
-        _count: { select: { rooms: { where: { active: true } } } },
+        _count: { select: { rooms: { where: { active: true, floor: { branchId } } } } },
       },
       orderBy: { name: 'asc' },
     });
@@ -128,14 +131,16 @@ export class RoomRequestsService {
     const stay = stayFrom(input);
     const lines = linesFrom(input.lines, stay.nights);
     const fields = requestFields(input);
+    await this.requireOpenBranch(input.branchId);
     const karamOrgId = await this.karamOrganisationId();
 
     const id = await this.prisma.$transaction(async (tx) => {
-      await this.ensureTypes(tx, karamOrgId, lines);
+      await this.ensureTypes(tx, karamOrgId, input.branchId, lines);
       const number = await nextDocumentNumber(tx, karamOrgId, 'ROOM_REQUEST');
       const request = await tx.roomRequest.create({
         data: {
           organisationId: actor.organisationId,
+          branchId: input.branchId,
           number,
           createdById: actor.id,
           checkIn: stay.checkIn,
@@ -168,13 +173,19 @@ export class RoomRequestsService {
     const stay = stayFrom(input);
     const lines = linesFrom(input.lines, stay.nights);
     const fields = requestFields(input);
+    await this.requireOpenBranch(input.branchId);
     const karamOrgId = await this.karamOrganisationId();
 
     await this.prisma.$transaction(async (tx) => {
-      await this.ensureTypes(tx, karamOrgId, lines);
+      await this.ensureTypes(tx, karamOrgId, input.branchId, lines);
       await tx.roomRequest.update({
         where: { id },
-        data: { checkIn: stay.checkIn, checkOut: stay.checkOut, ...fields },
+        data: {
+          checkIn: stay.checkIn,
+          checkOut: stay.checkOut,
+          branchId: input.branchId,
+          ...fields,
+        },
       });
       await tx.roomRequestLine.deleteMany({ where: { requestId: id } });
       await tx.roomRequestLine.createMany({
@@ -250,7 +261,7 @@ export class RoomRequestsService {
 
   async accept(actor: Actor, id: string): Promise<RoomRequestRecord> {
     assertCan(actor, 'room_requests', 'A', 'accept a room request');
-    const existing = await this.findSent(id);
+    const existing = await this.findSent(actor, id);
     const next = nextRoomRequestStatus(existing.status, 'accept');
     if (!next) throw new BadRequestException('Only a submitted request can be accepted.');
     const karamOrgId = await this.karamOrganisationId();
@@ -300,7 +311,7 @@ export class RoomRequestsService {
     if (reason.length < 3) {
       throw new BadRequestException('Give a reason for rejecting this request.');
     }
-    const existing = await this.findSent(id);
+    const existing = await this.findSent(actor, id);
     const next = nextRoomRequestStatus(existing.status, 'reject');
     if (!next) throw new BadRequestException('Only a submitted request can be rejected.');
     await this.decide(actor, existing, next, reason);
@@ -310,7 +321,7 @@ export class RoomRequestsService {
   /** Rooms of an accepted stay that Karam can check a guest in to now, by room type. */
   async freeRooms(actor: Actor, id: string): Promise<FreeRoomRecord[]> {
     assertCanManageStays(actor);
-    const existing = await this.findSent(id);
+    const existing = await this.findSent(actor, id);
     assertOpenStay(existing);
     const karamOrgId = await this.karamOrganisationId();
     const wanted = [...remainingByType(existing.lines).entries()]
@@ -323,6 +334,7 @@ export class RoomRequestsService {
         organisationId: karamOrgId,
         active: true,
         roomTypeId: { in: wanted },
+        floor: { branchId: existing.branchId },
         stays: { none: { checkedOutAt: null } },
       },
       include: {
@@ -355,14 +367,19 @@ export class RoomRequestsService {
     assertCanManageStays(actor);
     const ids = input.hotelRoomIds;
     if (new Set(ids).size !== ids.length) throw new BadRequestException('Pick each room once.');
-    const existing = await this.findSent(id);
+    const existing = await this.findSent(actor, id);
     assertOpenStay(existing);
     const karamOrgId = await this.karamOrganisationId();
 
     await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM hotel_rooms WHERE id IN (${Prisma.join(ids)}) FOR UPDATE`;
       const rooms = await tx.hotelRoom.findMany({
-        where: { id: { in: ids }, organisationId: karamOrgId, active: true },
+        where: {
+          id: { in: ids },
+          organisationId: karamOrgId,
+          active: true,
+          floor: { branchId: existing.branchId },
+        },
         include: {
           roomType: { select: { id: true, name: true } },
           stays: { where: { checkedOutAt: null }, select: { id: true } },
@@ -413,7 +430,7 @@ export class RoomRequestsService {
   /** Releases one room. The request keeps its number and its nightly price. */
   async checkOut(actor: Actor, id: string, stayId: string): Promise<RoomRequestRecord> {
     assertCanManageStays(actor);
-    const existing = await this.findSent(id);
+    const existing = await this.findSent(actor, id);
     if (existing.status !== 'ACCEPTED') {
       throw new BadRequestException('Only an accepted request has guests to check out.');
     }
@@ -504,19 +521,32 @@ export class RoomRequestsService {
       roomTypeId: line.roomTypeId,
       rooms: line.quantity,
     }));
-    await this.ensureTypes(tx, karamOrgId, lines);
+    await this.ensureTypes(tx, karamOrgId, request.branchId, lines);
     for (const line of request.lines) {
       if (lock) {
-        await tx.$queryRaw`SELECT id FROM hotel_rooms WHERE room_type_id = ${line.roomTypeId} AND active = true FOR UPDATE`;
+        await tx.$queryRaw`
+          SELECT hotel_rooms.id FROM hotel_rooms
+          INNER JOIN room_floors ON room_floors.id = hotel_rooms.floor_id
+          WHERE hotel_rooms.room_type_id = ${line.roomTypeId}
+            AND hotel_rooms.active = true
+            AND room_floors.branch_id = ${request.branchId}
+          FOR UPDATE
+        `;
       }
       const active = await tx.hotelRoom.count({
-        where: { roomTypeId: line.roomTypeId, organisationId: karamOrgId, active: true },
+        where: {
+          roomTypeId: line.roomTypeId,
+          organisationId: karamOrgId,
+          active: true,
+          floor: { branchId: request.branchId },
+        },
       });
       const booked = await tx.roomRequestLine.findMany({
         where: {
           roomTypeId: line.roomTypeId,
           request: {
             status: 'ACCEPTED',
+            branchId: request.branchId,
             checkIn: { lt: request.checkOut },
             checkOut: { gt: request.checkIn },
           },
@@ -536,12 +566,15 @@ export class RoomRequestsService {
   private async ensureTypes(
     tx: Prisma.TransactionClient,
     karamOrgId: string,
+    branchId: string,
     lines: LineInput[],
   ): Promise<void> {
     const ids = lines.map((line) => line.roomTypeId);
     const types = await tx.roomType.findMany({
       where: { id: { in: ids }, organisationId: karamOrgId, active: true },
-      include: { _count: { select: { rooms: { where: { active: true } } } } },
+      include: {
+        _count: { select: { rooms: { where: { active: true, floor: { branchId } } } } },
+      },
     });
     if (types.length !== ids.length) {
       throw new BadRequestException('One of the room types is not available. Choose it again.');
@@ -554,6 +587,14 @@ export class RoomRequestsService {
       const error = roomStockError(roomType.name, roomType._count.rooms, line.rooms);
       if (error) throw new BadRequestException(error);
     }
+  }
+
+  private async requireOpenBranch(branchId: string): Promise<void> {
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: branchId, active: true, organisation: { type: 'KARAM' } },
+      select: { id: true },
+    });
+    if (!branch) throw new BadRequestException('Choose a branch.');
   }
 
   private assertAirline(actor: Actor): void {
@@ -571,9 +612,9 @@ export class RoomRequestsService {
     return row;
   }
 
-  private async findSent(id: string): Promise<RequestRow> {
+  private async findSent(actor: Actor, id: string): Promise<RequestRow> {
     const row = await this.prisma.roomRequest.findFirst({
-      where: { id, status: { not: 'DRAFT' } },
+      where: { id, status: { not: 'DRAFT' }, branchId: requireBranch(actor) },
       include: requestInclude,
     });
     if (!row) throw new NotFoundException('That room request was not found.');
@@ -715,6 +756,8 @@ function toRequest(row: RequestRow): RoomRequestRecord {
     number: row.number,
     airlineId: row.organisationId,
     airlineName: row.organisation.name,
+    branchId: row.branchId,
+    branchName: row.branch.name,
     status: row.status,
     checkIn,
     checkOut,

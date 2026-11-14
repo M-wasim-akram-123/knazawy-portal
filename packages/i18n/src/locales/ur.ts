@@ -33,6 +33,7 @@ export const ur = {
     production: 'پیداوار',
     mealCost: 'کھانے کی لاگت',
     forecast: 'پیش گوئی',
+    branches: 'برانچز',
     signIn: 'سائن ان',
     signOut: 'سائن آؤٹ',
     archive: 'غیر فعال کریں',

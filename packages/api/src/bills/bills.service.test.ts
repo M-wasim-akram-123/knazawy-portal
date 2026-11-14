@@ -12,6 +12,7 @@ const actor = {
   name: 'Karam Administrator',
   role: 'ADMINISTRATOR' as const,
   organisationId: 'org-1',
+  branchId: 'branch-1',
 };
 
 const billFile = {

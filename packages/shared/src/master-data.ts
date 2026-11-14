@@ -64,5 +64,6 @@ export interface LoginResult {
     name: string;
     role: Role;
     organisationId: string;
+    branchId: string | null;
   };
 }

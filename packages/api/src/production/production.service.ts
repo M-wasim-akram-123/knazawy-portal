@@ -14,6 +14,7 @@ import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { formatIsoDate, parseIsoDate } from '../common/date';
 import { parsePositiveDecimal } from '../common/decimal';
 import { nextDocumentNumber } from '../common/document-number';
@@ -45,7 +46,7 @@ export class ProductionService {
   async list(actor: Actor): Promise<ProductionRecord[]> {
     assertCan(actor, 'recipes', 'R', 'view production');
     const rows = await this.prisma.productionBatch.findMany({
-      where: { organisationId: actor.organisationId },
+      where: { organisationId: actor.organisationId, location: { branchId: requireBranch(actor) } },
       include: productionInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -77,7 +78,12 @@ export class ProductionService {
       }
 
       const location = await tx.stockLocation.findFirst({
-        where: { id: input.locationId, organisationId: actor.organisationId, active: true },
+        where: {
+          id: input.locationId,
+          organisationId: actor.organisationId,
+          branchId: requireBranch(actor),
+          active: true,
+        },
       });
       if (!location) throw new BadRequestException('Choose an open location.');
 

@@ -1,9 +1,15 @@
 import { BASE_UNIT_LABELS, type Actor, type StockTransferRecord } from '@knazawy/shared';
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { formatIsoDate, parseIsoDate } from '../common/date';
 import { parsePositiveDecimal } from '../common/decimal';
 import { nextDocumentNumber } from '../common/document-number';
@@ -29,8 +35,12 @@ export class TransfersService {
 
   async list(actor: Actor): Promise<StockTransferRecord[]> {
     assertCan(actor, 'stock', 'R', 'view stock transfers');
+    const branchId = requireBranch(actor);
     const rows = await this.prisma.stockTransfer.findMany({
-      where: { organisationId: actor.organisationId },
+      where: {
+        organisationId: actor.organisationId,
+        OR: [{ fromLocation: { branchId } }, { toLocation: { branchId } }],
+      },
       include: transferInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -58,7 +68,12 @@ export class TransfersService {
     }
 
     const transferId = await this.prisma.$transaction(async (tx) => {
-      const from = await openLocation(tx, actor.organisationId, input.fromLocationId);
+      const from = await openLocation(
+        tx,
+        actor.organisationId,
+        input.fromLocationId,
+        requireBranch(actor),
+      );
       const to = await openLocation(tx, actor.organisationId, input.toLocationId);
       const items = await tx.item.findMany({
         where: { organisationId: actor.organisationId, id: { in: itemIds }, active: true },
@@ -170,7 +185,12 @@ export class TransfersService {
       if (transfer.status !== 'SENT') {
         throw new BadRequestException('This transfer has already been received.');
       }
-      const destination = await openLocation(tx, actor.organisationId, transfer.toLocationId);
+      const destination = await openLocation(
+        tx,
+        actor.organisationId,
+        transfer.toLocationId,
+        requireBranch(actor),
+      );
       const claimed = await tx.stockTransfer.updateMany({
         where: { id: transfer.id, status: 'SENT' },
         data: { status: 'RECEIVED', receivedOn },
@@ -238,9 +258,10 @@ async function openLocation(
   tx: Prisma.TransactionClient,
   organisationId: string,
   id: string,
+  branchId?: string,
 ): Promise<{ id: string; name: string }> {
   const location = await tx.stockLocation.findFirst({
-    where: { id, organisationId, active: true },
+    where: { id, organisationId, active: true, ...(branchId ? { branchId } : {}) },
   });
   if (!location) throw new BadRequestException('Choose an open location.');
   return location;

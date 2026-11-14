@@ -5,6 +5,7 @@ import { AirlinesModule } from './airlines/airlines.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BillsModule } from './bills/bills.module';
+import { BranchesModule } from './branches/branches.module';
 import { DeliveriesModule } from './deliveries/deliveries.module';
 import { DisputesModule } from './disputes/disputes.module';
 import { ForecastModule } from './forecast/forecast.module';
@@ -47,6 +48,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     PurchasesModule,
     ReceiptsModule,
     BillsModule,
+    BranchesModule,
     DeliveriesModule,
     DisputesModule,
     ForecastModule,

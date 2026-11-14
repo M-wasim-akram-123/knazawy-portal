@@ -10,6 +10,7 @@ export * from './ledger';
 export * from './notifications';
 export * from './master-data';
 export * from './bills';
+export * from './branches';
 export * from './costing';
 export * from './purchasing';
 export * from './rbac';

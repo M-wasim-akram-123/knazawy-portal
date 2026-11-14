@@ -17,4 +17,19 @@ describe('PurchasesService', () => {
     const service = new PurchasesService({} as never, new AuditService());
     await expect(service.list(actor)).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it('lists purchases for the branch the user is working in', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const service = new PurchasesService({ purchase: { findMany } } as never, new AuditService());
+    await service.list({
+      ...actor,
+      role: 'STOREKEEPER',
+      organisationId: 'org-1',
+      branchId: 'branch-1',
+    });
+    expect(findMany.mock.calls[0][0].where).toMatchObject({
+      organisationId: 'org-1',
+      branchId: 'branch-1',
+    });
+  });
 });

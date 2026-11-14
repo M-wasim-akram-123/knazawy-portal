@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
+import { requireBranch } from '../common/branch';
 import { formatIsoDate, parseIsoDate } from '../common/date';
 import { parseNonNegativeDecimal, parsePositiveDecimal } from '../common/decimal';
 import { nextDocumentNumber } from '../common/document-number';
@@ -28,7 +29,7 @@ export class PurchasesService {
   async list(actor: Actor): Promise<PurchaseRecord[]> {
     assertCan(actor, 'purchases', 'R', 'view purchases');
     const rows = await this.prisma.purchase.findMany({
-      where: { organisationId: actor.organisationId },
+      where: { organisationId: actor.organisationId, branchId: requireBranch(actor) },
       include: purchaseInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -37,11 +38,12 @@ export class PurchasesService {
 
   async get(actor: Actor, id: string): Promise<PurchaseRecord> {
     assertCan(actor, 'purchases', 'R', 'view purchases');
-    return toPurchase(await this.requirePurchase(actor.organisationId, id));
+    return toPurchase(await this.requirePurchase(actor, id));
   }
 
   async create(actor: Actor, input: CreatePurchaseDto): Promise<PurchaseRecord> {
     assertCan(actor, 'purchases', 'C', 'add purchases');
+    const branchId = requireBranch(actor);
     const orderedOn = parseIsoDate(input.orderedOn);
     await this.requireSupplier(actor.organisationId, input.supplierId);
     const lines = await this.pricedLines(actor.organisationId, input.lines);
@@ -51,6 +53,7 @@ export class PurchasesService {
       const purchase = await tx.purchase.create({
         data: {
           organisationId: actor.organisationId,
+          branchId,
           number,
           supplierId: input.supplierId,
           orderedOn,
@@ -72,7 +75,7 @@ export class PurchasesService {
 
   async addLine(actor: Actor, id: string, input: PurchaseLineDto): Promise<PurchaseRecord> {
     assertCan(actor, 'purchases', 'U', 'change purchases');
-    const existing = await this.requirePurchase(actor.organisationId, id);
+    const existing = await this.requirePurchase(actor, id);
     if (existing.status !== 'DRAFT') {
       throw new BadRequestException('Only a draft purchase can be changed.');
     }
@@ -97,7 +100,7 @@ export class PurchasesService {
 
   async send(actor: Actor, id: string): Promise<PurchaseRecord> {
     assertCan(actor, 'purchases', 'U', 'send purchases');
-    const existing = await this.requirePurchase(actor.organisationId, id);
+    const existing = await this.requirePurchase(actor, id);
     if (existing.status !== 'DRAFT') {
       throw new BadRequestException('Only a draft purchase can be sent.');
     }
@@ -106,7 +109,7 @@ export class PurchasesService {
 
   async cancel(actor: Actor, id: string): Promise<PurchaseRecord> {
     assertCan(actor, 'purchases', 'U', 'cancel purchases');
-    const existing = await this.requirePurchase(actor.organisationId, id);
+    const existing = await this.requirePurchase(actor, id);
     if (existing.lines.some((line) => line.receivedQuantity.gt(0))) {
       throw new BadRequestException('Goods have already been received on this purchase.');
     }
@@ -141,9 +144,9 @@ export class PurchasesService {
     return toPurchase(updated);
   }
 
-  private async requirePurchase(organisationId: string, id: string): Promise<PurchaseRow> {
+  private async requirePurchase(actor: Actor, id: string): Promise<PurchaseRow> {
     const purchase = await this.prisma.purchase.findFirst({
-      where: { id, organisationId },
+      where: { id, organisationId: actor.organisationId, branchId: requireBranch(actor) },
       include: purchaseInclude,
     });
     if (!purchase) throw new NotFoundException('That purchase was not found.');

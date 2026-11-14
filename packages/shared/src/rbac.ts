@@ -68,6 +68,7 @@ export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>>
     disputes: ['R'],
     ledger: ['R'],
     forecast: ['R'],
+    branches: ['C', 'R', 'U'],
     users: ['C', 'R', 'U'],
   },
 };

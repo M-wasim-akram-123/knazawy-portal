@@ -292,6 +292,8 @@ export interface RoomRequestRecord {
   number: string;
   airlineId: string;
   airlineName: string;
+  branchId: string;
+  branchName: string;
   status: RoomRequestStatus;
   checkIn: string;
   checkOut: string;

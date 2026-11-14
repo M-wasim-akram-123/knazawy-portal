@@ -33,6 +33,7 @@ export const en = {
     production: 'Production',
     mealCost: 'Meal cost',
     forecast: 'Forecast',
+    branches: 'Branches',
     signIn: 'Sign in',
     signOut: 'Sign out',
     archive: 'Archive',

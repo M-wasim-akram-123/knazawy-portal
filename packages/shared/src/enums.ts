@@ -118,6 +118,7 @@ export const AREAS = [
   'disputes',
   'ledger',
   'forecast',
+  'branches',
   'users',
 ] as const;
 

@@ -1,5 +1,5 @@
 import type { Actor, FreeRoomRecord, RoomOfferRecord, RoomRequestRecord } from '@knazawy/shared';
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../auth/current-user';
@@ -21,8 +21,11 @@ export class RoomRequestsController {
   }
 
   @Get('offers')
-  offers(@CurrentUser() actor: Actor): Promise<RoomOfferRecord[]> {
-    return this.requests.offers(actor);
+  offers(
+    @CurrentUser() actor: Actor,
+    @Query('branchId') branchId: string,
+  ): Promise<RoomOfferRecord[]> {
+    return this.requests.offers(actor, branchId ?? '');
   }
 
   @Post()
