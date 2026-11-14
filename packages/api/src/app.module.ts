@@ -14,6 +14,7 @@ import { ProductionModule } from './production/production.module';
 import { PurchasesModule } from './purchases/purchases.module';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { RecipesModule } from './recipes/recipes.module';
+import { RequestsModule } from './requests/requests.module';
 import { StockModule } from './stock/stock.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 
@@ -37,6 +38,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     RecipesModule,
     ProductionModule,
     MealCostsModule,
+    RequestsModule,
     StockModule,
   ],
 })

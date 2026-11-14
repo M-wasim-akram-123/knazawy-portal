@@ -10,7 +10,7 @@ const KARAM_ROLES: readonly Role[] = [
 
 export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>> = {
   AIRLINE_REQUESTER: {
-    service_requests: ['C', 'R'],
+    service_requests: ['C', 'R', 'U'],
     service_rates: ['R'],
     distribution: ['R'],
     invoices: ['R'],

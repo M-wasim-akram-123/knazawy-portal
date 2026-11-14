@@ -13,6 +13,7 @@ export const ur = {
     suppliers: 'سپلائرز',
     locations: 'جگہیں',
     airlines: 'ایئرلائنز',
+    requests: 'درخواستیں',
     purchases: 'خریداری',
     scanBill: 'بل اسکین کریں',
     issueStock: 'اسٹاک نکالیں',

@@ -4,6 +4,7 @@ import { costDifference, costOnePortion } from './costing';
 import { formatDisplayDate, todayInKarachi } from './dates';
 import { can, canReadOrganisation } from './rbac';
 import { recipeIngredientQuantity } from './recipes';
+import { isRequestEditable, nextRequestStatus, passengerTotal } from './requests';
 import { purchaseStatusTone, statusTone } from './status';
 import { countStatusTone } from './stock';
 
@@ -150,6 +151,41 @@ describe('meal cost', () => {
     expect(costDifference('33', '30.08')).toBe('2.92');
     expect(costDifference('30', '33')).toBe('-3');
     expect(costDifference('33', '33')).toBe('0');
+  });
+});
+
+describe('service requests', () => {
+  it('moves a draft to submitted, and only the airline may cancel it', () => {
+    expect(nextRequestStatus('DRAFT', 'submit')).toBe('SUBMITTED');
+    expect(nextRequestStatus('DRAFT', 'cancel')).toBe('CANCELLED');
+    expect(nextRequestStatus('DRAFT', 'accept')).toBeNull();
+    expect(isRequestEditable('DRAFT')).toBe(true);
+  });
+
+  it('lets Karam accept or reject only a submitted request', () => {
+    expect(nextRequestStatus('SUBMITTED', 'accept')).toBe('ACCEPTED');
+    expect(nextRequestStatus('SUBMITTED', 'reject')).toBe('REJECTED');
+    expect(nextRequestStatus('ACCEPTED', 'cancel')).toBeNull();
+    expect(nextRequestStatus('REJECTED', 'accept')).toBeNull();
+    expect(isRequestEditable('SUBMITTED')).toBe(false);
+  });
+
+  it('counts passengers once, with special diets inside the total', () => {
+    expect(
+      passengerTotal({ adults: 120, children: 10, infants: 2, crew: 8, specialDiets: 5 }),
+    ).toBe(140);
+  });
+
+  it('keeps the airline on its own requests and the kitchen read-only', () => {
+    expect(can('AIRLINE_REQUESTER', 'service_requests', 'C')).toBe(true);
+    expect(can('AIRLINE_REQUESTER', 'service_requests', 'U')).toBe(true);
+    expect(can('AIRLINE_REQUESTER', 'service_requests', 'A')).toBe(false);
+    expect(can('AIRLINE_FINANCE', 'service_requests', 'R')).toBe(false);
+    expect(can('OPERATIONS_MANAGER', 'service_requests', 'A')).toBe(true);
+    expect(can('OPERATIONS_MANAGER', 'service_requests', 'C')).toBe(false);
+    expect(can('ADMINISTRATOR', 'service_requests', 'A')).toBe(false);
+    expect(can('KITCHEN_LEAD', 'service_requests', 'R')).toBe(true);
+    expect(can('KITCHEN_LEAD', 'service_requests', 'A')).toBe(false);
   });
 });
 

@@ -65,3 +65,137 @@ a {
   margin: 0;
   color: var(--kz-problem);
 }
+
+.kz-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.kz-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kz-button-quiet {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--kz-line);
+  border-radius: 999px;
+  background: white;
+  color: var(--kz-problem);
+  font: 650 15px/1 var(--kz-font);
+  cursor: pointer;
+}
+
+.kz-button:disabled,
+.kz-button-quiet:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.kz-field select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--kz-line);
+  border-radius: 12px;
+  background: white;
+  color: var(--kz-ink);
+  font: inherit;
+}
+
+.kz-help {
+  color: var(--kz-ink-soft);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.kz-workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.kz-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.kz-panel > h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+
+.kz-table-wrap {
+  overflow-x: auto;
+}
+
+.kz-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.kz-table th {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--kz-line);
+  color: var(--kz-ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.kz-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--kz-line);
+  vertical-align: middle;
+}
+
+.kz-table input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--kz-line);
+  border-radius: 10px;
+  background: white;
+  font: inherit;
+}
+
+.kz-status {
+  font-weight: 650;
+}
+
+.kz-status[data-tone='draft'] {
+  color: var(--kz-draft);
+}
+
+.kz-status[data-tone='progress'] {
+  color: var(--kz-progress);
+}
+
+.kz-status[data-tone='done'] {
+  color: var(--kz-done);
+}
+
+.kz-status[data-tone='problem'] {
+  color: var(--kz-problem);
+}
+
+.kz-empty {
+  margin: 0;
+  color: var(--kz-ink-soft);
+}
+
+@media (max-width: 960px) {
+  .kz-workspace,
+  .kz-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

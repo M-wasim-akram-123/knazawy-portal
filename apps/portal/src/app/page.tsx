@@ -53,7 +53,11 @@ export default function HomePage() {
         {airline ? ` for ${account.organisationCode}` : ''}.
       </p>
       {airline ? (
-        <p>Your requests will appear here. You only see this airline.</p>
+        <p>
+          <a className="kz-button" href="/requests">
+            {messages.en.common.requests}
+          </a>
+        </p>
       ) : (
         <p>This portal is for airline staff. Karam staff use the staff app.</p>
       )}

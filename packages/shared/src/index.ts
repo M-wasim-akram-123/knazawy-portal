@@ -9,6 +9,7 @@ export * from './purchasing';
 export * from './rbac';
 export * from './status';
 export * from './production';
+export * from './requests';
 export * from './recipes';
 export * from './stock';
 export * from './types';

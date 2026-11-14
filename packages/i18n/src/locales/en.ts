@@ -13,6 +13,7 @@ export const en = {
     suppliers: 'Suppliers',
     locations: 'Locations',
     airlines: 'Airlines',
+    requests: 'Requests',
     purchases: 'Purchases',
     scanBill: 'Scan bill',
     issueStock: 'Issue stock',

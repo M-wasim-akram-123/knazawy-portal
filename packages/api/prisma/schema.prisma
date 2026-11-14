@@ -33,44 +33,47 @@ enum UserStatus {
 
 /// Tenancy spine. Items, requests, invoices, and journal lines attach here in later phases.
 model Organisation {
-  id        String             @id @default(cuid())
-  code      String             @unique
-  type      OrganisationType
-  name      String
-  taxNumber String?            @map("tax_number")
-  createdAt DateTime           @default(now()) @map("created_at")
-  updatedAt DateTime           @updatedAt @map("updated_at")
-  users     User[]
-  items     Item[]
-  suppliers Supplier[]
-  locations StockLocation[]
-  sequences DocumentSequence[]
-  purchases Purchase[]
-  receipts  GoodsReceipt[]
-  layers    StockLayer[]
-  movements StockMovement[]
-  issues    StockIssue[]
-  transfers StockTransfer[]
-  counts    StockCount[]
-  recipes   Recipe[]
+  id                String             @id @default(cuid())
+  code              String             @unique
+  type              OrganisationType
+  name              String
+  taxNumber         String?            @map("tax_number")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  users             User[]
+  items             Item[]
+  suppliers         Supplier[]
+  locations         StockLocation[]
+  sequences         DocumentSequence[]
+  purchases         Purchase[]
+  receipts          GoodsReceipt[]
+  layers            StockLayer[]
+  movements         StockMovement[]
+  issues            StockIssue[]
+  transfers         StockTransfer[]
+  counts            StockCount[]
+  recipes           Recipe[]
   productionBatches ProductionBatch[]
-  payables  SupplierPayable[]
+  serviceRequests   ServiceRequest[]
+  payables          SupplierPayable[]
 
   @@map("organisations")
 }
 
 model User {
-  id             String       @id @default(cuid())
-  organisationId String       @map("organisation_id")
-  organisation   Organisation @relation(fields: [organisationId], references: [id])
-  name           String
-  email          String       @unique
-  role           UserRole
-  status         UserStatus   @default(INVITED)
-  passwordHash   String       @map("password_hash")
-  lastLoginAt    DateTime?    @map("last_login_at")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  id                String           @id @default(cuid())
+  organisationId    String           @map("organisation_id")
+  organisation      Organisation     @relation(fields: [organisationId], references: [id])
+  name              String
+  email             String           @unique
+  role              UserRole
+  requestsCreated   ServiceRequest[] @relation("RequestCreatedBy")
+  requestsDecided   ServiceRequest[] @relation("RequestDecidedBy")
+  status            UserStatus       @default(INVITED)
+  passwordHash      String           @map("password_hash")
+  lastLoginAt       DateTime?        @map("last_login_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
 
   @@index([organisationId])
   @@map("users")
@@ -177,24 +180,24 @@ model ItemSupplier {
 }
 
 model StockLocation {
-  id             String          @id @default(cuid())
-  organisationId String          @map("organisation_id")
-  organisation   Organisation    @relation(fields: [organisationId], references: [id])
-  parentId       String?         @map("parent_id")
-  parent         StockLocation?  @relation("LocationTree", fields: [parentId], references: [id])
-  children       StockLocation[] @relation("LocationTree")
-  name           String
-  type           LocationType
-  active         Boolean         @default(true)
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  receipts       GoodsReceipt[]
-  layers         StockLayer[]
-  movements      StockMovement[]
-  issues         StockIssue[]
-  transfersOut   StockTransfer[] @relation("TransferFrom")
-  transfersIn    StockTransfer[] @relation("TransferTo")
-  counts         StockCount[]
+  id                String            @id @default(cuid())
+  organisationId    String            @map("organisation_id")
+  organisation      Organisation      @relation(fields: [organisationId], references: [id])
+  parentId          String?           @map("parent_id")
+  parent            StockLocation?    @relation("LocationTree", fields: [parentId], references: [id])
+  children          StockLocation[]   @relation("LocationTree")
+  name              String
+  type              LocationType
+  active            Boolean           @default(true)
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  receipts          GoodsReceipt[]
+  layers            StockLayer[]
+  movements         StockMovement[]
+  issues            StockIssue[]
+  transfersOut      StockTransfer[]   @relation("TransferFrom")
+  transfersIn       StockTransfer[]   @relation("TransferTo")
+  counts            StockCount[]
   productionBatches ProductionBatch[]
 
   @@index([organisationId])
@@ -371,35 +374,35 @@ model StockLayer {
 
 /// One row per layer touched. Receipts add (positive). Issues take from a layer (negative).
 model StockMovement {
-  id             String            @id @default(cuid())
-  organisationId String            @map("organisation_id")
-  organisation   Organisation      @relation(fields: [organisationId], references: [id])
-  itemId         String            @map("item_id")
-  item           Item              @relation(fields: [itemId], references: [id])
-  locationId     String            @map("location_id")
-  location       StockLocation     @relation(fields: [locationId], references: [id])
-  layerId        String            @map("layer_id")
-  layer          StockLayer        @relation(fields: [layerId], references: [id])
-  receiptLineId  String?           @unique @map("receipt_line_id")
-  receiptLine    GoodsReceiptLine? @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
-  issueId        String?           @map("issue_id")
-  issue          StockIssue?       @relation(fields: [issueId], references: [id], onDelete: Restrict)
-  issueLineId    String?           @map("issue_line_id")
-  issueLine      StockIssueLine?   @relation(fields: [issueLineId], references: [id], onDelete: Restrict)
-  transferId     String?           @map("transfer_id")
-  transfer       StockTransfer?    @relation(fields: [transferId], references: [id], onDelete: Restrict)
-  countId        String?           @map("count_id")
-  count          StockCount?       @relation(fields: [countId], references: [id], onDelete: Restrict)
-  countLineId    String?           @map("count_line_id")
-  countLine      StockCountLine?   @relation(fields: [countLineId], references: [id], onDelete: Restrict)
-  productionBatchId String?        @map("production_batch_id")
-  productionBatch   ProductionBatch? @relation(fields: [productionBatchId], references: [id], onDelete: Restrict)
-  productionLineId  String?        @map("production_line_id")
-  productionLine    ProductionLine?  @relation(fields: [productionLineId], references: [id], onDelete: Restrict)
-  type           StockMovementType
-  quantityBase   Decimal           @map("quantity_base") @db.Decimal(14, 4)
-  unitCost       Decimal           @map("unit_cost") @db.Decimal(14, 4)
-  createdAt      DateTime          @default(now()) @map("created_at")
+  id                String            @id @default(cuid())
+  organisationId    String            @map("organisation_id")
+  organisation      Organisation      @relation(fields: [organisationId], references: [id])
+  itemId            String            @map("item_id")
+  item              Item              @relation(fields: [itemId], references: [id])
+  locationId        String            @map("location_id")
+  location          StockLocation     @relation(fields: [locationId], references: [id])
+  layerId           String            @map("layer_id")
+  layer             StockLayer        @relation(fields: [layerId], references: [id])
+  receiptLineId     String?           @unique @map("receipt_line_id")
+  receiptLine       GoodsReceiptLine? @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
+  issueId           String?           @map("issue_id")
+  issue             StockIssue?       @relation(fields: [issueId], references: [id], onDelete: Restrict)
+  issueLineId       String?           @map("issue_line_id")
+  issueLine         StockIssueLine?   @relation(fields: [issueLineId], references: [id], onDelete: Restrict)
+  transferId        String?           @map("transfer_id")
+  transfer          StockTransfer?    @relation(fields: [transferId], references: [id], onDelete: Restrict)
+  countId           String?           @map("count_id")
+  count             StockCount?       @relation(fields: [countId], references: [id], onDelete: Restrict)
+  countLineId       String?           @map("count_line_id")
+  countLine         StockCountLine?   @relation(fields: [countLineId], references: [id], onDelete: Restrict)
+  productionBatchId String?           @map("production_batch_id")
+  productionBatch   ProductionBatch?  @relation(fields: [productionBatchId], references: [id], onDelete: Restrict)
+  productionLineId  String?           @map("production_line_id")
+  productionLine    ProductionLine?   @relation(fields: [productionLineId], references: [id], onDelete: Restrict)
+  type              StockMovementType
+  quantityBase      Decimal           @map("quantity_base") @db.Decimal(14, 4)
+  unitCost          Decimal           @map("unit_cost") @db.Decimal(14, 4)
+  createdAt         DateTime          @default(now()) @map("created_at")
 
   @@index([organisationId, itemId])
   @@index([issueId])
@@ -510,16 +513,16 @@ model StockCount {
 }
 
 model StockCountLine {
-  id               String          @id @default(cuid())
-  countId          String          @map("count_id")
-  count            StockCount      @relation(fields: [countId], references: [id])
-  itemId           String          @map("item_id")
-  item             Item            @relation(fields: [itemId], references: [id])
-  bookQuantity     Decimal         @map("book_quantity") @db.Decimal(14, 4)
-  countedQuantity  Decimal?        @map("counted_quantity") @db.Decimal(14, 4)
-  varianceCost     Decimal?        @map("variance_cost") @db.Decimal(14, 2)
-  layer            StockLayer?
-  movements        StockMovement[]
+  id              String          @id @default(cuid())
+  countId         String          @map("count_id")
+  count           StockCount      @relation(fields: [countId], references: [id])
+  itemId          String          @map("item_id")
+  item            Item            @relation(fields: [itemId], references: [id])
+  bookQuantity    Decimal         @map("book_quantity") @db.Decimal(14, 4)
+  countedQuantity Decimal?        @map("counted_quantity") @db.Decimal(14, 4)
+  varianceCost    Decimal?        @map("variance_cost") @db.Decimal(14, 2)
+  layer           StockLayer?
+  movements       StockMovement[]
 
   @@unique([countId, itemId])
   @@index([countId])
@@ -553,20 +556,21 @@ enum RecipeStatus {
 
 /// A meal or snack, and the ingredients for one portion. Stock is not moved until production.
 model Recipe {
-  id              String       @id @default(cuid())
-  organisationId  String       @map("organisation_id")
-  organisation    Organisation @relation(fields: [organisationId], references: [id])
-  code            String
-  name            String
-  kind            RecipeKind
-  portions        Decimal      @db.Decimal(14, 3)
-  wastagePercent  Decimal      @map("wastage_percent") @db.Decimal(5, 2)
-  status          RecipeStatus @default(DRAFT)
-  active          Boolean      @default(true)
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-  lines           RecipeLine[]
-  productionBatches ProductionBatch[]
+  id                  String               @id @default(cuid())
+  organisationId      String               @map("organisation_id")
+  organisation        Organisation         @relation(fields: [organisationId], references: [id])
+  code                String
+  name                String
+  kind                RecipeKind
+  portions            Decimal              @db.Decimal(14, 3)
+  wastagePercent      Decimal              @map("wastage_percent") @db.Decimal(5, 2)
+  status              RecipeStatus         @default(DRAFT)
+  active              Boolean              @default(true)
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  lines               RecipeLine[]
+  productionBatches   ProductionBatch[]
+  serviceRequestLines ServiceRequestLine[]
 
   @@unique([organisationId, code])
   @@index([organisationId])
@@ -574,17 +578,86 @@ model Recipe {
 }
 
 model RecipeLine {
-  id                  String  @id @default(cuid())
-  recipeId            String  @map("recipe_id")
-  recipe              Recipe  @relation(fields: [recipeId], references: [id])
-  itemId              String  @map("item_id")
-  item                Item    @relation(fields: [itemId], references: [id])
-  quantityPerPortion  Decimal @map("quantity_per_portion") @db.Decimal(14, 3)
+  id                 String  @id @default(cuid())
+  recipeId           String  @map("recipe_id")
+  recipe             Recipe  @relation(fields: [recipeId], references: [id])
+  itemId             String  @map("item_id")
+  item               Item    @relation(fields: [itemId], references: [id])
+  quantityPerPortion Decimal @map("quantity_per_portion") @db.Decimal(14, 3)
 
   @@unique([recipeId, itemId])
   @@index([recipeId])
   @@index([itemId])
   @@map("recipe_lines")
+}
+
+enum DeliveryPoint {
+  GATE
+  LOUNGE
+  AIRCRAFT
+  HOTEL
+}
+
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  IN_PRODUCTION
+  DISPATCHED
+  DELIVERED
+  INVOICED
+  CANCELLED
+}
+
+/// A meal or snack request from one airline. Karam numbers it; the airline builds and submits it.
+model ServiceRequest {
+  id              String               @id @default(cuid())
+  organisationId  String               @map("organisation_id")
+  organisation    Organisation         @relation(fields: [organisationId], references: [id])
+  number          String               @unique
+  status          RequestStatus        @default(DRAFT)
+  flightNumber    String               @map("flight_number")
+  route           String
+  serviceDate     DateTime             @map("service_date") @db.Date
+  deliveryTime    String               @map("delivery_time") @db.VarChar(5)
+  deliveryPoint   DeliveryPoint        @map("delivery_point")
+  deliveryDetail  String?              @map("delivery_detail")
+  adults          Int                  @default(0)
+  children        Int                  @default(0)
+  infants         Int                  @default(0)
+  crew            Int                  @default(0)
+  specialDiets    Int                  @default(0) @map("special_diets")
+  specialDietNote String?              @map("special_diet_note")
+  note            String?
+  createdById     String               @map("created_by_id")
+  createdBy       User                 @relation("RequestCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  submittedAt     DateTime?            @map("submitted_at")
+  decidedAt       DateTime?            @map("decided_at")
+  decidedById     String?              @map("decided_by_id")
+  decidedBy       User?                @relation("RequestDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  decisionNote    String?              @map("decision_note")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  lines           ServiceRequestLine[]
+
+  @@index([organisationId])
+  @@index([status])
+  @@map("service_requests")
+}
+
+model ServiceRequestLine {
+  id        String         @id @default(cuid())
+  requestId String         @map("request_id")
+  request   ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  recipeId  String         @map("recipe_id")
+  recipe    Recipe         @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  quantity  Int
+
+  @@unique([requestId, recipeId])
+  @@index([requestId])
+  @@index([recipeId])
+  @@map("service_request_lines")
 }
 
 /// A batch of one approved recipe. Its ingredients leave stock, oldest cost layer first, when the batch is recorded.

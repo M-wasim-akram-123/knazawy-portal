@@ -7,6 +7,7 @@ const PREFIX = {
   STOCK_TRANSFER: 'TR',
   STOCK_COUNT: 'SC',
   PRODUCTION: 'PB',
+  SERVICE_REQUEST: 'RQ',
 } as const;
 
 export async function nextDocumentNumber(

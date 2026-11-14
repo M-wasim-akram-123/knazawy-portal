@@ -3,11 +3,13 @@ import type {
   AccountRecord,
   AirlineRecord,
   AirlineRole,
+  DeliveryPoint,
   GoodsReceiptRecord,
   ItemRecord,
   LocationRecord,
   LoginResult,
   MealCostRecord,
+  MenuItemRecord,
   ProductionRecord,
   PurchaseRecord,
   RecipeKind,
@@ -17,6 +19,7 @@ import type {
   StockIssueRecord,
   StockOnHandRecord,
   StockTransferRecord,
+  ServiceRequestRecord,
   SupplierRecord,
 } from '@knazawy/shared';
 
@@ -164,6 +167,23 @@ export interface BillInput {
   lines: BillLineInput[];
 }
 
+export interface ServiceRequestInput {
+  flightNumber: string;
+  route: string;
+  serviceDate: string;
+  deliveryTime: string;
+  deliveryPoint: DeliveryPoint;
+  deliveryDetail?: string;
+  adults: number;
+  children: number;
+  infants: number;
+  crew: number;
+  specialDiets: number;
+  specialDietNote?: string;
+  note?: string;
+  lines: Array<{ recipeId: string; quantity: number }>;
+}
+
 export class ApiClient {
   constructor(
     private readonly baseUrl: string,
@@ -204,6 +224,38 @@ export class ApiClient {
     input: AirlineUserChange,
   ): Promise<AirlineRecord> {
     return this.request('PATCH', `/v1/airlines/${airlineId}/users/${userId}`, input);
+  }
+
+  listRequests(): Promise<ServiceRequestRecord[]> {
+    return this.request('GET', '/v1/requests');
+  }
+
+  listMenu(): Promise<MenuItemRecord[]> {
+    return this.request('GET', '/v1/requests/menu');
+  }
+
+  createRequest(input: ServiceRequestInput): Promise<ServiceRequestRecord> {
+    return this.request('POST', '/v1/requests', input);
+  }
+
+  updateRequest(id: string, input: ServiceRequestInput): Promise<ServiceRequestRecord> {
+    return this.request('PATCH', `/v1/requests/${id}`, input);
+  }
+
+  submitRequest(id: string): Promise<ServiceRequestRecord> {
+    return this.request('POST', `/v1/requests/${id}/submit`);
+  }
+
+  cancelRequest(id: string): Promise<ServiceRequestRecord> {
+    return this.request('POST', `/v1/requests/${id}/cancel`);
+  }
+
+  acceptRequest(id: string): Promise<ServiceRequestRecord> {
+    return this.request('POST', `/v1/requests/${id}/accept`);
+  }
+
+  rejectRequest(id: string, reason: string): Promise<ServiceRequestRecord> {
+    return this.request('POST', `/v1/requests/${id}/reject`, { reason });
   }
 
   listItems(): Promise<ItemRecord[]> {

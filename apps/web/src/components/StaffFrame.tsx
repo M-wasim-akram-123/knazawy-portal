@@ -19,6 +19,7 @@ const links = [
   { href: '/recipes', label: messages.en.common.recipes },
   { href: '/production', label: messages.en.common.production },
   { href: '/meal-cost', label: messages.en.common.mealCost },
+  { href: '/requests', label: messages.en.common.requests },
   { href: '/items', label: messages.en.common.items },
   { href: '/suppliers', label: messages.en.common.suppliers },
   { href: '/locations', label: messages.en.common.locations },

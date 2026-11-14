@@ -2,6 +2,10 @@
 
 Newest entry at the top.
 
+## 2026-11-14 — Requests
+
+An airline user asks for meals and snacks for one flight. The request gives the flight number, route, service date, delivery time, and delivery point (gate, lounge, aircraft, or hotel), plus the passenger split (adults, children, infants, crew, and special diets, which sit inside the total). It lists menu items as portions. Only approved, active meals and snacks appear on the menu, and costs are never sent to the airline. A draft can be changed, sent, or cancelled. Once sent, the request is locked to the airline's view. Operations accepts it or rejects it, and a rejection needs a reason. Karam sees a request only after it is sent. Each request gets a number from the restaurant's sequence (RQ-00001), so numbers are unique across airlines. The service date must be today or later, and the menu is checked again when the request is sent. Rate preview, amendments, cut-off, and invoicing are still ahead.
+
 ## 2026-11-14 — Airline accounts
 
 An administrator opens an airline account and adds its users. Each user belongs to one airline and holds either the requester role or the finance role. A disabled user cannot sign in. The airline portal shows that airline's name after sign-in. An airline user cannot open another airline's account, and a Karam role cannot be placed on an airline. Requests, rate cards, and invoices are still ahead.
