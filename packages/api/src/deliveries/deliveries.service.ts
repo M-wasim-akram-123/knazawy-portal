@@ -13,6 +13,7 @@ import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
 import { formatIsoDate } from '../common/date';
 import { nextDocumentNumber } from '../common/document-number';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import type { DispatchDeliveryDto, RecordDeliveryDto, StartDeliveryDto } from './deliveries.dto';
@@ -39,6 +40,7 @@ export class DeliveriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Karam sees every delivery. An airline sees only its own. */
@@ -92,6 +94,15 @@ export class DeliveriesService {
         action: 'start',
         after: { number, requestId: request.id, status: next },
       });
+      await this.notifications.notify(tx, {
+        organisationId: request.organisationId,
+        role: 'AIRLINE_REQUESTER',
+        title: `${request.number} is in production`,
+        body: `${request.flightNumber} is being prepared.`,
+        entity: 'ServiceRequest',
+        entityId: request.id,
+        exceptUserId: actor.id,
+      });
       return delivery.id;
     });
     return this.load(id);
@@ -136,6 +147,15 @@ export class DeliveriesService {
         action: 'dispatch',
         before: { status: existing.request.status },
         after: { status: next, lines: input.lines },
+      });
+      await this.notifications.notify(tx, {
+        organisationId: existing.organisationId,
+        role: 'AIRLINE_REQUESTER',
+        title: `${existing.request.number} has left the kitchen`,
+        body: `${existing.number} is on the way for ${existing.request.flightNumber}.`,
+        entity: 'Delivery',
+        entityId: id,
+        exceptUserId: actor.id,
       });
     });
     return this.load(id);
@@ -186,6 +206,15 @@ export class DeliveriesService {
         action: 'deliver',
         before: { status: existing.request.status },
         after: { status: next, lines: input.lines, note },
+      });
+      await this.notifications.notify(tx, {
+        organisationId: existing.organisationId,
+        role: 'AIRLINE_REQUESTER',
+        title: `${existing.request.number} has arrived`,
+        body: `${existing.number} was recorded for ${existing.request.flightNumber}.`,
+        entity: 'Delivery',
+        entityId: id,
+        exceptUserId: actor.id,
       });
     });
     return this.load(id);

@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -95,6 +96,19 @@ export class ServiceRequestDto {
   @ValidateNested({ each: true })
   @Type(() => RequestLineDto)
   lines!: RequestLineDto[];
+}
+
+export class AmendServiceRequestDto extends ServiceRequestDto {
+  @IsString()
+  @MinLength(3)
+  @MaxLength(300)
+  reason!: string;
+}
+
+export class CancelServiceRequestDto {
+  @IsOptional()
+  @IsBoolean()
+  acceptCharge?: boolean;
 }
 
 export class RejectServiceRequestDto {

@@ -8,8 +8,13 @@ import {
   DELIVERY_POINTS,
   RECIPE_KIND_LABELS,
   REQUEST_STATUS_LABELS,
+  amendmentError,
+  cancellationChargeApplies,
+  cutOffInstant,
   formatDisplayDate,
+  formatKarachiDateTime,
   isAirlineRole,
+  isPastCutOff,
   previewCharges,
   statusTone,
   todayInKarachi,
@@ -66,6 +71,8 @@ export function RequestsScreen() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [purpose, setPurpose] = useState<'draft' | 'amend'>('draft');
+  const [amendReason, setAmendReason] = useState('');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
@@ -123,12 +130,16 @@ export function RequestsScreen() {
     setForm(emptyForm());
     setQuantities({});
     setEditingId(null);
+    setPurpose('draft');
+    setAmendReason('');
   }
 
-  function openDraft(request: ServiceRequestRecord) {
+  function openRequest(request: ServiceRequestRecord, next: 'draft' | 'amend') {
     setError('');
     setSaved('');
     setEditingId(request.id);
+    setPurpose(next);
+    setAmendReason('');
     setForm({
       flightNumber: request.flightNumber,
       route: request.route,
@@ -155,6 +166,17 @@ export function RequestsScreen() {
     setSaved('');
     try {
       const input = toInput(form, quantities);
+      if (purpose === 'amend' && editingId) {
+        if (amendReason.trim().length < 3) {
+          setError('Give a reason for this change.');
+          return;
+        }
+        const record = await api.amendRequest(editingId, { ...input, reason: amendReason.trim() });
+        setRequests(await api.listRequests());
+        resetForm();
+        setSaved(`${record.number} is changed.`);
+        return;
+      }
       let record = editingId
         ? await api.updateRequest(editingId, input)
         : await api.createRequest(input);
@@ -174,16 +196,35 @@ export function RequestsScreen() {
     }
   }
 
-  async function cancelDraft() {
-    if (!editingId) return;
+  async function cancelRequest(request: ServiceRequestRecord) {
     setBusy(true);
     setError('');
     setSaved('');
     try {
-      const record = await api.cancelRequest(editingId);
+      let acceptCharge = false;
+      if (
+        cancellationChargeApplies(
+          request.status,
+          isPastCutOff(request.serviceDate, request.deliveryTime),
+        )
+      ) {
+        const current = await api.currentRateCard(request.serviceDate);
+        const charge = previewCharges(request.lines, current);
+        const total = charge.total ?? 'an amount Karam will confirm';
+        const confirmed = window.confirm(
+          `Cancelling ${request.number} now costs ${total} PKR. Karam bills that charge straight away.`,
+        );
+        if (!confirmed) return;
+        acceptCharge = true;
+      }
+      const record = await api.cancelRequest(request.id, { acceptCharge });
       setRequests(await api.listRequests());
-      resetForm();
-      setSaved(`${record.number} is cancelled.`);
+      if (editingId === request.id) resetForm();
+      setSaved(
+        acceptCharge
+          ? `${record.number} is cancelled and the charge is billed.`
+          : `${record.number} is cancelled.`,
+      );
     } catch (caught: unknown) {
       handleFailure(caught);
     } finally {
@@ -212,7 +253,8 @@ export function RequestsScreen() {
         <h1>{messages.en.common.requests}</h1>
         <p>
           Ask for meals and snacks for a flight. Save a draft as often as you like. Karam sees the
-          request once you send it. You only see your own airline.
+          request once you send it. Send it, or change it, at least 24 hours before delivery. You
+          only see your own airline.
         </p>
         <p lang="ur" dir="rtl">
           {messages.ur.common.requests}
@@ -226,7 +268,9 @@ export function RequestsScreen() {
             void save(true);
           }}
         >
-          <h2>{editingId ? 'Edit draft' : 'New request'}</h2>
+          <h2>
+            {purpose === 'amend' ? 'Change request' : editingId ? 'Edit draft' : 'New request'}
+          </h2>
           <div className="kz-form-grid">
             <Field label="Flight number">
               <input
@@ -255,7 +299,14 @@ export function RequestsScreen() {
                 required
               />
             </Field>
-            <Field label="Delivery time" hint="24-hour, such as 11:30.">
+            <Field
+              label="Delivery time"
+              hint={
+                cutOffInstant(form.serviceDate, form.deliveryTime.trim())
+                  ? `Cut-off ${formatKarachiDateTime(cutOffInstant(form.serviceDate, form.deliveryTime.trim()) as Date)}. Change or send the request before then.`
+                  : '24-hour, such as 11:30. The cut-off is 24 hours before this time.'
+              }
+            >
               <input
                 value={form.deliveryTime}
                 maxLength={5}
@@ -381,26 +432,55 @@ export function RequestsScreen() {
             </p>
           ) : null}
           {saved ? <p>{saved}</p> : null}
-          <div className="kz-actions">
-            <button
-              type="button"
-              className="kz-button"
-              disabled={busy}
-              onClick={() => void save(false)}
+          {purpose === 'amend' ? (
+            <Field
+              label="Reason for the change"
+              hint="Karam and your airline keep this with the request."
             >
-              Save draft
-            </button>
-            <button type="submit" className="kz-button" disabled={busy}>
-              Send to Karam
-            </button>
+              <input
+                value={amendReason}
+                maxLength={300}
+                onChange={(event) => setAmendReason(event.target.value)}
+                required
+              />
+            </Field>
+          ) : null}
+          <div className="kz-actions">
+            {purpose === 'amend' ? (
+              <button
+                type="button"
+                className="kz-button"
+                disabled={busy}
+                onClick={() => void save(false)}
+              >
+                Save change
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="kz-button"
+                  disabled={busy}
+                  onClick={() => void save(false)}
+                >
+                  Save draft
+                </button>
+                <button type="submit" className="kz-button" disabled={busy}>
+                  Send to Karam
+                </button>
+              </>
+            )}
             {editingId ? (
               <button
                 type="button"
                 className="kz-button-quiet"
                 disabled={busy}
-                onClick={() => void cancelDraft()}
+                onClick={() => {
+                  const current = requests.find((row) => row.id === editingId);
+                  if (current) void cancelRequest(current);
+                }}
               >
-                Cancel draft
+                {purpose === 'amend' ? 'Cancel request' : 'Cancel draft'}
               </button>
             ) : null}
           </div>
@@ -440,10 +520,39 @@ export function RequestsScreen() {
                         <button
                           type="button"
                           className="kz-button-quiet"
-                          onClick={() => openDraft(request)}
+                          onClick={() => openRequest(request, 'draft')}
                         >
                           Edit
                         </button>
+                      ) : null}
+                      {amendmentError(
+                        request.status,
+                        isPastCutOff(request.serviceDate, request.deliveryTime),
+                        false,
+                      ) === null ? (
+                        <button
+                          type="button"
+                          className="kz-button-quiet"
+                          onClick={() => openRequest(request, 'amend')}
+                        >
+                          Change
+                        </button>
+                      ) : null}
+                      {request.status === 'SUBMITTED' || request.status === 'ACCEPTED' ? (
+                        <button
+                          type="button"
+                          className="kz-button-quiet"
+                          disabled={busy}
+                          onClick={() => void cancelRequest(request)}
+                        >
+                          Cancel
+                        </button>
+                      ) : null}
+                      {request.amendments.length > 0 ? (
+                        <span className="kz-help">
+                          {' '}
+                          {request.amendments[request.amendments.length - 1]?.number}
+                        </span>
                       ) : null}
                     </td>
                   </tr>

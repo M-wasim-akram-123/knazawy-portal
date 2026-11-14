@@ -3,12 +3,13 @@ import { billedQuantity, chargeFor, subtractMoney, sumMoney } from './rates';
 import { can, isKaramRole } from './rbac';
 import type { StatusTone } from './status';
 
-export const INVOICE_KINDS = ['INVOICE', 'CREDIT_NOTE'] as const;
+export const INVOICE_KINDS = ['INVOICE', 'CANCELLATION', 'CREDIT_NOTE'] as const;
 
 export type InvoiceKind = (typeof INVOICE_KINDS)[number];
 
 export const INVOICE_KIND_LABELS: Record<InvoiceKind, string> = {
   INVOICE: 'Invoice',
+  CANCELLATION: 'Cancellation',
   CREDIT_NOTE: 'Credit note',
 };
 

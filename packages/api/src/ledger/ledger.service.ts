@@ -56,6 +56,18 @@ export class LedgerService {
   /** Writes one balanced entry for a document. A zero bill is not posted. An entry is never changed. */
   async post(tx: Prisma.TransactionClient, actor: Actor, input: PostJournalInput): Promise<void> {
     assertCan(actor, 'ledger', 'C', 'post to the ledger');
+    await this.postFromDocument(tx, actor, input);
+  }
+
+  /**
+   * Posts a document the caller has already authorised.
+   * A cancellation charge is raised by the airline, who cannot otherwise post to the ledger.
+   */
+  async postFromDocument(
+    tx: Prisma.TransactionClient,
+    actor: Actor,
+    input: PostJournalInput,
+  ): Promise<void> {
     const error = journalBalanceError(input.lines);
     if (error === 'There is nothing to post.') return;
     if (error) throw new BadRequestException(error);

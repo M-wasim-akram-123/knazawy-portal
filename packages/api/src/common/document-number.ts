@@ -13,6 +13,8 @@ const PREFIX = {
   INVOICE: 'IN',
   CREDIT_NOTE: 'CN',
   JOURNAL: 'JE',
+  AMENDMENT: 'AM',
+  DISPUTE: 'DP',
 } as const;
 
 export async function nextDocumentNumber(

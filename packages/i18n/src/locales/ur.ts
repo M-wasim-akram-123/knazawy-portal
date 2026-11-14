@@ -16,6 +16,8 @@ export const ur = {
     requests: 'درخواستیں',
     deliveries: 'ترسیل',
     invoices: 'بل',
+    disputes: 'تنازعات',
+    notifications: 'اطلاعات',
     ledger: 'کھاتہ',
     home: 'ہوم',
     rateCards: 'نرخ نامے',

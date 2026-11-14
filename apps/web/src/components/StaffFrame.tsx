@@ -10,6 +10,7 @@ import { clearSession, readSessionUser } from '../lib/session';
 
 const links = [
   { href: '/', label: messages.en.common.today },
+  { href: '/notifications', label: messages.en.common.notifications },
   { href: '/purchases', label: messages.en.common.purchases },
   { href: '/bills', label: messages.en.common.scanBill },
   { href: '/store', label: messages.en.common.receiveGoods },
@@ -22,6 +23,7 @@ const links = [
   { href: '/requests', label: messages.en.common.requests },
   { href: '/deliveries', label: messages.en.common.deliveries },
   { href: '/invoices', label: messages.en.common.invoices },
+  { href: '/disputes', label: messages.en.common.disputes },
   { href: '/ledger', label: messages.en.common.ledger },
   { href: '/rates', label: messages.en.common.rateCards },
   { href: '/items', label: messages.en.common.items },

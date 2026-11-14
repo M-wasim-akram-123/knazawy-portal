@@ -18,6 +18,7 @@ export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>>
   AIRLINE_FINANCE: {
     service_rates: ['R'],
     invoices: ['C', 'R'],
+    disputes: ['C', 'R'],
     ledger: ['R'],
   },
   HOTEL_COORDINATOR: {
@@ -49,6 +50,7 @@ export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>>
     purchases: ['R', 'A'],
     recipes: ['R'],
     invoices: ['C', 'R', 'U', 'A'],
+    disputes: ['R', 'A'],
     ledger: ['C', 'R', 'U'],
   },
   ADMINISTRATOR: {
@@ -58,6 +60,7 @@ export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>>
     stock: ['C', 'R', 'U', 'A'],
     recipes: ['C', 'R', 'U', 'A'],
     invoices: ['R'],
+    disputes: ['R'],
     ledger: ['R'],
     users: ['C', 'R', 'U'],
   },

@@ -59,6 +59,7 @@ model Organisation {
   deliveries        Delivery[]
   invoices          Invoice[]
   journalEntries    JournalEntry[]
+  disputes          Dispute[]
   payables          SupplierPayable[]
 
   @@map("organisations")
@@ -81,6 +82,10 @@ model User {
   invoicesCreated      Invoice[]        @relation("InvoiceCreatedBy")
   invoicesIssued       Invoice[]        @relation("InvoiceIssuedBy")
   journalEntriesPosted JournalEntry[]   @relation("JournalPostedBy")
+  amendmentsCreated    RequestAmendment[] @relation("AmendmentCreatedBy")
+  notifications        Notification[]
+  disputesOpened       Dispute[]        @relation("DisputeOpenedBy")
+  disputesDecided      Dispute[]        @relation("DisputeDecidedBy")
   status               UserStatus       @default(INVITED)
   passwordHash         String           @map("password_hash")
   lastLoginAt          DateTime?        @map("last_login_at")
@@ -655,6 +660,7 @@ model ServiceRequest {
   createdAt       DateTime             @default(now()) @map("created_at")
   updatedAt       DateTime             @updatedAt @map("updated_at")
   lines           ServiceRequestLine[]
+  amendments      RequestAmendment[]
   delivery        Delivery?
   invoices        Invoice[]
 
@@ -675,6 +681,21 @@ model ServiceRequestLine {
   @@index([requestId])
   @@index([recipeId])
   @@map("service_request_lines")
+}
+
+/// A change made after a request was sent. The request keeps its number; this row says who changed it and why.
+model RequestAmendment {
+  id          String         @id @default(cuid())
+  requestId   String         @map("request_id")
+  request     ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  number      String         @unique
+  reason      String
+  createdById String         @map("created_by_id")
+  createdBy   User           @relation("AmendmentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  @@index([requestId])
+  @@map("request_amendments")
 }
 
 /// What left the kitchen for one accepted request, and what arrived. One request has one delivery.
@@ -721,6 +742,7 @@ model DeliveryLine {
 
 enum InvoiceKind {
   INVOICE
+  CANCELLATION
   CREDIT_NOTE
 }
 
@@ -754,6 +776,7 @@ model Invoice {
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
   lines           InvoiceLine[]
+  dispute         Dispute?
 
   @@index([organisationId, status])
   @@index([requestId])
@@ -814,6 +837,51 @@ model JournalLine {
 
   @@index([entryId])
   @@map("journal_lines")
+}
+
+/// A message for one user inside the app. Email and text messages are later.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  title     String
+  body      String
+  entity    String
+  entityId  String    @map("entity_id")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+enum DisputeStatus {
+  OPEN
+  ACCEPTED
+  REJECTED
+}
+
+/// An airline's disagreement with an issued bill. Deciding it does not change the bill.
+model Dispute {
+  id             String         @id @default(cuid())
+  organisationId String         @map("organisation_id")
+  organisation   Organisation   @relation(fields: [organisationId], references: [id])
+  invoiceId      String         @unique @map("invoice_id")
+  invoice        Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  number         String         @unique
+  status         DisputeStatus  @default(OPEN)
+  reason         String
+  resolution     String?
+  openedById     String         @map("opened_by_id")
+  openedBy       User           @relation("DisputeOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+  decidedById    String?        @map("decided_by_id")
+  decidedBy      User?          @relation("DisputeDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  decidedAt      DateTime?      @map("decided_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@index([organisationId])
+  @@map("disputes")
 }
 
 enum RateCardStatus {

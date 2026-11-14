@@ -6,8 +6,11 @@ import {
   DELIVERY_POINT_LABELS,
   RECIPE_KIND_LABELS,
   REQUEST_STATUS_LABELS,
+  amendmentError,
   can,
   formatDisplayDate,
+  formatKarachiDateTime,
+  isPastCutOff,
   passengerTotal,
   statusTone,
   type ServiceRequestRecord,
@@ -24,6 +27,8 @@ export function RequestsScreen() {
   const [requests, setRequests] = useState<ServiceRequestRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [changeReason, setChangeReason] = useState('');
+  const [portions, setPortions] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
@@ -38,6 +43,11 @@ export function RequestsScreen() {
       .then((rows) => {
         setRequests(rows);
         setSelectedId(rows[0]?.id ?? null);
+        setPortions(
+          Object.fromEntries(
+            (rows[0]?.lines ?? []).map((line) => [line.recipeId, String(line.quantity)]),
+          ),
+        );
       })
       .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
   }, []);
@@ -52,6 +62,7 @@ export function RequestsScreen() {
   }
 
   const canDecide = can(user.role, 'service_requests', 'A');
+  const canChange = can(user.role, 'service_requests', 'U');
   const selected = requests.find((row) => row.id === selectedId) ?? null;
 
   async function decide(action: 'accept' | 'reject') {
@@ -69,6 +80,44 @@ export function RequestsScreen() {
       setSaved(
         action === 'accept' ? `${record.number} is accepted.` : `${record.number} is rejected.`,
       );
+    } catch (caught: unknown) {
+      setError(explainApiError(caught, setUser));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveChange() {
+    if (!selected) return;
+    setBusy(true);
+    setError('');
+    setSaved('');
+    try {
+      const record = await api.amendRequest(selected.id, {
+        flightNumber: selected.flightNumber,
+        route: selected.route,
+        serviceDate: selected.serviceDate,
+        deliveryTime: selected.deliveryTime,
+        deliveryPoint: selected.deliveryPoint,
+        deliveryDetail: selected.deliveryDetail ?? undefined,
+        adults: selected.passengers.adults,
+        children: selected.passengers.children,
+        infants: selected.passengers.infants,
+        crew: selected.passengers.crew,
+        specialDiets: selected.passengers.specialDiets,
+        specialDietNote: selected.specialDietNote ?? undefined,
+        note: selected.note ?? undefined,
+        reason: changeReason.trim(),
+        lines: selected.lines
+          .map((line) => ({
+            recipeId: line.recipeId,
+            quantity: Number(portions[line.recipeId] ?? line.quantity),
+          }))
+          .filter((line) => Number.isInteger(line.quantity) && line.quantity > 0),
+      });
+      setRequests((current) => current.map((row) => (row.id === record.id ? record : row)));
+      setChangeReason('');
+      setSaved(`${record.number} is changed.`);
     } catch (caught: unknown) {
       setError(explainApiError(caught, setUser));
     } finally {
@@ -114,6 +163,12 @@ export function RequestsScreen() {
                         onClick={(event) => {
                           event.preventDefault();
                           setSelectedId(row.id);
+                          setPortions(
+                            Object.fromEntries(
+                              row.lines.map((line) => [line.recipeId, String(line.quantity)]),
+                            ),
+                          );
+                          setChangeReason('');
                           setSaved('');
                           setError('');
                         }}
@@ -148,6 +203,11 @@ export function RequestsScreen() {
                 {' · '}Flight {selected.flightNumber}, {selected.route}
               </p>
               <p>
+                {selected.cutOffAt
+                  ? `Cut-off ${formatKarachiDateTime(new Date(selected.cutOffAt))}. After that, the airline asks you to change it.`
+                  : null}
+              </p>
+              <p>
                 Service {formatDisplayDate(selected.serviceDate)} at {selected.deliveryTime},{' '}
                 {DELIVERY_POINT_LABELS[selected.deliveryPoint]}
                 {selected.deliveryDetail ? `, ${selected.deliveryDetail}` : ''}
@@ -173,7 +233,29 @@ export function RequestsScreen() {
                       <tr key={line.recipeId}>
                         <td>{line.recipeName}</td>
                         <td>{RECIPE_KIND_LABELS[line.kind]}</td>
-                        <td>{line.quantity}</td>
+                        <td>
+                          {canChange &&
+                          amendmentError(
+                            selected.status,
+                            isPastCutOff(selected.serviceDate, selected.deliveryTime),
+                            true,
+                          ) === null ? (
+                            <input
+                              type="number"
+                              min={0}
+                              max={999}
+                              value={portions[line.recipeId] ?? String(line.quantity)}
+                              onChange={(event) =>
+                                setPortions((current) => ({
+                                  ...current,
+                                  [line.recipeId]: event.target.value,
+                                }))
+                              }
+                            />
+                          ) : (
+                            line.quantity
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -185,6 +267,35 @@ export function RequestsScreen() {
                 </p>
               ) : null}
               {selected.decisionNote ? <p>Reason: {selected.decisionNote}</p> : null}
+              {selected.amendments.map((amendment) => (
+                <p key={amendment.id} className="kz-help">
+                  {amendment.number}: {amendment.reason} ({amendment.createdByName})
+                </p>
+              ))}
+              {canChange &&
+              amendmentError(
+                selected.status,
+                isPastCutOff(selected.serviceDate, selected.deliveryTime),
+                true,
+              ) === null ? (
+                <div className="kz-stack">
+                  <Field label="Reason for the change" hint="Kept with the request.">
+                    <input
+                      value={changeReason}
+                      maxLength={300}
+                      onChange={(event) => setChangeReason(event.target.value)}
+                    />
+                  </Field>
+                  <button
+                    type="button"
+                    className="kz-button"
+                    disabled={busy || changeReason.trim().length < 3}
+                    onClick={() => void saveChange()}
+                  >
+                    Save change
+                  </button>
+                </div>
+              ) : null}
               {canDecide && selected.status === 'SUBMITTED' ? (
                 <div className="kz-stack">
                   <button

@@ -1,0 +1,155 @@
+'use client';
+
+import type { SessionUser } from '@knazawy/auth-client';
+import { messages } from '@knazawy/i18n';
+import {
+  DISPUTE_STATUS_LABELS,
+  canDisputeInvoice,
+  canOpenDispute,
+  disputeStatusTone,
+  formatDisplayDate,
+  type DisputeRecord,
+  type InvoiceRecord,
+} from '@knazawy/shared';
+import { useEffect, useState } from 'react';
+
+import { Field } from '../../components/Field';
+import { ApiError, api, clearSession, readSessionUser } from '../../lib/session';
+
+export function DisputesScreen() {
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [rows, setRows] = useState<DisputeRecord[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
+  const [invoiceId, setInvoiceId] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const session = readSessionUser();
+    setUser(session);
+    setReady(true);
+    if (!session) return;
+    void Promise.all([api.listDisputes(), api.listInvoices()])
+      .then(([nextRows, nextInvoices]) => {
+        setRows(nextRows);
+        setInvoices(nextInvoices);
+      })
+      .catch((caught: unknown) => {
+        if (caught instanceof ApiError && caught.status === 401) {
+          clearSession();
+          window.location.assign('/login');
+          return;
+        }
+        setError(caught instanceof Error ? caught.message : 'Disputes could not load.');
+      });
+  }, []);
+
+  if (!ready) return <p>Loading</p>;
+  if (!user) {
+    return (
+      <p>
+        <a href="/login">{messages.en.common.signIn}</a> to see disputes.
+      </p>
+    );
+  }
+
+  const openable = invoices.filter(
+    (invoice) =>
+      canDisputeInvoice(invoice.kind, invoice.status) &&
+      !rows.some((row) => row.invoiceId === invoice.id),
+  );
+
+  async function openDispute() {
+    setBusy(true);
+    setError('');
+    setSaved('');
+    try {
+      const record = await api.openDispute(invoiceId, reason.trim());
+      setRows((current) => [record, ...current]);
+      setReason('');
+      setInvoiceId('');
+      setSaved(`${record.number} is open. Karam will decide it. The bill is unchanged.`);
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : 'The dispute could not be opened.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="kz-stack">
+      <div className="kz-page-head">
+        <h1>{messages.en.common.disputes}</h1>
+        <p>
+          Dispute an issued bill for your airline. One dispute per bill. Karam&apos;s decision does
+          not change the bill.
+        </p>
+        <p lang="ur" dir="rtl">
+          {messages.ur.common.disputes}
+        </p>
+      </div>
+      {canOpenDispute(user.role) ? (
+        <form
+          className="kz-panel kz-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void openDispute();
+          }}
+        >
+          <h2>Open a dispute</h2>
+          <Field label="Invoice">
+            <select
+              value={invoiceId}
+              onChange={(event) => setInvoiceId(event.target.value)}
+              required
+            >
+              <option value="">Choose a bill</option>
+              {openable.map((invoice) => (
+                <option key={invoice.id} value={invoice.id}>
+                  {invoice.number} · {invoice.total} PKR · {formatDisplayDate(invoice.serviceDate)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Reason">
+            <input
+              value={reason}
+              maxLength={300}
+              onChange={(event) => setReason(event.target.value)}
+              required
+            />
+          </Field>
+          {error ? (
+            <p className="kz-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {saved ? <p>{saved}</p> : null}
+          <button type="submit" className="kz-button" disabled={busy || reason.trim().length < 3}>
+            Open dispute
+          </button>
+        </form>
+      ) : null}
+      {rows.length === 0 ? <p className="kz-empty">No disputes yet.</p> : null}
+      {rows.map((row) => (
+        <article key={row.id} className="kz-panel kz-stack">
+          <h2>
+            {row.number}{' '}
+            <span className="kz-status" data-tone={disputeStatusTone(row.status)}>
+              {DISPUTE_STATUS_LABELS[row.status]}
+            </span>
+          </h2>
+          <p>
+            {row.invoiceNumber} · {row.invoiceTotal} PKR ·{' '}
+            {formatDisplayDate(row.createdAt.slice(0, 10))}
+          </p>
+          <p>{row.reason}</p>
+          {row.resolution ? <p>Decision: {row.resolution}</p> : null}
+        </article>
+      ))}
+    </section>
+  );
+}

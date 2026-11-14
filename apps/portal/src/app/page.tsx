@@ -75,6 +75,16 @@ export default function HomePage() {
             <p>See what has been posted for your airline.</p>
           </a>
         ) : null}
+        <a className="kz-panel kz-home-card" href="/notifications">
+          <h2>{messages.en.common.notifications}</h2>
+          <p>See messages about your requests, deliveries, and bills.</p>
+        </a>
+        {can(account.role, 'disputes', 'R') ? (
+          <a className="kz-panel kz-home-card" href="/disputes">
+            <h2>{messages.en.common.disputes}</h2>
+            <p>Question a bill Karam has issued. The bill itself is not changed.</p>
+          </a>
+        ) : null}
         {can(account.role, 'invoices', 'R') ? (
           <a className="kz-panel kz-home-card" href="/invoices">
             <h2>{messages.en.common.invoices}</h2>

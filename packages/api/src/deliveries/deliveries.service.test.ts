@@ -59,7 +59,8 @@ function serviceFor(tx: Record<string, unknown>): DeliveriesService {
     ...tx,
     $transaction: (run: (client: object) => Promise<unknown>) => run(tx),
   };
-  return new DeliveriesService(prisma as never, new AuditService());
+  const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+  return new DeliveriesService(prisma as never, new AuditService(), notifications as never);
 }
 
 describe('DeliveriesService', () => {

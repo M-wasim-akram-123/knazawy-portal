@@ -1,3 +1,4 @@
+import { todayInKarachi } from '@knazawy/shared';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
 import { AuditService } from '../audit/audit.service';
@@ -45,6 +46,7 @@ function requestRow(overrides: Record<string, unknown> = {}) {
     decidedAt: null,
     createdBy: { name: 'Ayesha Khan' },
     organisation: { name: 'Sample Air' },
+    amendments: [],
     lines: [
       { recipeId: 'recipe-1', quantity: 10, recipe: { name: 'Chicken biryani', kind: 'MEAL' } },
     ],
@@ -74,7 +76,14 @@ function serviceFor(tx: Record<string, unknown>): RequestsService {
     ...tx,
     $transaction: (run: (client: object) => Promise<unknown>) => run(tx),
   };
-  return new RequestsService(prisma as never, new AuditService());
+  const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+  const ledger = { postFromDocument: jest.fn().mockResolvedValue(undefined) };
+  return new RequestsService(
+    prisma as never,
+    new AuditService(),
+    notifications as never,
+    ledger as never,
+  );
 }
 
 function karamSequence() {
@@ -228,6 +237,7 @@ describe('RequestsService', () => {
         update: jest.fn().mockResolvedValue({}),
       },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
+      organisation: { findFirst: jest.fn().mockResolvedValue({ id: 'org-karam' }) },
     };
     const service = serviceFor(mocks);
     await service.accept(operations, 'rq-1');
@@ -245,6 +255,7 @@ describe('RequestsService', () => {
         update: jest.fn().mockResolvedValue({}),
       },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
+      organisation: { findFirst: jest.fn().mockResolvedValue({ id: 'org-karam' }) },
     };
     const service = serviceFor(mocks);
     await service.reject(operations, 'rq-1', { reason: '  Aircraft swapped  ' });
@@ -270,6 +281,143 @@ describe('RequestsService', () => {
     await service.list(operations);
     expect(mocks.serviceRequest.findMany).toHaveBeenLastCalledWith(
       expect.objectContaining({ where: { status: { not: 'DRAFT' } } }),
+    );
+  });
+
+  it('will not send a request inside the 24-hour cut-off', async () => {
+    const mocks = {
+      serviceRequest: {
+        findUnique: jest.fn().mockResolvedValue(
+          requestRow({
+            serviceDate: new Date(`${todayInKarachi()}T00:00:00.000Z`),
+            deliveryTime: '00:00',
+          }),
+        ),
+      },
+    };
+    const service = serviceFor(mocks);
+    await expect(service.submit(airline, 'rq-1')).rejects.toThrow(
+      'Send the request at least 24 hours before delivery.',
+    );
+  });
+
+  it('stops an airline changing a request after the cut-off', async () => {
+    const mocks = {
+      serviceRequest: {
+        findUnique: jest.fn().mockResolvedValue(
+          requestRow({
+            status: 'SUBMITTED',
+            serviceDate: new Date('2020-01-01T00:00:00.000Z'),
+          }),
+        ),
+      },
+    };
+    const service = serviceFor(mocks);
+    await expect(
+      service.amend(airline, 'rq-1', { ...input(), reason: 'Add more meals' }),
+    ).rejects.toThrow('The cut-off has passed. Ask Karam to change this request.');
+  });
+
+  it('lets operations change a request after the cut-off and keeps the reason', async () => {
+    const mocks = {
+      ...karamSequence(),
+      recipe: { findMany: jest.fn().mockResolvedValue([{ id: 'recipe-1' }]) },
+      serviceRequest: {
+        findUnique: jest.fn().mockResolvedValue(
+          requestRow({
+            status: 'ACCEPTED',
+            serviceDate: new Date('2020-01-01T00:00:00.000Z'),
+          }),
+        ),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      serviceRequestLine: {
+        deleteMany: jest.fn().mockResolvedValue({}),
+        createMany: jest.fn().mockResolvedValue({}),
+      },
+      requestAmendment: { create: jest.fn().mockResolvedValue({ id: 'am-1' }) },
+    };
+    const service = serviceFor(mocks);
+    await service.amend(operations, 'rq-1', { ...input(), reason: 'Aircraft swapped' });
+    expect(mocks.requestAmendment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ number: 'AM-00001', reason: 'Aircraft swapped' }),
+      }),
+    );
+  });
+
+  it('asks the airline to confirm a cancellation charge after the cut-off', async () => {
+    const mocks = {
+      serviceRequest: {
+        findUnique: jest.fn().mockResolvedValue(
+          requestRow({
+            status: 'ACCEPTED',
+            serviceDate: new Date('2020-01-01T00:00:00.000Z'),
+          }),
+        ),
+      },
+      rateCard: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'rc-1',
+          lines: [
+            {
+              recipeId: 'recipe-1',
+              unitPrice: { toFixed: () => '650.00' },
+              minimumQuantity: 20,
+            },
+          ],
+        }),
+      },
+      invoice: { create: jest.fn() },
+    };
+    const service = serviceFor(mocks);
+    await expect(service.cancel(airline, 'rq-1')).rejects.toThrow(
+      'Cancelling now costs 13000.00 PKR. Confirm the charge.',
+    );
+    expect(mocks.invoice.create).not.toHaveBeenCalled();
+  });
+
+  it('bills the cancellation when the airline confirms the charge', async () => {
+    const mocks = {
+      ...karamSequence(),
+      serviceRequest: {
+        findUnique: jest.fn().mockResolvedValue(
+          requestRow({
+            status: 'ACCEPTED',
+            serviceDate: new Date('2020-01-01T00:00:00.000Z'),
+          }),
+        ),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      rateCard: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'rc-1',
+          lines: [
+            {
+              recipeId: 'recipe-1',
+              unitPrice: { toFixed: () => '650.00' },
+              minimumQuantity: 20,
+            },
+          ],
+        }),
+      },
+      invoice: { create: jest.fn().mockResolvedValue({ id: 'in-1' }) },
+    };
+    const service = serviceFor(mocks);
+    await service.cancel(airline, 'rq-1', { acceptCharge: true });
+    expect(mocks.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          kind: 'CANCELLATION',
+          status: 'ISSUED',
+          number: 'IN-00001',
+        }),
+      }),
+    );
+    expect(mocks.serviceRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'CANCELLED' }),
+      }),
     );
   });
 });

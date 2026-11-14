@@ -6,12 +6,14 @@ import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BillsModule } from './bills/bills.module';
 import { DeliveriesModule } from './deliveries/deliveries.module';
+import { DisputesModule } from './disputes/disputes.module';
 import { HealthModule } from './health/health.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { ItemsModule } from './items/items.module';
 import { LedgerModule } from './ledger/ledger.module';
 import { LocationsModule } from './locations/locations.module';
 import { MealCostsModule } from './meal-costs/meal-costs.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductionModule } from './production/production.module';
 import { PurchasesModule } from './purchases/purchases.module';
@@ -42,6 +44,8 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     ReceiptsModule,
     BillsModule,
     DeliveriesModule,
+    DisputesModule,
+    NotificationsModule,
     RecipesModule,
     ProductionModule,
     MealCostsModule,

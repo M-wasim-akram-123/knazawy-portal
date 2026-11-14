@@ -2,6 +2,16 @@
 
 Newest entry at the top.
 
+## 2026-11-14 — Amendments, cancellation charges, notifications, disputes
+
+A request can be changed after it is sent, until 24 hours before delivery in Karachi time. The airline does that itself. After the cut-off, only Karam can change it, and only until production starts. Each change keeps a number (AM-00001) and a reason. The request keeps its own number. Sending a request inside the cut-off is refused.
+
+Cancelling a draft or a request Karam has not accepted is free, as is cancelling an accepted request before the cut-off. Once the cut-off has passed on an accepted request, cancelling bills the portions ordered, and at least each item's minimum, on the rate card for the service date. The airline confirms that amount. The bill is issued at once as a cancellation, posted to the ledger, and the request is cancelled. Nothing already in production can be cancelled. A credit note is still how that charge is reduced.
+
+The app keeps a message for the people who need to know: operations when a request is sent, changed, or cancelled; the airline when it is accepted, rejected, cooked, sent out, or arrives; finance on both sides when a bill, credit note, or cancellation is issued. These messages are not email or text messages.
+
+Airline finance can dispute one issued invoice, including a cancellation. Karam finance accepts or rejects it with a reason. The invoice is not changed either way. If money is due back, finance raises a credit note.
+
 ## 2026-11-14 — Ledger
 
 Issuing an invoice posts one balanced entry: accounts receivable is debited and meal sales is credited, for the invoice total. A credit note posts the opposite, for the amount credited. A bill of zero is not posted. Each document posts once, in the same step as it is issued, and an entry is never edited or deleted. The book has two accounts, 1100 and 4000. It is not a full ledger: there is no chart of accounts to maintain and nothing is exported into another accounting package yet. Finance and an administrator see every entry. Airline finance sees only its own airline, on a Ledger page in the portal. Operations cannot open it. The page exports the entries as a spreadsheet.

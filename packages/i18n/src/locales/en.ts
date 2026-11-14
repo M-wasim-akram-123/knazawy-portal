@@ -16,6 +16,8 @@ export const en = {
     requests: 'Requests',
     deliveries: 'Deliveries',
     invoices: 'Invoices',
+    disputes: 'Disputes',
+    notifications: 'Notifications',
     ledger: 'Ledger',
     home: 'Home',
     rateCards: 'Rate cards',

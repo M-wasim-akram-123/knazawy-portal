@@ -5,7 +5,12 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/current-user';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-import { RejectServiceRequestDto, ServiceRequestDto } from './requests.dto';
+import {
+  AmendServiceRequestDto,
+  CancelServiceRequestDto,
+  RejectServiceRequestDto,
+  ServiceRequestDto,
+} from './requests.dto';
 import { RequestsService } from './requests.service';
 
 @ApiTags('Requests')
@@ -47,9 +52,22 @@ export class RequestsController {
     return this.requests.submit(actor, id);
   }
 
+  @Post(':id/amend')
+  amend(
+    @CurrentUser() actor: Actor,
+    @Param('id') id: string,
+    @Body() body: AmendServiceRequestDto,
+  ): Promise<ServiceRequestRecord> {
+    return this.requests.amend(actor, id, body);
+  }
+
   @Post(':id/cancel')
-  cancel(@CurrentUser() actor: Actor, @Param('id') id: string): Promise<ServiceRequestRecord> {
-    return this.requests.cancel(actor, id);
+  cancel(
+    @CurrentUser() actor: Actor,
+    @Param('id') id: string,
+    @Body() body: CancelServiceRequestDto,
+  ): Promise<ServiceRequestRecord> {
+    return this.requests.cancel(actor, id, body);
   }
 
   @Post(':id/accept')

@@ -104,7 +104,13 @@ function serviceFor(tx: Record<string, unknown>): InvoicesService {
     $transaction: (run: (client: object) => Promise<unknown>) => run(tx),
   };
   const audit = new AuditService();
-  return new InvoicesService(prisma as never, audit, new LedgerService(prisma as never, audit));
+  const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+  return new InvoicesService(
+    prisma as never,
+    audit,
+    new LedgerService(prisma as never, audit),
+    notifications as never,
+  );
 }
 
 describe('InvoicesService', () => {

@@ -1,10 +1,17 @@
 import {
+  amendmentError,
+  cancellationChargeApplies,
+  cutOffInstant,
+  invoicePosting,
   isKaramRole,
+  isPastCutOff,
   isRequestEditable,
   nextRequestStatus,
   passengerTotal,
+  previewCharges,
   todayInKarachi,
   type Actor,
+  type InvoicePricedLine,
   type MenuItemRecord,
   type PassengerSplit,
   type RequestAction,
@@ -17,14 +24,21 @@ import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
 import { formatIsoDate, parseIsoDate } from '../common/date';
 import { nextDocumentNumber } from '../common/document-number';
+import { LedgerService } from '../ledger/ledger.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-import type { RejectServiceRequestDto, ServiceRequestDto } from './requests.dto';
+import type {
+  AmendServiceRequestDto,
+  RejectServiceRequestDto,
+  ServiceRequestDto,
+} from './requests.dto';
 
 const requestInclude = {
   organisation: { select: { name: true } },
   createdBy: { select: { name: true } },
   lines: { include: { recipe: { select: { name: true, kind: true } } } },
+  amendments: { include: { createdBy: { select: { name: true } } } },
 } satisfies Prisma.ServiceRequestInclude;
 
 type RequestRow = Prisma.ServiceRequestGetPayload<{ include: typeof requestInclude }>;
@@ -54,6 +68,8 @@ export class RequestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
+    private readonly ledger: LedgerService,
   ) {}
 
   /** Karam staff see every airline's requests once they are sent. An airline sees only its own. */
@@ -157,7 +173,11 @@ export class RequestsService {
     if (existing.lines.length === 0) {
       throw new BadRequestException('Add a menu item before you send the request.');
     }
-    checkServiceDate(formatIsoDate(existing.serviceDate));
+    const serviceDate = formatIsoDate(existing.serviceDate);
+    checkServiceDate(serviceDate);
+    if (isPastCutOff(serviceDate, existing.deliveryTime)) {
+      throw new BadRequestException('Send the request at least 24 hours before delivery.');
+    }
     const karamOrgId = await this.karamOrganisationId();
     const lines = existing.lines.map((line) => ({
       recipeId: line.recipeId,
@@ -178,16 +198,184 @@ export class RequestsService {
         before: { status: existing.status },
         after: { status: next },
       });
+      await this.notifications.notify(tx, {
+        organisationId: karamOrgId,
+        role: 'OPERATIONS_MANAGER',
+        title: `${existing.number} was sent`,
+        body: `${existing.organisation.name} sent ${existing.number} for ${existing.flightNumber}.`,
+        entity: 'ServiceRequest',
+        entityId: id,
+        exceptUserId: actor.id,
+      });
     });
     return this.load(id);
   }
 
-  async cancel(actor: Actor, id: string): Promise<ServiceRequestRecord> {
+  /** Changes a sent request. The airline can do this until the cut-off; Karam can until production. */
+  async amend(
+    actor: Actor,
+    id: string,
+    input: AmendServiceRequestDto,
+  ): Promise<ServiceRequestRecord> {
+    assertCan(actor, 'service_requests', 'U', 'change a request');
+    const existing = isKaramRole(actor.role)
+      ? await this.findAny(id)
+      : await this.findOwn(actor, id);
+    const blocked = amendmentError(
+      existing.status,
+      isPastCutOff(formatIsoDate(existing.serviceDate), existing.deliveryTime),
+      isKaramRole(actor.role),
+    );
+    if (blocked) throw new BadRequestException(blocked);
+    const reason = input.reason.trim();
+    if (reason.length < 3) throw new BadRequestException('Give a reason for this change.');
+    const fields = requestFields(input);
+    const serviceDate = checkServiceDate(input.serviceDate);
+    if (!isKaramRole(actor.role) && isPastCutOff(input.serviceDate, fields.deliveryTime)) {
+      throw new BadRequestException('The new delivery is inside the 24-hour cut-off.');
+    }
+    const lines = linesFrom(input.lines);
+    if (lines.length === 0) {
+      throw new BadRequestException('Add a menu item before you change the request.');
+    }
+    const karamOrgId = await this.karamOrganisationId();
+
+    await this.prisma.$transaction(async (tx) => {
+      await checkMenu(tx, karamOrgId, lines);
+      await tx.serviceRequest.update({ where: { id }, data: { serviceDate, ...fields } });
+      await tx.serviceRequestLine.deleteMany({ where: { requestId: id } });
+      await tx.serviceRequestLine.createMany({
+        data: lines.map((line) => ({
+          requestId: id,
+          recipeId: line.recipeId,
+          quantity: line.quantity,
+        })),
+      });
+      const number = await nextDocumentNumber(tx, karamOrgId, 'AMENDMENT');
+      await tx.requestAmendment.create({
+        data: { requestId: id, number, reason, createdById: actor.id },
+      });
+      await this.audit.record(tx, {
+        userId: actor.id,
+        entity: 'ServiceRequest',
+        entityId: id,
+        action: 'amend',
+        before: toRequest(existing),
+        after: { number, reason, ...fields, lines },
+      });
+      await this.notifications.notify(tx, {
+        organisationId: isKaramRole(actor.role) ? existing.organisationId : karamOrgId,
+        role: isKaramRole(actor.role) ? 'AIRLINE_REQUESTER' : 'OPERATIONS_MANAGER',
+        title: `${existing.number} was changed`,
+        body: reason,
+        entity: 'ServiceRequest',
+        entityId: id,
+        exceptUserId: actor.id,
+      });
+    });
+    return this.load(id);
+  }
+
+  async cancel(
+    actor: Actor,
+    id: string,
+    input: { acceptCharge?: boolean } = {},
+  ): Promise<ServiceRequestRecord> {
     assertCan(actor, 'service_requests', 'U', 'cancel a request');
     const existing = await this.findOwn(actor, id);
     const next = nextRequestStatus(existing.status, 'cancel');
     if (!next) throw new BadRequestException('This request can no longer be cancelled.');
-    await this.decide(actor, id, existing.status, 'cancel', next, null);
+    const pastCutOff = isPastCutOff(formatIsoDate(existing.serviceDate), existing.deliveryTime);
+    if (!cancellationChargeApplies(existing.status, pastCutOff)) {
+      await this.decide(actor, existing, 'cancel', next, null);
+      return this.load(id);
+    }
+    const quote = await this.quoteCancellation(existing);
+    if (quote.total === '0.00') {
+      await this.decide(actor, existing, 'cancel', next, null);
+      return this.load(id);
+    }
+    if (!input.acceptCharge) {
+      throw new BadRequestException(`Cancelling now costs ${quote.total} PKR. Confirm the charge.`);
+    }
+    const karamOrgId = await this.karamOrganisationId();
+    await this.prisma.$transaction(async (tx) => {
+      const current = await tx.serviceRequest.findUnique({
+        where: { id },
+        select: { status: true },
+      });
+      if (current?.status !== existing.status) {
+        throw new BadRequestException('This request can no longer be cancelled.');
+      }
+      const number = await nextDocumentNumber(tx, karamOrgId, 'INVOICE');
+      const invoice = await tx.invoice.create({
+        data: {
+          organisationId: existing.organisationId,
+          number,
+          kind: 'CANCELLATION',
+          status: 'ISSUED',
+          requestId: existing.id,
+          rateCardId: quote.rateCardId,
+          reason: 'Cancelled after the cut-off',
+          createdById: actor.id,
+          issuedAt: new Date(),
+          issuedById: actor.id,
+          lines: { create: quote.lines.map(lineData) },
+        },
+      });
+      await tx.serviceRequest.update({
+        where: { id },
+        data: {
+          status: next,
+          decidedAt: new Date(),
+          decidedById: actor.id,
+          decisionNote: `Cancellation charge ${quote.total} PKR`,
+        },
+      });
+      await this.audit.record(tx, {
+        userId: actor.id,
+        entity: 'ServiceRequest',
+        entityId: id,
+        action: 'cancel',
+        before: { status: existing.status },
+        after: { status: next, invoice: number, total: quote.total },
+      });
+      await this.ledger.postFromDocument(tx, actor, {
+        organisationId: existing.organisationId,
+        karamOrganisationId: karamOrgId,
+        sourceId: invoice.id,
+        memo: `Cancellation ${number} for ${existing.number}`,
+        lines: invoicePosting(quote.total),
+      });
+      const charged = `${existing.number} was cancelled. The charge is ${quote.total} PKR.`;
+      await this.notifications.notify(tx, {
+        organisationId: karamOrgId,
+        role: 'OPERATIONS_MANAGER',
+        title: `${existing.number} was cancelled`,
+        body: charged,
+        entity: 'ServiceRequest',
+        entityId: id,
+        exceptUserId: actor.id,
+      });
+      await this.notifications.notify(tx, {
+        organisationId: karamOrgId,
+        role: 'FINANCE_OFFICER',
+        title: `${number} bills a cancellation`,
+        body: charged,
+        entity: 'Invoice',
+        entityId: invoice.id,
+        exceptUserId: actor.id,
+      });
+      await this.notifications.notify(tx, {
+        organisationId: existing.organisationId,
+        role: 'AIRLINE_FINANCE',
+        title: `${number} bills a cancellation`,
+        body: charged,
+        entity: 'Invoice',
+        entityId: invoice.id,
+        exceptUserId: actor.id,
+      });
+    });
     return this.load(id);
   }
 
@@ -196,7 +384,7 @@ export class RequestsService {
     const existing = await this.findAny(id);
     const next = nextRequestStatus(existing.status, 'accept');
     if (!next) throw new BadRequestException('Only a submitted request can be accepted.');
-    await this.decide(actor, id, existing.status, 'accept', next, null);
+    await this.decide(actor, existing, 'accept', next, null);
     return this.load(id);
   }
 
@@ -213,14 +401,13 @@ export class RequestsService {
     const existing = await this.findAny(id);
     const next = nextRequestStatus(existing.status, 'reject');
     if (!next) throw new BadRequestException('Only a submitted request can be rejected.');
-    await this.decide(actor, id, existing.status, 'reject', next, reason);
+    await this.decide(actor, existing, 'reject', next, reason);
     return this.load(id);
   }
 
   private async decide(
     actor: Actor,
-    id: string,
-    from: RequestRow['status'],
+    existing: RequestRow,
     action: RequestAction,
     next: RequestRow['status'],
     decisionNote: string | null,
@@ -228,7 +415,7 @@ export class RequestsService {
     const decided = action === 'accept' || action === 'reject';
     await this.prisma.$transaction(async (tx) => {
       await tx.serviceRequest.update({
-        where: { id },
+        where: { id: existing.id },
         data: {
           status: next,
           ...(decided ? { decidedAt: new Date(), decidedById: actor.id, decisionNote } : {}),
@@ -237,12 +424,101 @@ export class RequestsService {
       await this.audit.record(tx, {
         userId: actor.id,
         entity: 'ServiceRequest',
-        entityId: id,
+        entityId: existing.id,
         action,
-        before: { status: from },
+        before: { status: existing.status },
         after: { status: next, decisionNote },
       });
+      const karam = await tx.organisation.findFirst({
+        where: { type: 'KARAM' },
+        select: { id: true },
+      });
+      if (action === 'cancel' && karam) {
+        await this.notifications.notify(tx, {
+          organisationId: karam.id,
+          role: 'OPERATIONS_MANAGER',
+          title: `${existing.number} was cancelled`,
+          body: `${existing.organisation.name} cancelled ${existing.number}.`,
+          entity: 'ServiceRequest',
+          entityId: existing.id,
+          exceptUserId: actor.id,
+        });
+      }
+      if (action === 'accept' || action === 'reject') {
+        await this.notifications.notify(tx, {
+          organisationId: existing.organisationId,
+          role: 'AIRLINE_REQUESTER',
+          title:
+            action === 'accept'
+              ? `${existing.number} is accepted`
+              : `${existing.number} was rejected`,
+          body: decisionNote ?? `${existing.flightNumber}, ${existing.route}.`,
+          entity: 'ServiceRequest',
+          entityId: existing.id,
+          exceptUserId: actor.id,
+        });
+      }
     });
+  }
+
+  /** The charge is what the request would have billed, including each item's minimum. */
+  private async quoteCancellation(
+    row: RequestRow,
+  ): Promise<{ rateCardId: string; total: string; lines: InvoicePricedLine[] }> {
+    const card = await this.prisma.rateCard.findFirst({
+      where: {
+        organisationId: row.organisationId,
+        status: 'APPROVED',
+        validFrom: { lte: row.serviceDate },
+        OR: [{ validTo: null }, { validTo: { gte: row.serviceDate } }],
+      },
+      include: { lines: true },
+    });
+    if (!card) {
+      throw new BadRequestException(
+        'No rate card covers this service date, so the cancellation cannot be priced.',
+      );
+    }
+    const preview = previewCharges(
+      row.lines.map((line) => ({ recipeId: line.recipeId, quantity: line.quantity })),
+      {
+        lines: card.lines.map((line) => {
+          const recipe = row.lines.find((item) => item.recipeId === line.recipeId);
+          return {
+            recipeId: line.recipeId,
+            recipeName: recipe?.recipe.name ?? '',
+            kind: recipe?.recipe.kind ?? 'MEAL',
+            unitPrice: line.unitPrice.toFixed(2),
+            minimumQuantity: line.minimumQuantity,
+          };
+        }),
+      },
+    );
+    if (!preview.total) {
+      throw new BadRequestException(
+        'One of the menu items has no price, so the cancellation cannot be priced.',
+      );
+    }
+    const lines = row.lines.map((line) => {
+      const priced = preview.lines.find((item) => item.recipeId === line.recipeId);
+      const rate = card.lines.find((item) => item.recipeId === line.recipeId);
+      if (!priced?.amount || !priced.unitPrice || !rate) {
+        throw new BadRequestException(
+          'One of the menu items has no price, so the cancellation cannot be priced.',
+        );
+      }
+      return {
+        recipeId: line.recipeId,
+        recipeName: line.recipe.name,
+        kind: line.recipe.kind,
+        deliveredQuantity: 0,
+        minimumQuantity: rate.minimumQuantity,
+        billedQuantity: priced.billedQuantity,
+        unitPrice: priced.unitPrice,
+        amount: priced.amount,
+      };
+    });
+    return { rateCardId: card.id, total: preview.total, lines };
   }
 
   /** An airline reads only its own request. Anything else is reported as not found. */
@@ -357,6 +633,19 @@ async function checkMenu(
   }
 }
 
+function lineData(line: InvoicePricedLine) {
+  return {
+    recipeId: line.recipeId,
+    recipeName: line.recipeName,
+    kind: line.kind,
+    deliveredQuantity: line.deliveredQuantity,
+    minimumQuantity: line.minimumQuantity,
+    billedQuantity: line.billedQuantity,
+    unitPrice: line.unitPrice,
+    amount: line.amount,
+  };
+}
+
 function blankToNull(value: string | undefined): string | null {
   const trimmed = value?.trim() ?? '';
   return trimmed ? trimmed : null;
@@ -388,6 +677,17 @@ function toRequest(row: RequestRow): ServiceRequestRecord {
     createdByName: row.createdBy.name,
     submittedAt: row.submittedAt?.toISOString() ?? null,
     decidedAt: row.decidedAt?.toISOString() ?? null,
+    cutOffAt:
+      cutOffInstant(formatIsoDate(row.serviceDate), row.deliveryTime)?.toISOString() ?? null,
+    amendments: [...row.amendments]
+      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+      .map((amendment) => ({
+        id: amendment.id,
+        number: amendment.number,
+        reason: amendment.reason,
+        createdByName: amendment.createdBy.name,
+        createdAt: amendment.createdAt.toISOString(),
+      })),
     lines: [...row.lines]
       .sort((left, right) => left.recipe.name.localeCompare(right.recipe.name))
       .map((line) => ({

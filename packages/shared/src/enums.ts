@@ -113,6 +113,7 @@ export const AREAS = [
   'recipes',
   'distribution',
   'invoices',
+  'disputes',
   'ledger',
   'users',
 ] as const;

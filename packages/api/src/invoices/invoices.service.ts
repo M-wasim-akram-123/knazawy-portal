@@ -27,6 +27,7 @@ import { assertCan } from '../auth/permissions';
 import { formatIsoDate } from '../common/date';
 import { nextDocumentNumber } from '../common/document-number';
 import { LedgerService } from '../ledger/ledger.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import type { CreateInvoiceDto, CreditInvoiceDto } from './invoices.dto';
@@ -60,6 +61,7 @@ export class InvoicesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly ledger: LedgerService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Karam sees every invoice. An airline sees its own once they are issued. */
@@ -161,6 +163,15 @@ export class InvoicesService {
         memo: `Invoice ${existing.number}`,
         lines: invoicePosting(total),
       });
+      await this.notifications.notify(tx, {
+        organisationId: request.organisationId,
+        role: 'AIRLINE_FINANCE',
+        title: `${existing.number} was issued`,
+        body: `The bill is ${total} PKR.`,
+        entity: 'Invoice',
+        entityId: id,
+        exceptUserId: actor.id,
+      });
     });
     return this.load(id);
   }
@@ -175,7 +186,7 @@ export class InvoicesService {
 
     const creditId = await this.prisma.$transaction(async (tx) => {
       const existing = await this.find(tx, id);
-      if (existing.kind !== 'INVOICE' || existing.status !== 'ISSUED') {
+      if (existing.kind === 'CREDIT_NOTE' || existing.status !== 'ISSUED') {
         throw new BadRequestException('Credit an invoice that has been issued.');
       }
       const credited = creditedByRecipe(existing);
@@ -233,6 +244,15 @@ export class InvoicesService {
         sourceId: creditNote.id,
         memo: `Credit note ${number} on ${existing.number}`,
         lines: creditNotePosting(total),
+      });
+      await this.notifications.notify(tx, {
+        organisationId: existing.organisationId,
+        role: 'AIRLINE_FINANCE',
+        title: `${number} credits ${existing.number}`,
+        body: `${reason} The credit is ${total} PKR.`,
+        entity: 'Invoice',
+        entityId: creditNote.id,
+        exceptUserId: actor.id,
       });
       return creditNote.id;
     });
@@ -380,7 +400,7 @@ function toInvoice(row: InvoiceRow): InvoiceRecord {
       })),
     ),
   );
-  const due = row.kind === 'INVOICE' ? (amountDue(total, creditTotals) ?? total) : total;
+  const due = row.kind === 'CREDIT_NOTE' ? total : (amountDue(total, creditTotals) ?? total);
   return {
     id: row.id,
     number: row.number,

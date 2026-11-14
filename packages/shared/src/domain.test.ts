@@ -1,7 +1,8 @@
 import { isAirlineRole } from './airlines';
 import { moneyMatches, supplierBillOwed } from './bills';
 import { costDifference, costOnePortion } from './costing';
-import { formatDisplayDate, todayInKarachi } from './dates';
+import { formatDisplayDate, formatKarachiDateTime, todayInKarachi } from './dates';
+import { canDecideDispute, canDisputeInvoice, canOpenDispute, nextDisputeStatus } from './disputes';
 import {
   deliveredQuantityError,
   dispatchQuantityError,
@@ -25,7 +26,15 @@ import {
 } from './rates';
 import { can, canReadOrganisation } from './rbac';
 import { recipeIngredientQuantity } from './recipes';
-import { isRequestEditable, nextRequestStatus, passengerTotal } from './requests';
+import {
+  amendmentError,
+  cancellationChargeApplies,
+  cutOffInstant,
+  isPastCutOff,
+  isRequestEditable,
+  nextRequestStatus,
+  passengerTotal,
+} from './requests';
 import { purchaseStatusTone, statusTone } from './status';
 import { countStatusTone } from './stock';
 
@@ -329,8 +338,8 @@ describe('service requests', () => {
   it('lets Karam accept or reject only a submitted request', () => {
     expect(nextRequestStatus('SUBMITTED', 'accept')).toBe('ACCEPTED');
     expect(nextRequestStatus('SUBMITTED', 'reject')).toBe('REJECTED');
-    expect(nextRequestStatus('ACCEPTED', 'cancel')).toBeNull();
     expect(nextRequestStatus('REJECTED', 'accept')).toBeNull();
+    expect(nextRequestStatus('IN_PRODUCTION', 'cancel')).toBeNull();
     expect(isRequestEditable('SUBMITTED')).toBe(false);
   });
 
@@ -350,6 +359,53 @@ describe('service requests', () => {
     expect(can('ADMINISTRATOR', 'service_requests', 'A')).toBe(false);
     expect(can('KITCHEN_LEAD', 'service_requests', 'R')).toBe(true);
     expect(can('KITCHEN_LEAD', 'service_requests', 'A')).toBe(false);
+  });
+});
+
+describe('cut-off and amendments', () => {
+  it('closes the airline window 24 hours before delivery in Karachi', () => {
+    const cutOff = cutOffInstant('2026-12-15', '11:30');
+    expect(cutOff?.toISOString()).toBe('2026-12-14T06:30:00.000Z');
+    expect(formatKarachiDateTime(cutOff ?? new Date(0))).toBe('14/12/2026 11:30');
+    expect(isPastCutOff('2026-12-15', '11:30', new Date('2026-12-14T06:29:00.000Z'))).toBe(false);
+    expect(isPastCutOff('2026-12-15', '11:30', new Date('2026-12-14T06:30:00.000Z'))).toBe(true);
+  });
+
+  it('lets an airline change a sent request only before the cut-off', () => {
+    expect(amendmentError('SUBMITTED', false, false)).toBeNull();
+    expect(amendmentError('ACCEPTED', true, false)).toBe(
+      'The cut-off has passed. Ask Karam to change this request.',
+    );
+    expect(amendmentError('ACCEPTED', true, true)).toBeNull();
+    expect(amendmentError('IN_PRODUCTION', false, true)).toBe(
+      'This request can no longer be changed.',
+    );
+  });
+
+  it('charges a cancellation only after an accepted request passes the cut-off', () => {
+    expect(nextRequestStatus('ACCEPTED', 'cancel')).toBe('CANCELLED');
+    expect(nextRequestStatus('SUBMITTED', 'cancel')).toBe('CANCELLED');
+    expect(cancellationChargeApplies('SUBMITTED', true)).toBe(false);
+    expect(cancellationChargeApplies('ACCEPTED', false)).toBe(false);
+    expect(cancellationChargeApplies('ACCEPTED', true)).toBe(true);
+  });
+});
+
+describe('disputes', () => {
+  it('lets airline finance open a dispute and Karam finance decide it', () => {
+    expect(canOpenDispute('AIRLINE_FINANCE')).toBe(true);
+    expect(canOpenDispute('AIRLINE_REQUESTER')).toBe(false);
+    expect(canOpenDispute('FINANCE_OFFICER')).toBe(false);
+    expect(canDecideDispute('FINANCE_OFFICER')).toBe(true);
+    expect(canDecideDispute('ADMINISTRATOR')).toBe(false);
+    expect(canDecideDispute('OPERATIONS_MANAGER')).toBe(false);
+    expect(nextDisputeStatus('OPEN', 'accept')).toBe('ACCEPTED');
+    expect(nextDisputeStatus('OPEN', 'reject')).toBe('REJECTED');
+    expect(nextDisputeStatus('ACCEPTED', 'reject')).toBeNull();
+    expect(canDisputeInvoice('INVOICE', 'ISSUED')).toBe(true);
+    expect(canDisputeInvoice('CANCELLATION', 'ISSUED')).toBe(true);
+    expect(canDisputeInvoice('CREDIT_NOTE', 'ISSUED')).toBe(false);
+    expect(canDisputeInvoice('INVOICE', 'DRAFT')).toBe(false);
   });
 });
 

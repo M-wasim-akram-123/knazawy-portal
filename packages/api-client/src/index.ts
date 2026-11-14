@@ -3,6 +3,7 @@ import type {
   AccountRecord,
   AirlineOption,
   DeliveryRecord,
+  DisputeRecord,
   AirlineRecord,
   AirlineRole,
   DeliveryPoint,
@@ -14,6 +15,7 @@ import type {
   LoginResult,
   MealCostRecord,
   MenuItemRecord,
+  NotificationRecord,
   ProductionRecord,
   RateCardRecord,
   PurchaseRecord,
@@ -259,8 +261,39 @@ export class ApiClient {
     return this.request('POST', `/v1/requests/${id}/submit`);
   }
 
-  cancelRequest(id: string): Promise<ServiceRequestRecord> {
-    return this.request('POST', `/v1/requests/${id}/cancel`);
+  amendRequest(
+    id: string,
+    input: ServiceRequestInput & { reason: string },
+  ): Promise<ServiceRequestRecord> {
+    return this.request('POST', `/v1/requests/${id}/amend`, input);
+  }
+
+  cancelRequest(id: string, input: { acceptCharge?: boolean } = {}): Promise<ServiceRequestRecord> {
+    return this.request('POST', `/v1/requests/${id}/cancel`, input);
+  }
+
+  listNotifications(): Promise<NotificationRecord[]> {
+    return this.request('GET', '/v1/notifications');
+  }
+
+  markNotificationRead(id: string): Promise<NotificationRecord> {
+    return this.request('POST', `/v1/notifications/${id}/read`);
+  }
+
+  listDisputes(): Promise<DisputeRecord[]> {
+    return this.request('GET', '/v1/disputes');
+  }
+
+  openDispute(invoiceId: string, reason: string): Promise<DisputeRecord> {
+    return this.request('POST', '/v1/disputes', { invoiceId, reason });
+  }
+
+  acceptDispute(id: string, resolution: string): Promise<DisputeRecord> {
+    return this.request('POST', `/v1/disputes/${id}/accept`, { resolution });
+  }
+
+  rejectDispute(id: string, resolution: string): Promise<DisputeRecord> {
+    return this.request('POST', `/v1/disputes/${id}/reject`, { resolution });
   }
 
   acceptRequest(id: string): Promise<ServiceRequestRecord> {
