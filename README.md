@@ -10,7 +10,7 @@ Product behaviour is specified in the Product Requirements Document v0.1 (5 Nove
 
 ## Project status
 
-**Scaffold.** Phase 1A (restaurant and inventory) is the first build. The apps boot, the API exposes `/v1/health`, and the shared package holds roles, the request lifecycle, and organisation isolation. Purchasing, stock, OCR, and invoicing are not implemented yet.
+**Phase 1A recipes.** Staff can sign in, keep items, suppliers, and locations, send a purchase, receive it, post a supplier bill, issue stock, transfer stock, count a location, keep a meal or snack recipe, record a production batch that uses stock, and compare a meal's standard cost with what batches actually cost. Automatic bill reading (waiting for the restaurant's bill copies) and invoicing are still ahead.
 
 ## Branches
 

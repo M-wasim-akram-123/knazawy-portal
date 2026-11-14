@@ -41,6 +41,20 @@ model Organisation {
   createdAt DateTime           @default(now()) @map("created_at")
   updatedAt DateTime           @updatedAt @map("updated_at")
   users     User[]
+  items     Item[]
+  suppliers Supplier[]
+  locations StockLocation[]
+  sequences DocumentSequence[]
+  purchases Purchase[]
+  receipts  GoodsReceipt[]
+  layers    StockLayer[]
+  movements StockMovement[]
+  issues    StockIssue[]
+  transfers StockTransfer[]
+  counts    StockCount[]
+  recipes   Recipe[]
+  productionBatches ProductionBatch[]
+  payables  SupplierPayable[]
 
   @@map("organisations")
 }
@@ -74,4 +88,542 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@map("audit_logs")
+}
+
+enum BaseUnit {
+  KG
+  LITRE
+  PIECE
+}
+
+enum StorageType {
+  DRY
+  CHILLED
+  FROZEN
+}
+
+enum LocationType {
+  STORE
+  COLD_ROOM
+  FREEZER
+  KITCHEN
+  VEHICLE
+  BIN
+}
+
+model Item {
+  id               String              @id @default(cuid())
+  organisationId   String              @map("organisation_id")
+  organisation     Organisation        @relation(fields: [organisationId], references: [id])
+  code             String
+  name             String
+  category         String
+  baseUnit         BaseUnit            @map("base_unit")
+  purchaseUnit     String              @map("purchase_unit")
+  conversionToBase Decimal             @map("conversion_to_base") @db.Decimal(14, 4)
+  reorderLevel     Decimal             @map("reorder_level") @db.Decimal(14, 3)
+  shelfLifeDays    Int                 @map("shelf_life_days")
+  storageType      StorageType         @map("storage_type")
+  active           Boolean             @default(true)
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  suppliers        ItemSupplier[]
+  purchaseLines    PurchaseLine[]
+  receiptLines     GoodsReceiptLine[]
+  issueLines       StockIssueLine[]
+  transferLines    StockTransferLine[]
+  countLines       StockCountLine[]
+  recipeLines      RecipeLine[]
+  productionLines  ProductionLine[]
+  layers           StockLayer[]
+  movements        StockMovement[]
+
+  @@unique([organisationId, code])
+  @@index([organisationId])
+  @@map("items")
+}
+
+model Supplier {
+  id               String            @id @default(cuid())
+  organisationId   String            @map("organisation_id")
+  organisation     Organisation      @relation(fields: [organisationId], references: [id])
+  name             String
+  contactName      String?           @map("contact_name")
+  phone            String?
+  email            String?
+  taxNumber        String?           @map("tax_number")
+  paymentTermsDays Int               @default(0) @map("payment_terms_days")
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  items            ItemSupplier[]
+  purchases        Purchase[]
+  receipts         GoodsReceipt[]
+  payables         SupplierPayable[]
+
+  @@unique([organisationId, name])
+  @@index([organisationId])
+  @@map("suppliers")
+}
+
+model ItemSupplier {
+  itemId     String   @map("item_id")
+  supplierId String   @map("supplier_id")
+  item       Item     @relation(fields: [itemId], references: [id])
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+
+  @@id([itemId, supplierId])
+  @@map("item_suppliers")
+}
+
+model StockLocation {
+  id             String          @id @default(cuid())
+  organisationId String          @map("organisation_id")
+  organisation   Organisation    @relation(fields: [organisationId], references: [id])
+  parentId       String?         @map("parent_id")
+  parent         StockLocation?  @relation("LocationTree", fields: [parentId], references: [id])
+  children       StockLocation[] @relation("LocationTree")
+  name           String
+  type           LocationType
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  receipts       GoodsReceipt[]
+  layers         StockLayer[]
+  movements      StockMovement[]
+  issues         StockIssue[]
+  transfersOut   StockTransfer[] @relation("TransferFrom")
+  transfersIn    StockTransfer[] @relation("TransferTo")
+  counts         StockCount[]
+  productionBatches ProductionBatch[]
+
+  @@index([organisationId])
+  @@index([parentId])
+  @@map("stock_locations")
+}
+
+enum PurchaseStatus {
+  DRAFT
+  SENT
+  PART_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum StockMovementType {
+  RECEIPT
+  ISSUE
+  TRANSFER_OUT
+  TRANSFER_IN
+  COUNT
+  PRODUCTION_USE
+}
+
+enum TransferStatus {
+  SENT
+  RECEIVED
+}
+
+enum StockIssueReason {
+  KITCHEN_USE
+  WASTAGE
+  SPOILAGE
+  DAMAGE
+}
+
+model DocumentSequence {
+  organisationId String       @map("organisation_id")
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  kind           String
+  lastNumber     Int          @default(0) @map("last_number")
+
+  @@id([organisationId, kind])
+  @@map("document_sequences")
+}
+
+model Purchase {
+  id             String         @id @default(cuid())
+  organisationId String         @map("organisation_id")
+  organisation   Organisation   @relation(fields: [organisationId], references: [id])
+  number         String
+  supplierId     String         @map("supplier_id")
+  supplier       Supplier       @relation(fields: [supplierId], references: [id])
+  status         PurchaseStatus @default(DRAFT)
+  orderedOn      DateTime       @map("ordered_on") @db.Date
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  lines          PurchaseLine[]
+  receipts       GoodsReceipt[]
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@map("purchases")
+}
+
+model PurchaseLine {
+  id               String             @id @default(cuid())
+  purchaseId       String             @map("purchase_id")
+  purchase         Purchase           @relation(fields: [purchaseId], references: [id])
+  itemId           String             @map("item_id")
+  item             Item               @relation(fields: [itemId], references: [id])
+  quantity         Decimal            @db.Decimal(14, 3)
+  unitPrice        Decimal            @map("unit_price") @db.Decimal(14, 2)
+  receivedQuantity Decimal            @default(0) @map("received_quantity") @db.Decimal(14, 3)
+  receiptLines     GoodsReceiptLine[]
+
+  @@index([purchaseId])
+  @@map("purchase_lines")
+}
+
+model GoodsReceipt {
+  id              String             @id @default(cuid())
+  organisationId  String             @map("organisation_id")
+  organisation    Organisation       @relation(fields: [organisationId], references: [id])
+  number          String
+  purchaseId      String?            @map("purchase_id")
+  purchase        Purchase?          @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  supplierId      String             @map("supplier_id")
+  supplier        Supplier           @relation(fields: [supplierId], references: [id])
+  locationId      String             @map("location_id")
+  location        StockLocation      @relation(fields: [locationId], references: [id])
+  receivedOn      DateTime           @map("received_on") @db.Date
+  billNumber      String?            @map("bill_number")
+  billTotal       Decimal?           @map("bill_total") @db.Decimal(14, 2)
+  billTax         Decimal            @default(0) @map("bill_tax") @db.Decimal(14, 2)
+  billDiscount    Decimal            @default(0) @map("bill_discount") @db.Decimal(14, 2)
+  billFileName    String?            @map("bill_file_name")
+  billStoredAs    String?            @map("bill_stored_as")
+  billContentType String?            @map("bill_content_type")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  lines           GoodsReceiptLine[]
+  payable         SupplierPayable?
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@index([supplierId])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptLine {
+  id             String         @id @default(cuid())
+  receiptId      String         @map("receipt_id")
+  receipt        GoodsReceipt   @relation(fields: [receiptId], references: [id])
+  itemId         String         @map("item_id")
+  item           Item           @relation(fields: [itemId], references: [id])
+  purchaseLineId String?        @map("purchase_line_id")
+  purchaseLine   PurchaseLine?  @relation(fields: [purchaseLineId], references: [id], onDelete: Restrict)
+  quantity       Decimal        @db.Decimal(14, 3)
+  quantityBase   Decimal        @map("quantity_base") @db.Decimal(14, 4)
+  unitCost       Decimal        @map("unit_cost") @db.Decimal(14, 4)
+  layer          StockLayer?
+  movement       StockMovement?
+
+  @@index([receiptId])
+  @@index([itemId])
+  @@map("goods_receipt_lines")
+}
+
+enum PayableStatus {
+  OPEN
+}
+
+/// What Karam owes the supplier for a posted bill. Payments come with finance.
+model SupplierPayable {
+  id             String        @id @default(cuid())
+  organisationId String        @map("organisation_id")
+  organisation   Organisation  @relation(fields: [organisationId], references: [id])
+  supplierId     String        @map("supplier_id")
+  supplier       Supplier      @relation(fields: [supplierId], references: [id])
+  receiptId      String        @unique @map("receipt_id")
+  receipt        GoodsReceipt  @relation(fields: [receiptId], references: [id])
+  amount         Decimal       @db.Decimal(14, 2)
+  status         PayableStatus @default(OPEN)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([organisationId])
+  @@map("supplier_payables")
+}
+
+/// A receipt opens a cost layer. Later issues consume the oldest open layer first.
+model StockLayer {
+  id             String             @id @default(cuid())
+  organisationId String             @map("organisation_id")
+  organisation   Organisation       @relation(fields: [organisationId], references: [id])
+  itemId         String             @map("item_id")
+  item           Item               @relation(fields: [itemId], references: [id])
+  locationId     String             @map("location_id")
+  location       StockLocation      @relation(fields: [locationId], references: [id])
+  receiptLineId  String?            @unique @map("receipt_line_id")
+  receiptLine    GoodsReceiptLine?  @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
+  transferDrawId String?            @unique @map("transfer_draw_id")
+  transferDraw   StockTransferDraw? @relation(fields: [transferDrawId], references: [id], onDelete: Restrict)
+  countLineId    String?            @unique @map("count_line_id")
+  countLine      StockCountLine?    @relation(fields: [countLineId], references: [id], onDelete: Restrict)
+  quantityBase   Decimal            @map("quantity_base") @db.Decimal(14, 4)
+  unitCost       Decimal            @map("unit_cost") @db.Decimal(14, 4)
+  receivedOn     DateTime           @map("received_on") @db.Date
+  createdAt      DateTime           @default(now()) @map("created_at")
+  movements      StockMovement[]
+
+  @@index([organisationId, itemId, receivedOn])
+  @@map("stock_layers")
+}
+
+/// One row per layer touched. Receipts add (positive). Issues take from a layer (negative).
+model StockMovement {
+  id             String            @id @default(cuid())
+  organisationId String            @map("organisation_id")
+  organisation   Organisation      @relation(fields: [organisationId], references: [id])
+  itemId         String            @map("item_id")
+  item           Item              @relation(fields: [itemId], references: [id])
+  locationId     String            @map("location_id")
+  location       StockLocation     @relation(fields: [locationId], references: [id])
+  layerId        String            @map("layer_id")
+  layer          StockLayer        @relation(fields: [layerId], references: [id])
+  receiptLineId  String?           @unique @map("receipt_line_id")
+  receiptLine    GoodsReceiptLine? @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
+  issueId        String?           @map("issue_id")
+  issue          StockIssue?       @relation(fields: [issueId], references: [id], onDelete: Restrict)
+  issueLineId    String?           @map("issue_line_id")
+  issueLine      StockIssueLine?   @relation(fields: [issueLineId], references: [id], onDelete: Restrict)
+  transferId     String?           @map("transfer_id")
+  transfer       StockTransfer?    @relation(fields: [transferId], references: [id], onDelete: Restrict)
+  countId        String?           @map("count_id")
+  count          StockCount?       @relation(fields: [countId], references: [id], onDelete: Restrict)
+  countLineId    String?           @map("count_line_id")
+  countLine      StockCountLine?   @relation(fields: [countLineId], references: [id], onDelete: Restrict)
+  productionBatchId String?        @map("production_batch_id")
+  productionBatch   ProductionBatch? @relation(fields: [productionBatchId], references: [id], onDelete: Restrict)
+  productionLineId  String?        @map("production_line_id")
+  productionLine    ProductionLine?  @relation(fields: [productionLineId], references: [id], onDelete: Restrict)
+  type           StockMovementType
+  quantityBase   Decimal           @map("quantity_base") @db.Decimal(14, 4)
+  unitCost       Decimal           @map("unit_cost") @db.Decimal(14, 4)
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  @@index([organisationId, itemId])
+  @@index([issueId])
+  @@index([issueLineId])
+  @@index([transferId])
+  @@index([countId])
+  @@index([productionBatchId])
+  @@map("stock_movements")
+}
+
+/// A stock issue takes goods out of one location, oldest cost layer first. Issues are not edited.
+model StockIssue {
+  id             String           @id @default(cuid())
+  organisationId String           @map("organisation_id")
+  organisation   Organisation     @relation(fields: [organisationId], references: [id])
+  number         String
+  locationId     String           @map("location_id")
+  location       StockLocation    @relation(fields: [locationId], references: [id])
+  issuedOn       DateTime         @map("issued_on") @db.Date
+  reason         StockIssueReason
+  note           String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  lines          StockIssueLine[]
+  movements      StockMovement[]
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@map("stock_issues")
+}
+
+model StockIssueLine {
+  id           String          @id @default(cuid())
+  issueId      String          @map("issue_id")
+  issue        StockIssue      @relation(fields: [issueId], references: [id])
+  itemId       String          @map("item_id")
+  item         Item            @relation(fields: [itemId], references: [id])
+  quantityBase Decimal         @map("quantity_base") @db.Decimal(14, 4)
+  cost         Decimal         @db.Decimal(14, 2)
+  movements    StockMovement[]
+
+  @@index([issueId])
+  @@index([itemId])
+  @@map("stock_issue_lines")
+}
+
+/// Goods leave the source when the transfer is sent. They arrive, at the same cost, when the destination confirms.
+model StockTransfer {
+  id             String              @id @default(cuid())
+  organisationId String              @map("organisation_id")
+  organisation   Organisation        @relation(fields: [organisationId], references: [id])
+  number         String
+  fromLocationId String              @map("from_location_id")
+  fromLocation   StockLocation       @relation("TransferFrom", fields: [fromLocationId], references: [id])
+  toLocationId   String              @map("to_location_id")
+  toLocation     StockLocation       @relation("TransferTo", fields: [toLocationId], references: [id])
+  status         TransferStatus      @default(SENT)
+  sentOn         DateTime            @map("sent_on") @db.Date
+  receivedOn     DateTime?           @map("received_on") @db.Date
+  createdAt      DateTime            @default(now()) @map("created_at")
+  lines          StockTransferLine[]
+  movements      StockMovement[]
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@map("stock_transfers")
+}
+
+model StockTransferLine {
+  id           String              @id @default(cuid())
+  transferId   String              @map("transfer_id")
+  transfer     StockTransfer       @relation(fields: [transferId], references: [id])
+  itemId       String              @map("item_id")
+  item         Item                @relation(fields: [itemId], references: [id])
+  quantityBase Decimal             @map("quantity_base") @db.Decimal(14, 4)
+  cost         Decimal             @db.Decimal(14, 2)
+  draws        StockTransferDraw[]
+
+  @@index([transferId])
+  @@index([itemId])
+  @@map("stock_transfer_lines")
+}
+
+enum CountStatus {
+  COUNTING
+  WAITING
+  POSTED
+}
+
+/// A periodic count of one location. Stock changes only when the count is approved.
+model StockCount {
+  id             String           @id @default(cuid())
+  organisationId String           @map("organisation_id")
+  organisation   Organisation     @relation(fields: [organisationId], references: [id])
+  number         String
+  locationId     String           @map("location_id")
+  location       StockLocation    @relation(fields: [locationId], references: [id])
+  status         CountStatus      @default(COUNTING)
+  countedOn      DateTime         @map("counted_on") @db.Date
+  note           String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  lines          StockCountLine[]
+  movements      StockMovement[]
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@index([locationId])
+  @@map("stock_counts")
+}
+
+model StockCountLine {
+  id               String          @id @default(cuid())
+  countId          String          @map("count_id")
+  count            StockCount      @relation(fields: [countId], references: [id])
+  itemId           String          @map("item_id")
+  item             Item            @relation(fields: [itemId], references: [id])
+  bookQuantity     Decimal         @map("book_quantity") @db.Decimal(14, 4)
+  countedQuantity  Decimal?        @map("counted_quantity") @db.Decimal(14, 4)
+  varianceCost     Decimal?        @map("variance_cost") @db.Decimal(14, 2)
+  layer            StockLayer?
+  movements        StockMovement[]
+
+  @@unique([countId, itemId])
+  @@index([countId])
+  @@index([itemId])
+  @@map("stock_count_lines")
+}
+
+/// One slice of a source cost layer, kept so the destination opens the same cost on the same day.
+model StockTransferDraw {
+  id           String            @id @default(cuid())
+  lineId       String            @map("line_id")
+  line         StockTransferLine @relation(fields: [lineId], references: [id])
+  quantityBase Decimal           @map("quantity_base") @db.Decimal(14, 4)
+  unitCost     Decimal           @map("unit_cost") @db.Decimal(14, 4)
+  receivedOn   DateTime          @map("received_on") @db.Date
+  layer        StockLayer?
+
+  @@index([lineId])
+  @@map("stock_transfer_draws")
+}
+
+enum RecipeKind {
+  MEAL
+  SNACK
+}
+
+enum RecipeStatus {
+  DRAFT
+  APPROVED
+}
+
+/// A meal or snack, and the ingredients for one portion. Stock is not moved until production.
+model Recipe {
+  id              String       @id @default(cuid())
+  organisationId  String       @map("organisation_id")
+  organisation    Organisation @relation(fields: [organisationId], references: [id])
+  code            String
+  name            String
+  kind            RecipeKind
+  portions        Decimal      @db.Decimal(14, 3)
+  wastagePercent  Decimal      @map("wastage_percent") @db.Decimal(5, 2)
+  status          RecipeStatus @default(DRAFT)
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  lines           RecipeLine[]
+  productionBatches ProductionBatch[]
+
+  @@unique([organisationId, code])
+  @@index([organisationId])
+  @@map("recipes")
+}
+
+model RecipeLine {
+  id                  String  @id @default(cuid())
+  recipeId            String  @map("recipe_id")
+  recipe              Recipe  @relation(fields: [recipeId], references: [id])
+  itemId              String  @map("item_id")
+  item                Item    @relation(fields: [itemId], references: [id])
+  quantityPerPortion  Decimal @map("quantity_per_portion") @db.Decimal(14, 3)
+
+  @@unique([recipeId, itemId])
+  @@index([recipeId])
+  @@index([itemId])
+  @@map("recipe_lines")
+}
+
+/// A batch of one approved recipe. Its ingredients leave stock, oldest cost layer first, when the batch is recorded.
+model ProductionBatch {
+  id              String           @id @default(cuid())
+  organisationId  String           @map("organisation_id")
+  organisation    Organisation     @relation(fields: [organisationId], references: [id])
+  number          String
+  recipeId        String           @map("recipe_id")
+  recipe          Recipe           @relation(fields: [recipeId], references: [id])
+  locationId      String           @map("location_id")
+  location        StockLocation    @relation(fields: [locationId], references: [id])
+  producedOn      DateTime         @map("produced_on") @db.Date
+  plannedPortions Decimal          @map("planned_portions") @db.Decimal(14, 3)
+  actualPortions  Decimal          @map("actual_portions") @db.Decimal(14, 3)
+  totalCost       Decimal          @map("total_cost") @db.Decimal(14, 2)
+  costPerPortion  Decimal          @map("cost_per_portion") @db.Decimal(14, 2)
+  note            String?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  lines           ProductionLine[]
+  movements       StockMovement[]
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@index([recipeId])
+  @@map("production_batches")
+}
+
+model ProductionLine {
+  id           String          @id @default(cuid())
+  batchId      String          @map("batch_id")
+  batch        ProductionBatch @relation(fields: [batchId], references: [id])
+  itemId       String          @map("item_id")
+  item         Item            @relation(fields: [itemId], references: [id])
+  quantityBase Decimal         @map("quantity_base") @db.Decimal(14, 4)
+  cost         Decimal         @db.Decimal(14, 2)
+  movements    StockMovement[]
+
+  @@index([batchId])
+  @@index([itemId])
+  @@map("production_lines")
 }

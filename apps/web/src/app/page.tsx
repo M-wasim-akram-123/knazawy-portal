@@ -6,16 +6,17 @@ import { ApiStatus } from '../components/ApiStatus';
 export default function HomePage() {
   return (
     <>
-      <section className="kz-hero">
+      <section className="kz-page-head">
+        <h1>{messages.en.common.today}</h1>
         <p>
-          Phase 1A starts in the store. Kitchen production, airline requests, and finance stay on
-          the same record.
+          Scan a supplier bill to put goods into stock. Purchases and the item list sit in the
+          side navigation.
         </p>
-        <a className="kz-button" href="/store">
-          {messages.en.common.receiveGoods}
+        <a className="kz-button" href="/bills">
+          {messages.en.common.scanBill}
         </a>
         <p lang="ur" dir="rtl">
-          {messages.ur.common.receiveGoods}
+          {messages.ur.common.purchases}
         </p>
         <ApiStatus />
       </section>

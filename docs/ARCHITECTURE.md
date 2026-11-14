@@ -22,7 +22,7 @@ A meal or snack request is fulfilled from stock and a recipe. A hotel request (P
 
 ## Data
 
-PostgreSQL via Prisma. The first schema is the tenancy spine: `Organisation`, `User`, and `AuditLog`. Items, receipts, stock movements, recipes, requests, invoices, and journal lines land with the phase that uses them. They reference this spine; they do not grow a second user table.
+PostgreSQL via Prisma. The tenancy spine is `Organisation`, `User`, and `AuditLog`. Phase 1A adds items, suppliers, stock locations, purchases, goods receipts, supplier bills, payables, FIFO stock layers, stock issues, stock transfers, stock counts, recipes, and production batches on that spine. Meal cost is calculated from those records when it is opened. Requests, invoices, and journal lines land with the feature that posts them.
 
 Redis is started locally and is unused until a feature needs a cache or a queue.
 

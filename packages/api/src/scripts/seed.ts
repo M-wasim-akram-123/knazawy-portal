@@ -16,7 +16,7 @@ async function main(): Promise<void> {
 
   ensureDatabaseUrl();
   const prisma = new PrismaClient();
-  const email = process.env.SEED_ADMIN_EMAIL ?? 'admin@karam.local';
+  const email = (process.env.SEED_ADMIN_EMAIL ?? 'admin@karam.local').trim().toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD ?? '1234';
   const passwordHash = await bcrypt.hash(password, 10);
 

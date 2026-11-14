@@ -13,3 +13,371 @@ body {
 a {
   color: var(--kz-brand-strong);
 }
+
+.kz-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.kz-nav a,
+.kz-button-quiet {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--kz-line);
+  border-radius: 999px;
+  background: white;
+  color: var(--kz-ink);
+  font: 650 15px/1 var(--kz-font);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.kz-nav a[aria-current='page'] {
+  border-color: var(--kz-brand);
+  background: var(--kz-brand);
+  color: white;
+}
+
+.kz-button-quiet {
+  color: var(--kz-problem);
+}
+
+.kz-stack,
+.kz-form,
+.kz-field {
+  display: grid;
+  gap: 12px;
+}
+
+.kz-field span,
+.kz-field legend {
+  font-weight: 650;
+}
+
+.kz-field input,
+.kz-field select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--kz-line);
+  border-radius: 12px;
+  background: white;
+  color: var(--kz-ink);
+  font: inherit;
+}
+
+.kz-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.kz-help {
+  color: var(--kz-ink-soft);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.kz-error {
+  margin: 0;
+  color: var(--kz-problem);
+}
+
+.kz-status {
+  font-weight: 650;
+}
+
+.kz-status[data-tone='draft'] {
+  color: var(--kz-draft);
+}
+
+.kz-status[data-tone='progress'] {
+  color: var(--kz-progress);
+}
+
+.kz-status[data-tone='done'] {
+  color: var(--kz-done);
+}
+
+.kz-status[data-tone='problem'] {
+  color: var(--kz-problem);
+}
+
+.kz-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kz-app,
+.kz-signin {
+  min-height: 100vh;
+  background: var(--kz-paper);
+  color: var(--kz-ink);
+  font-family: var(--kz-font);
+}
+
+.kz-booting {
+  margin: 0;
+  padding: 24px;
+}
+
+.kz-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 64px;
+  padding: 10px 20px;
+  background: white;
+  border-bottom: 1px solid var(--kz-line);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.kz-brand {
+  display: grid;
+  gap: 2px;
+}
+
+.kz-brand strong {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.kz-brand span {
+  color: var(--kz-ink-soft);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.kz-top-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kz-top-user p {
+  display: grid;
+  margin: 0;
+  text-align: right;
+}
+
+.kz-top-user span {
+  color: var(--kz-ink-soft);
+  font-size: 13px;
+}
+
+.kz-body {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  min-height: calc(100vh - 64px);
+}
+
+.kz-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 12px;
+  background: white;
+  border-right: 1px solid var(--kz-line);
+}
+
+.kz-side a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: var(--kz-ink);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.kz-side a[aria-current='page'] {
+  background: #fff7ed;
+  color: var(--kz-brand-strong);
+}
+
+.kz-content {
+  padding: 24px;
+}
+
+.kz-signin-main {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 72px);
+  padding: 24px;
+}
+
+.kz-signin-card {
+  width: min(440px, 100%);
+}
+
+.kz-page-head {
+  margin-bottom: 16px;
+}
+
+.kz-page-head h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.kz-page-head p {
+  margin: 6px 0 0;
+  color: var(--kz-ink-soft);
+}
+
+.kz-page-head .kz-button {
+  margin-top: 16px;
+}
+
+.kz-workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.kz-panel {
+  padding: 20px;
+  border: 1px solid var(--kz-line);
+  border-radius: var(--kz-radius);
+  background: var(--kz-card);
+  box-shadow: var(--kz-shadow);
+}
+
+.kz-panel > h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+
+.kz-form-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.kz-span-2 {
+  grid-column: 1 / -1;
+}
+
+.kz-button-block {
+  width: 100%;
+}
+
+.kz-button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.kz-table-wrap {
+  overflow-x: auto;
+}
+
+.kz-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.kz-table th {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--kz-line);
+  color: var(--kz-ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.kz-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--kz-line);
+  vertical-align: middle;
+}
+
+.kz-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.kz-table a {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.kz-empty {
+  margin: 0;
+  color: var(--kz-ink-soft);
+}
+
+.kz-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kz-file-input {
+  display: none;
+}
+
+.kz-bill-preview {
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: white;
+}
+
+.kz-table select,
+.kz-table input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--kz-line);
+  border-radius: 10px;
+  background: white;
+  font: inherit;
+}
+
+@media (max-width: 960px) {
+  .kz-workspace,
+  .kz-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kz-span-2 {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 800px) {
+  .kz-body {
+    grid-template-columns: 1fr;
+  }
+
+  .kz-side {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--kz-line);
+  }
+
+  .kz-side a {
+    white-space: nowrap;
+  }
+
+  .kz-content {
+    padding: 16px;
+  }
+
+  .kz-top-user p {
+    display: none;
+  }
+}

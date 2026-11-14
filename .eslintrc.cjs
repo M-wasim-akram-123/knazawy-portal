@@ -40,6 +40,12 @@ module.exports = {
       files: ['**/*.test.ts', '**/*.test.tsx'],
       env: { jest: true },
     },
+    {
+      files: ['packages/api/**/*.ts'],
+      rules: {
+        '@typescript-eslint/consistent-type-imports': 'off',
+      },
+    },
   ],
   ignorePatterns: [
     'node_modules',

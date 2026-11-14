@@ -6,6 +6,15 @@ export interface OrganisationRef {
   name: string;
 }
 
+/** Signed-in user. The API reloads this from the database on each request. */
+export interface Actor {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  organisationId: string;
+}
+
 export interface UserRef {
   id: string;
   email: string;

@@ -1,0 +1,18 @@
+import type { LoginResult } from '@knazawy/shared';
+import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+
+import { AuthService } from './auth.service';
+import { LoginDto } from './login.dto';
+
+@ApiTags('Auth')
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly auth: AuthService) {}
+
+  @Post('login')
+  @HttpCode(200)
+  login(@Body() body: LoginDto): Promise<LoginResult> {
+    return this.auth.login(body);
+  }
+}
