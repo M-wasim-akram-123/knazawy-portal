@@ -2,10 +2,13 @@ import type { TokenStore } from '@knazawy/auth-client';
 import type {
   AccountRecord,
   AirlineOption,
+  DeliveryRecord,
   AirlineRecord,
   AirlineRole,
   DeliveryPoint,
   GoodsReceiptRecord,
+  InvoiceRecord,
+  JournalEntryRecord,
   ItemRecord,
   LocationRecord,
   LoginResult,
@@ -268,6 +271,59 @@ export class ApiClient {
     return this.request('POST', `/v1/requests/${id}/reject`, { reason });
   }
 
+  listJournal(): Promise<JournalEntryRecord[]> {
+    return this.request('GET', '/v1/ledger');
+  }
+
+  journalCsv(): Promise<{ csv: string }> {
+    return this.request('GET', '/v1/ledger/export');
+  }
+
+  listInvoices(): Promise<InvoiceRecord[]> {
+    return this.request('GET', '/v1/invoices');
+  }
+
+  createInvoice(requestId: string, note?: string): Promise<InvoiceRecord> {
+    return this.request('POST', '/v1/invoices', { requestId, note });
+  }
+
+  issueInvoice(id: string): Promise<InvoiceRecord> {
+    return this.request('POST', `/v1/invoices/${id}/issue`);
+  }
+
+  creditInvoice(
+    id: string,
+    input: { reason: string; lines: Array<{ recipeId: string; quantity: number }> },
+  ): Promise<InvoiceRecord> {
+    return this.request('POST', `/v1/invoices/${id}/credit`, input);
+  }
+
+  listDeliveries(): Promise<DeliveryRecord[]> {
+    return this.request('GET', '/v1/deliveries');
+  }
+
+  startDelivery(requestId: string): Promise<DeliveryRecord> {
+    return this.request('POST', '/v1/deliveries', { requestId });
+  }
+
+  dispatchDelivery(
+    id: string,
+    input: { vehicleNote?: string; lines: Array<{ recipeId: string; quantity: number }> },
+  ): Promise<DeliveryRecord> {
+    return this.request('POST', `/v1/deliveries/${id}/dispatch`, input);
+  }
+
+  recordDelivery(
+    id: string,
+    input: {
+      receivedBy?: string;
+      note?: string;
+      lines: Array<{ recipeId: string; quantity: number }>;
+    },
+  ): Promise<DeliveryRecord> {
+    return this.request('POST', `/v1/deliveries/${id}/deliver`, input);
+  }
+
   listRateCardAirlines(): Promise<AirlineOption[]> {
     return this.request('GET', '/v1/rate-cards/airlines');
   }
@@ -429,7 +485,10 @@ export class ApiClient {
     return this.request('POST', '/v1/recipes', input);
   }
 
-  updateRecipe(id: string, input: Partial<RecipeInput> & { active?: boolean }): Promise<RecipeRecord> {
+  updateRecipe(
+    id: string,
+    input: Partial<RecipeInput> & { active?: boolean },
+  ): Promise<RecipeRecord> {
     return this.request('PATCH', `/v1/recipes/${id}`, input);
   }
 

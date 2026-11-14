@@ -2,7 +2,20 @@ import { isAirlineRole } from './airlines';
 import { moneyMatches, supplierBillOwed } from './bills';
 import { costDifference, costOnePortion } from './costing';
 import { formatDisplayDate, todayInKarachi } from './dates';
-import { can, canReadOrganisation } from './rbac';
+import {
+  deliveredQuantityError,
+  dispatchQuantityError,
+  requestStatusAfterDelivery,
+} from './distribution';
+import {
+  amountDue,
+  canIssueInvoice,
+  canRaiseInvoice,
+  creditQuantityError,
+  priceInvoiceLines,
+  requestStatusAfterInvoice,
+} from './invoices';
+import { creditNotePosting, invoicePosting, journalBalanceError, journalCsv } from './ledger';
 import {
   billedQuantity,
   chargeFor,
@@ -10,6 +23,7 @@ import {
   rateCardCovers,
   rateCardsOverlap,
 } from './rates';
+import { can, canReadOrganisation } from './rbac';
 import { recipeIngredientQuantity } from './recipes';
 import { isRequestEditable, nextRequestStatus, passengerTotal } from './requests';
 import { purchaseStatusTone, statusTone } from './status';
@@ -158,6 +172,106 @@ describe('meal cost', () => {
     expect(costDifference('33', '30.08')).toBe('2.92');
     expect(costDifference('30', '33')).toBe('-3');
     expect(costDifference('33', '33')).toBe('0');
+  });
+});
+
+describe('deliveries', () => {
+  it('moves an accepted request through production, dispatch, and delivery', () => {
+    expect(requestStatusAfterDelivery('ACCEPTED', 'start')).toBe('IN_PRODUCTION');
+    expect(requestStatusAfterDelivery('IN_PRODUCTION', 'dispatch')).toBe('DISPATCHED');
+    expect(requestStatusAfterDelivery('DISPATCHED', 'deliver')).toBe('DELIVERED');
+    expect(requestStatusAfterDelivery('SUBMITTED', 'start')).toBeNull();
+    expect(requestStatusAfterDelivery('DELIVERED', 'deliver')).toBeNull();
+  });
+
+  it('sends no more than ordered, and records no more than was sent', () => {
+    expect(dispatchQuantityError([{ ordered: 10, quantity: 11 }])).toBe(
+      'Send no more than was ordered.',
+    );
+    expect(dispatchQuantityError([{ ordered: 10, quantity: 0 }])).toBe(
+      'Send at least one portion.',
+    );
+    expect(dispatchQuantityError([{ ordered: 10, quantity: 10 }])).toBeNull();
+    expect(deliveredQuantityError([{ dispatched: 8, quantity: 9 }])).toBe(
+      'Record no more than was sent.',
+    );
+    expect(deliveredQuantityError([{ dispatched: 8, quantity: 0 }])).toBeNull();
+  });
+});
+
+describe('ledger', () => {
+  it('posts an invoice as money owed and a sale, and a credit note the other way', () => {
+    expect(journalBalanceError(invoicePosting('13000.00'))).toBeNull();
+    expect(invoicePosting('13000.00')[0]).toEqual({
+      account: '1100',
+      side: 'DEBIT',
+      amount: '13000.00',
+    });
+    expect(creditNotePosting('1300.00').map((line) => line.side)).toEqual(['DEBIT', 'CREDIT']);
+    expect(journalBalanceError(creditNotePosting('1300.00'))).toBeNull();
+  });
+
+  it('refuses an entry that does not balance, and an empty one', () => {
+    expect(
+      journalBalanceError([
+        { account: '1100', side: 'DEBIT', amount: '10.00' },
+        { account: '4000', side: 'CREDIT', amount: '9.00' },
+      ]),
+    ).toBe('The entry does not balance.');
+    expect(journalBalanceError(invoicePosting('0.00'))).toBe('There is nothing to post.');
+  });
+
+  it('writes a spreadsheet row for each side', () => {
+    const csv = journalCsv([
+      {
+        id: 'je-1',
+        number: 'JE-00001',
+        airlineId: 'air-1',
+        airlineName: 'Sample Air',
+        memo: 'Invoice IN-00001',
+        postedAt: '2026-11-14T07:00:00.000Z',
+        total: '13000.00',
+        lines: invoicePosting('13000.00').map((line) => ({
+          ...line,
+          accountName: line.account === '1100' ? 'Accounts receivable' : 'Meal sales',
+        })),
+      },
+    ]);
+    expect(csv.split('\n')).toHaveLength(3);
+    expect(csv).toContain('14/11/2026,JE-00001,Sample Air,Accounts receivable,Debit,13000.00');
+  });
+});
+
+describe('invoices', () => {
+  it('bills the delivered portions, and at least the minimum', () => {
+    const priced = priceInvoiceLines([
+      {
+        recipeId: 'biryani',
+        recipeName: 'Chicken biryani',
+        kind: 'MEAL',
+        deliveredQuantity: 8,
+        minimumQuantity: 20,
+        unitPrice: '650',
+      },
+    ]);
+    expect(priced?.lines[0]?.billedQuantity).toBe(20);
+    expect(priced?.total).toBe('13000.00');
+  });
+
+  it('keeps a credit inside what was billed and reduces the amount due', () => {
+    expect(creditQuantityError(20, 0, 21)).toBe('Credit no more than was billed.');
+    expect(creditQuantityError(20, 18, 2)).toBeNull();
+    expect(amountDue('13000.00', ['1300.00'])).toBe('11700.00');
+    expect(amountDue('13000.00', ['13000.00', '0.01'])).toBeNull();
+  });
+
+  it('lets Karam finance raise and issue a bill, and an airline only read it', () => {
+    expect(canRaiseInvoice('FINANCE_OFFICER')).toBe(true);
+    expect(canIssueInvoice('FINANCE_OFFICER')).toBe(true);
+    expect(canRaiseInvoice('AIRLINE_FINANCE')).toBe(false);
+    expect(canRaiseInvoice('OPERATIONS_MANAGER')).toBe(false);
+    expect(requestStatusAfterInvoice('DELIVERED')).toBe('INVOICED');
+    expect(requestStatusAfterInvoice('DISPATCHED')).toBeNull();
   });
 });
 

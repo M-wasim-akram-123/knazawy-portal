@@ -12,7 +12,10 @@ import { clearSession, readSessionUser } from '../lib/session';
 const links: Array<{ href: string; label: string; area?: Area }> = [
   { href: '/', label: messages.en.common.home },
   { href: '/requests', label: messages.en.common.requests, area: 'service_requests' },
+  { href: '/deliveries', label: messages.en.common.deliveries, area: 'distribution' },
   { href: '/rates', label: messages.en.common.rateCards, area: 'service_rates' },
+  { href: '/invoices', label: messages.en.common.invoices, area: 'invoices' },
+  { href: '/ledger', label: messages.en.common.ledger, area: 'ledger' },
 ];
 
 export function PortalFrame({ children }: { children: ReactNode }) {

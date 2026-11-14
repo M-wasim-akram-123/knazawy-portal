@@ -9,6 +9,10 @@ const PREFIX = {
   PRODUCTION: 'PB',
   SERVICE_REQUEST: 'RQ',
   RATE_CARD: 'RC',
+  DELIVERY: 'DN',
+  INVOICE: 'IN',
+  CREDIT_NOTE: 'CN',
+  JOURNAL: 'JE',
 } as const;
 
 export async function nextDocumentNumber(

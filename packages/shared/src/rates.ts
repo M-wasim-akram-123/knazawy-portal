@@ -50,6 +50,14 @@ export function chargeFor(quantity: number, unitPrice: string): string | null {
   return fromPaisa(price * BigInt(quantity));
 }
 
+/** Left minus right, in PKR to 2 dp. Null when either value is not money, or the result is negative. */
+export function subtractMoney(left: string, right: string): string | null {
+  const from = toPaisa(left);
+  const taken = toPaisa(right);
+  if (from === null || taken === null || taken > from) return null;
+  return fromPaisa(from - taken);
+}
+
 export function sumMoney(values: string[]): string | null {
   let total = 0n;
   for (const value of values) {

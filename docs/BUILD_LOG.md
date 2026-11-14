@@ -2,6 +2,18 @@
 
 Newest entry at the top.
 
+## 2026-11-14 — Ledger
+
+Issuing an invoice posts one balanced entry: accounts receivable is debited and meal sales is credited, for the invoice total. A credit note posts the opposite, for the amount credited. A bill of zero is not posted. Each document posts once, in the same step as it is issued, and an entry is never edited or deleted. The book has two accounts, 1100 and 4000. It is not a full ledger: there is no chart of accounts to maintain and nothing is exported into another accounting package yet. Finance and an administrator see every entry. Airline finance sees only its own airline, on a Ledger page in the portal. Operations cannot open it. The page exports the entries as a spreadsheet.
+
+## 2026-11-14 — Invoices
+
+Finance prepares an invoice for a delivered request. The price is the approved rate card that covers the service date, and the billed quantity is the portions that arrived, or the card's minimum when that is higher. Prices are taken again when the invoice is issued, then locked. The request becomes invoiced and the airline can read it. A draft stays inside Karam. A correction is a credit note against the issued invoice: it uses the price that was billed, it cannot credit more than is still open, and it needs a reason. The invoice itself is never edited or deleted. Raising and issuing a bill belongs to Karam finance. An airline finance user can read invoices; their permission to create one is not used for this bill. The ledger is still ahead.
+
+## 2026-11-14 — Deliveries
+
+Operations takes an accepted request into production, then records what leaves the kitchen and what arrives. One request has one delivery, numbered DN-00001 from the restaurant's sequence. Portions sent cannot exceed what was ordered, and at least one portion must leave. Portions recorded on arrival cannot exceed what was sent. If nothing arrives, a reason is required. Once recorded, the delivery is not edited: the portions that arrived are what an invoice will bill, and a correction later is a credit or debit note. The delivery does not move stock; cooking already did that. An airline requester can read its own deliveries. Finance, the kitchen, and an administrator cannot. Invoicing is still ahead.
+
 ## 2026-11-14 — Rate cards
 
 A rate card holds the price an airline pays for each meal and snack, in PKR, over a range of dates. A card can be left open-ended. Each priced item can carry a minimum number of portions. The airline pays for the portions delivered, but never fewer than that minimum. Finance writes a card as a draft and approves it. An administrator can correct a draft. Once approved, a card's prices cannot change. Two approved cards for the same airline can never share a date, so exactly one card applies to any service date. To change prices, finance ends the current card on a date (today or later, so past days keep their prices) and approves a new one. Cards are numbered RC-00001 from the restaurant's sequence. An airline sees only its own approved cards, on a Rate cards page in the portal. Its request form shows the price of each item, the charge after the minimum, and an estimated total from the card that covers the service date. Invoicing will use the same rule on delivered portions.

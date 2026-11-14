@@ -1,6 +1,14 @@
 import { OrganisationType, PrismaClient, UserRole, UserStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
+/** One sign-in per Karam role, so each screen can be tried locally. */
+const SAMPLE_STAFF = [
+  { email: 'ops@karam.local', name: 'Operations Manager', role: UserRole.OPERATIONS_MANAGER },
+  { email: 'store@karam.local', name: 'Storekeeper', role: UserRole.STOREKEEPER },
+  { email: 'kitchen@karam.local', name: 'Kitchen Lead', role: UserRole.KITCHEN_LEAD },
+  { email: 'finance@karam.local', name: 'Finance Officer', role: UserRole.FINANCE_OFFICER },
+] as const;
+
 function ensureDatabaseUrl(): void {
   if (process.env.DATABASE_URL) return;
   if (process.env.NODE_ENV === 'production') {
@@ -49,7 +57,31 @@ async function main(): Promise<void> {
       },
     });
 
+    const staffHash = process.env.SEED_STAFF_PASSWORD
+      ? await bcrypt.hash(process.env.SEED_STAFF_PASSWORD, 10)
+      : passwordHash;
+    for (const staff of SAMPLE_STAFF) {
+      await prisma.user.upsert({
+        where: { email: staff.email },
+        update: {
+          passwordHash: staffHash,
+          role: staff.role,
+          status: UserStatus.ACTIVE,
+          organisationId: organisation.id,
+        },
+        create: {
+          organisationId: organisation.id,
+          name: staff.name,
+          email: staff.email,
+          role: staff.role,
+          status: UserStatus.ACTIVE,
+          passwordHash: staffHash,
+        },
+      });
+    }
+
     console.info(`Seeded ${email} on organisation ${organisation.code}`);
+    console.info(`Seeded sample staff: ${SAMPLE_STAFF.map((staff) => staff.email).join(', ')}`);
   } finally {
     await prisma.$disconnect();
   }

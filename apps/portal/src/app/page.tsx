@@ -63,6 +63,24 @@ export default function HomePage() {
             <p>Ask for meals and snacks for a flight and follow each request.</p>
           </a>
         ) : null}
+        {can(account.role, 'distribution', 'R') ? (
+          <a className="kz-panel kz-home-card" href="/deliveries">
+            <h2>{messages.en.common.deliveries}</h2>
+            <p>See what has left the kitchen and what arrived for your flights.</p>
+          </a>
+        ) : null}
+        {can(account.role, 'ledger', 'R') ? (
+          <a className="kz-panel kz-home-card" href="/ledger">
+            <h2>{messages.en.common.ledger}</h2>
+            <p>See what has been posted for your airline.</p>
+          </a>
+        ) : null}
+        {can(account.role, 'invoices', 'R') ? (
+          <a className="kz-panel kz-home-card" href="/invoices">
+            <h2>{messages.en.common.invoices}</h2>
+            <p>See the bills Karam has issued and any credit notes.</p>
+          </a>
+        ) : null}
         {can(account.role, 'service_rates', 'R') ? (
           <a className="kz-panel kz-home-card" href="/rates">
             <h2>{messages.en.common.rateCards}</h2>
