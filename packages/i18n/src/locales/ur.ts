@@ -32,6 +32,7 @@ export const ur = {
     recipes: 'ترکیبیں',
     production: 'پیداوار',
     mealCost: 'کھانے کی لاگت',
+    forecast: 'پیش گوئی',
     signIn: 'سائن ان',
     signOut: 'سائن آؤٹ',
     archive: 'غیر فعال کریں',

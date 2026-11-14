@@ -34,6 +34,7 @@ export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>>
     recipes: ['R', 'A'],
     distribution: ['C', 'R', 'U'],
     invoices: ['R'],
+    forecast: ['R'],
   },
   STOREKEEPER: {
     service_requests: ['R'],
@@ -44,6 +45,7 @@ export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>>
     service_requests: ['R'],
     stock: ['R'],
     recipes: ['C', 'R', 'U'],
+    forecast: ['R'],
   },
   FINANCE_OFFICER: {
     service_rates: ['C', 'R', 'U', 'A'],
@@ -65,6 +67,7 @@ export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>>
     invoices: ['R'],
     disputes: ['R'],
     ledger: ['R'],
+    forecast: ['R'],
     users: ['C', 'R', 'U'],
   },
 };

@@ -7,6 +7,7 @@ import type {
   AirlineRecord,
   AirlineRole,
   DeliveryPoint,
+  ForecastRecord,
   GoodsReceiptRecord,
   InvoiceRecord,
   JournalEntryRecord,
@@ -675,6 +676,10 @@ export class ApiClient {
 
   listMealCosts(): Promise<MealCostRecord[]> {
     return this.request('GET', '/v1/meal-costs');
+  }
+
+  getForecast(): Promise<ForecastRecord> {
+    return this.request('GET', '/v1/forecast');
   }
 
   listProduction(): Promise<ProductionRecord[]> {

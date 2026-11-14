@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { BillsModule } from './bills/bills.module';
 import { DeliveriesModule } from './deliveries/deliveries.module';
 import { DisputesModule } from './disputes/disputes.module';
+import { ForecastModule } from './forecast/forecast.module';
 import { HealthModule } from './health/health.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { ItemsModule } from './items/items.module';
@@ -48,6 +49,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     BillsModule,
     DeliveriesModule,
     DisputesModule,
+    ForecastModule,
     NotificationsModule,
     RecipesModule,
     ProductionModule,

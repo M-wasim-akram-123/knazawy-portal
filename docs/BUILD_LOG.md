@@ -2,6 +2,10 @@
 
 Newest entry at the top.
 
+## 2026-11-14 — Forecast of meals and snacks for the next seven days
+
+Operations, the kitchen lead, and administrators see the expected meals and snacks for today and the next six days, per airline and item, with a total per item across airlines. The expected number for a day is the average of the same weekday over the last four weeks. Only accepted requests count, so drafts, submitted, rejected, and cancelled requests are left out. The page also shows what is already booked for each day. Nothing is stored: the forecast is worked out when the page loads. Airlines and finance cannot see it. Stock needs and billing forecasts are not built yet.
+
 ## 2026-11-14 — A room cannot leave while a guest is in it or accepted stays need it
 
 Archiving a room, or moving it to another room type, is refused in two cases. A guest is checked into the room, or the accepted stays of that type would be left short of rooms on any night from today on. The message says how many rooms the stays need. The check runs under the same lock as check-in and acceptance, so a stay cannot be accepted while the room is leaving. Reactivating a room is not limited. Before this, an archived room could leave accepted stays with no room behind them.

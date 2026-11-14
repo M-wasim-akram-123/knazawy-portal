@@ -4,6 +4,7 @@ export * from './enums';
 export * from './dates';
 export * from './disputes';
 export * from './distribution';
+export * from './forecast';
 export * from './invoices';
 export * from './ledger';
 export * from './notifications';
