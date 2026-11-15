@@ -107,8 +107,11 @@ export function InvoicesScreen() {
             </span>
           </h2>
           <p className="kz-help">
-            {invoice.requestNumber}, flight {invoice.flightNumber},{' '}
-            {formatDisplayDate(invoice.serviceDate)}
+            {invoice.requestNumber && invoice.flightNumber
+              ? `${invoice.requestNumber}, flight ${invoice.flightNumber}${
+                  invoice.serviceDate ? `, ${formatDisplayDate(invoice.serviceDate)}` : ''
+                }`
+              : 'One-off invoice'}
             {invoice.sourceInvoiceNumber ? `, credits ${invoice.sourceInvoiceNumber}` : ''}
           </p>
           <div className="kz-table-wrap">

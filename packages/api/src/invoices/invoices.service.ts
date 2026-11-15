@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   amountDue,
   canIssueInvoice,
@@ -6,11 +8,13 @@ import {
   creditNotePosting,
   creditQuantityError,
   invoicePosting,
+  isMoney,
   isKaramRole,
   priceInvoiceLines,
   requestStatusAfterInvoice,
   sumMoney,
   type Actor,
+  type BillableRequestOption,
   type InvoicePricedLine,
   type InvoiceRecord,
 } from '@knazawy/shared';
@@ -25,15 +29,16 @@ import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
 import { formatIsoDate } from '../common/date';
+import { parsePositiveDecimal } from '../common/decimal';
 import { nextDocumentNumber } from '../common/document-number';
 import { LedgerService } from '../ledger/ledger.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-import type { CreateInvoiceDto, CreditInvoiceDto } from './invoices.dto';
+import type { CreateInvoiceDto, CreateManualInvoiceDto, CreditInvoiceDto } from './invoices.dto';
 
 const invoiceInclude = {
-  organisation: { select: { name: true } },
+  organisation: { select: { name: true, taxNumber: true } },
   request: { select: { number: true, flightNumber: true, serviceDate: true, status: true } },
   rateCard: { select: { number: true } },
   sourceInvoice: { select: { number: true } },
@@ -77,6 +82,29 @@ export class InvoicesService {
     return rows.map(toInvoice);
   }
 
+  async billableRequests(actor: Actor): Promise<BillableRequestOption[]> {
+    this.assertCanRaise(actor);
+    const rows = await this.prisma.serviceRequest.findMany({
+      where: {
+        status: 'DELIVERED',
+        invoices: { none: { kind: 'INVOICE' } },
+      },
+      select: {
+        id: true,
+        number: true,
+        flightNumber: true,
+        organisation: { select: { name: true } },
+      },
+      orderBy: [{ serviceDate: 'asc' }, { number: 'asc' }],
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      number: row.number,
+      airlineName: row.organisation.name,
+      flightNumber: row.flightNumber,
+    }));
+  }
+
   /** Prices a delivered request from the rate card that covers its service date. */
   async create(actor: Actor, input: CreateInvoiceDto): Promise<InvoiceRecord> {
     this.assertCanRaise(actor);
@@ -118,7 +146,51 @@ export class InvoicesService {
     return this.load(id);
   }
 
-  /** Locks the prices and shows the invoice to the airline. The request becomes invoiced. */
+  /** Creates a bill for an airline without granting it portal access. */
+  async createManual(actor: Actor, input: CreateManualInvoiceDto): Promise<InvoiceRecord> {
+    this.assertCanRaise(actor);
+    const airlineName = input.airlineName.trim();
+    if (airlineName.length < 2) throw new BadRequestException('Enter the airline name.');
+    const karamOrgId = await this.karamOrganisationId();
+
+    const id = await this.prisma.$transaction(async (tx) => {
+      const lines = await this.manualLines(tx, input, karamOrgId);
+      const customer = await tx.organisation.create({
+        data: {
+          code: `ONEOFF-${randomUUID()}`,
+          type: 'ONE_OFF_AIRLINE',
+          name: airlineName,
+          taxNumber: blankToNull(input.taxNumber),
+        },
+      });
+      const number = await nextDocumentNumber(tx, karamOrgId, 'INVOICE');
+      const invoice = await tx.invoice.create({
+        data: {
+          organisationId: customer.id,
+          number,
+          note: blankToNull(input.note),
+          createdById: actor.id,
+          lines: { create: lines.map(lineData) },
+        },
+      });
+      await this.audit.record(tx, {
+        userId: actor.id,
+        entity: 'Invoice',
+        entityId: invoice.id,
+        action: 'create',
+        after: {
+          number,
+          customer: airlineName,
+          oneOff: true,
+          total: totalOf(lines),
+        },
+      });
+      return invoice.id;
+    });
+    return this.load(id);
+  }
+
+  /** Locks the prices and posts the invoice. A linked request becomes invoiced. */
   async issue(actor: Actor, id: string): Promise<InvoiceRecord> {
     if (!canIssueInvoice(actor.role)) {
       throw new ForbiddenException('You cannot issue an invoice.');
@@ -129,25 +201,35 @@ export class InvoicesService {
       if (existing.kind !== 'INVOICE' || existing.status !== 'DRAFT') {
         throw new BadRequestException('Only a draft invoice can be issued.');
       }
-      const next = requestStatusAfterInvoice(existing.request.status);
-      if (!next) throw new BadRequestException('Only a delivered request can be invoiced.');
-      const request = await this.loadRequest(tx, existing.requestId);
-      const charge = await this.price(tx, request);
-      await tx.invoiceLine.deleteMany({ where: { invoiceId: id } });
-      await tx.invoiceLine.createMany({
-        data: charge.lines.map((line) => ({ invoiceId: id, ...lineData(line) })),
-      });
+      let total: string;
+      let rateCardId: string | undefined;
+      if (existing.requestId) {
+        const request = await this.loadRequest(tx, existing.requestId);
+        const next = requestStatusAfterInvoice(request.status);
+        if (!next) throw new BadRequestException('Only a delivered request can be invoiced.');
+        const charge = await this.price(tx, request);
+        await tx.invoiceLine.deleteMany({ where: { invoiceId: id } });
+        await tx.invoiceLine.createMany({
+          data: charge.lines.map((line) => ({ invoiceId: id, ...lineData(line) })),
+        });
+        rateCardId = charge.rateCardId;
+        await tx.serviceRequest.update({ where: { id: request.id }, data: { status: next } });
+        total = totalOf(charge.lines);
+      } else {
+        if (existing.lines.length === 0) {
+          throw new BadRequestException('Add at least one menu item before issuing this invoice.');
+        }
+        total = totalOf(existing.lines.map((line) => ({ amount: line.amount.toFixed(2) })));
+      }
       await tx.invoice.update({
         where: { id },
         data: {
-          rateCardId: charge.rateCardId,
+          rateCardId,
           status: 'ISSUED',
           issuedAt: new Date(),
           issuedById: actor.id,
         },
       });
-      await tx.serviceRequest.update({ where: { id: request.id }, data: { status: next } });
-      const total = totalOf(charge.lines);
       await this.audit.record(tx, {
         userId: actor.id,
         entity: 'Invoice',
@@ -157,21 +239,23 @@ export class InvoicesService {
         after: { status: 'ISSUED', total },
       });
       await this.ledger.post(tx, actor, {
-        organisationId: request.organisationId,
+        organisationId: existing.organisationId,
         karamOrganisationId: karamOrgId,
         sourceId: id,
         memo: `Invoice ${existing.number}`,
         lines: invoicePosting(total),
       });
-      await this.notifications.notify(tx, {
-        organisationId: request.organisationId,
-        role: 'AIRLINE_FINANCE',
-        title: `${existing.number} was issued`,
-        body: `The bill is ${total} PKR.`,
-        entity: 'Invoice',
-        entityId: id,
-        exceptUserId: actor.id,
-      });
+      if (existing.requestId) {
+        await this.notifications.notify(tx, {
+          organisationId: existing.organisationId,
+          role: 'AIRLINE_FINANCE',
+          title: `${existing.number} was issued`,
+          body: `The bill is ${total} PKR.`,
+          entity: 'Invoice',
+          entityId: id,
+          exceptUserId: actor.id,
+        });
+      }
     });
     return this.load(id);
   }
@@ -245,15 +329,17 @@ export class InvoicesService {
         memo: `Credit note ${number} on ${existing.number}`,
         lines: creditNotePosting(total),
       });
-      await this.notifications.notify(tx, {
-        organisationId: existing.organisationId,
-        role: 'AIRLINE_FINANCE',
-        title: `${number} credits ${existing.number}`,
-        body: `${reason} The credit is ${total} PKR.`,
-        entity: 'Invoice',
-        entityId: creditNote.id,
-        exceptUserId: actor.id,
-      });
+      if (existing.requestId) {
+        await this.notifications.notify(tx, {
+          organisationId: existing.organisationId,
+          role: 'AIRLINE_FINANCE',
+          title: `${number} credits ${existing.number}`,
+          body: `${reason} The credit is ${total} PKR.`,
+          entity: 'Invoice',
+          entityId: creditNote.id,
+          exceptUserId: actor.id,
+        });
+      }
       return creditNote.id;
     });
     return this.load(creditId);
@@ -312,6 +398,56 @@ export class InvoicesService {
     const priced = priceInvoiceLines(lines);
     if (!priced) throw new BadRequestException('This rate card has a price that cannot be used.');
     return { rateCardId: card.id, lines: priced.lines };
+  }
+
+  private async manualLines(
+    tx: Prisma.TransactionClient,
+    input: CreateManualInvoiceDto,
+    karamOrgId: string,
+  ): Promise<InvoicePricedLine[]> {
+    const recipeIds = input.lines.map((line) => line.recipeId);
+    if (new Set(recipeIds).size !== recipeIds.length) {
+      throw new BadRequestException('Add each menu item only once.');
+    }
+    const recipes = await tx.recipe.findMany({
+      where: {
+        organisationId: karamOrgId,
+        id: { in: recipeIds },
+        active: true,
+        status: 'APPROVED',
+      },
+      select: { id: true, name: true, kind: true },
+    });
+    const recipeById = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+    if (recipeById.size !== recipeIds.length) {
+      throw new BadRequestException('Choose an active, approved menu item for every line.');
+    }
+    const lines = input.lines.map((line) => {
+      const recipe = recipeById.get(line.recipeId);
+      if (!recipe) throw new BadRequestException('Choose an active, approved menu item.');
+      const price = line.unitPrice.trim();
+      parsePositiveDecimal(price, 'Enter a unit price greater than zero.');
+      if (!isMoney(price)) throw new BadRequestException('Enter a valid PKR unit price.');
+      const amount = chargeFor(line.quantity, price);
+      if (amount === null || new Prisma.Decimal(amount).gt('999999999999.99')) {
+        throw new BadRequestException('This invoice line exceeds the supported amount.');
+      }
+      return {
+        recipeId: recipe.id,
+        recipeName: recipe.name,
+        kind: recipe.kind,
+        deliveredQuantity: line.quantity,
+        minimumQuantity: 0,
+        billedQuantity: line.quantity,
+        unitPrice: new Prisma.Decimal(price).toFixed(2),
+        amount,
+      };
+    });
+    const total = sumMoney(lines.map((line) => line.amount));
+    if (!total || new Prisma.Decimal(total).gt('999999999999.99')) {
+      throw new BadRequestException('This invoice exceeds the supported total.');
+    }
+    return lines;
   }
 
   private async find(tx: Prisma.TransactionClient, id: string): Promise<InvoiceRow> {
@@ -408,11 +544,12 @@ function toInvoice(row: InvoiceRow): InvoiceRecord {
     status: row.status,
     airlineId: row.organisationId,
     airlineName: row.organisation.name,
+    airlineTaxNumber: row.organisation.taxNumber,
     requestId: row.requestId,
-    requestNumber: row.request.number,
-    flightNumber: row.request.flightNumber,
-    serviceDate: formatIsoDate(row.request.serviceDate),
-    rateCardNumber: row.rateCard.number,
+    requestNumber: row.request?.number ?? null,
+    flightNumber: row.request?.flightNumber ?? null,
+    serviceDate: row.request ? formatIsoDate(row.request.serviceDate) : null,
+    rateCardNumber: row.rateCard?.number ?? null,
     sourceInvoiceNumber: row.sourceInvoice?.number ?? null,
     note: row.note,
     reason: row.reason,

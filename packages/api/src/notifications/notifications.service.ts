@@ -50,6 +50,10 @@ export class NotificationsService {
     return rows.map(toNotification);
   }
 
+  unreadCount(actor: Actor): Promise<number> {
+    return this.prisma.notification.count({ where: { userId: actor.id, readAt: null } });
+  }
+
   async markRead(actor: Actor, id: string): Promise<NotificationRecord> {
     const updated = await this.prisma.notification.updateMany({
       where: { id, userId: actor.id, readAt: null },
@@ -65,6 +69,15 @@ export class NotificationsService {
     const row = await this.prisma.notification.findFirst({ where: { id, userId: actor.id } });
     if (!row) throw new NotFoundException('That notification was not found.');
     return toNotification(row);
+  }
+
+  async markAllRead(actor: Actor): Promise<{ count: number; readAt: string }> {
+    const readAt = new Date();
+    const updated = await this.prisma.notification.updateMany({
+      where: { userId: actor.id, readAt: null },
+      data: { readAt },
+    });
+    return { count: updated.count, readAt: readAt.toISOString() };
   }
 }
 

@@ -53,7 +53,7 @@ function invoiceRow(overrides: Record<string, unknown> = {}) {
     note: null,
     reason: null,
     issuedAt: null,
-    organisation: { name: 'Sample Air' },
+    organisation: { name: 'Sample Air', taxNumber: null },
     request: {
       number: 'RQ-00001',
       flightNumber: 'PK301',
@@ -124,6 +124,28 @@ describe('InvoicesService', () => {
     );
   });
 
+  it('lists only delivered, unbilled requests for invoice creators', async () => {
+    const request = {
+      id: 'rq-2',
+      number: 'RQ-00002',
+      flightNumber: 'PK302',
+      organisation: { name: 'Sample Air' },
+    };
+    const mocks = {
+      serviceRequest: { findMany: jest.fn().mockResolvedValue([request]) },
+    };
+    const service = serviceFor(mocks);
+    await expect(service.billableRequests(finance)).resolves.toEqual([
+      { id: 'rq-2', number: 'RQ-00002', flightNumber: 'PK302', airlineName: 'Sample Air' },
+    ]);
+    expect(mocks.serviceRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: 'DELIVERED', invoices: { none: { kind: 'INVOICE' } } },
+      }),
+    );
+    await expect(service.billableRequests(operations)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('bills the delivered portions and at least the minimum', async () => {
     const mocks = {
       ...priced(),
@@ -147,6 +169,71 @@ describe('InvoicesService', () => {
     );
     expect(invoice.total).toBe('13000.00');
     expect(invoice.lines[0]?.creditedQuantity).toBe(0);
+  });
+
+  it('prepares an itemized invoice for an unregistered airline without a portal user', async () => {
+    const manual = invoiceRow({
+      organisationId: 'one-off-1',
+      requestId: null,
+      request: null,
+      rateCard: null,
+      organisation: { name: 'Guest Air', taxNumber: 'TAX-1' },
+      lines: [
+        {
+          recipeId: 'recipe-1',
+          recipeName: 'Chicken biryani',
+          kind: 'MEAL',
+          deliveredQuantity: 3,
+          minimumQuantity: 0,
+          billedQuantity: 3,
+          unitPrice: new Prisma.Decimal('700'),
+          amount: new Prisma.Decimal('2100'),
+        },
+      ],
+    });
+    const mocks = {
+      organisation: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'org-karam' }),
+        create: jest.fn().mockResolvedValue({ id: 'one-off-1' }),
+      },
+      recipe: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'recipe-1', name: 'Chicken biryani', kind: 'MEAL' }]),
+      },
+      documentSequence: { upsert: jest.fn().mockResolvedValue({ lastNumber: 2 }) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+      invoice: {
+        create: jest.fn().mockResolvedValue({ id: 'in-2' }),
+        findUnique: jest.fn().mockResolvedValue(manual),
+      },
+    };
+    const service = serviceFor(mocks);
+    const invoice = await service.createManual(finance, {
+      airlineName: 'Guest Air',
+      taxNumber: 'TAX-1',
+      lines: [{ recipeId: 'recipe-1', quantity: 3, unitPrice: '700' }],
+    });
+
+    expect(mocks.organisation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'ONE_OFF_AIRLINE',
+          name: 'Guest Air',
+          taxNumber: 'TAX-1',
+        }),
+      }),
+    );
+    expect(mocks.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          organisationId: 'one-off-1',
+          lines: { create: [expect.objectContaining({ billedQuantity: 3, amount: '2100.00' })] },
+        }),
+      }),
+    );
+    expect(invoice.requestId).toBeNull();
+    expect(invoice.airlineTaxNumber).toBe('TAX-1');
   });
 
   it('will not invoice a request that has not been delivered', async () => {
@@ -180,6 +267,47 @@ describe('InvoicesService', () => {
     );
     expect(mocks.serviceRequest.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: 'INVOICED' } }),
+    );
+  });
+
+  it('issues a one-off invoice without changing a service request', async () => {
+    const manual = invoiceRow({
+      organisationId: 'one-off-1',
+      requestId: null,
+      request: null,
+      rateCard: null,
+      lines: [
+        {
+          recipeId: 'recipe-1',
+          recipeName: 'Chicken biryani',
+          kind: 'MEAL',
+          deliveredQuantity: 3,
+          minimumQuantity: 0,
+          billedQuantity: 3,
+          unitPrice: new Prisma.Decimal('700'),
+          amount: new Prisma.Decimal('2100'),
+        },
+      ],
+    });
+    const mocks = {
+      ...priced(),
+      invoice: {
+        findUnique: jest.fn().mockResolvedValue(manual),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      journalEntry: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'je-3' }),
+      },
+    };
+    const service = serviceFor(mocks);
+    await service.issue(finance, 'in-2');
+
+    expect(mocks.serviceRequest.update).not.toHaveBeenCalled();
+    expect(mocks.journalEntry.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ organisationId: 'one-off-1' }),
+      }),
     );
   });
 

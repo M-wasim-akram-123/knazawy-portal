@@ -8,6 +8,7 @@ import {
   type RoomFloorRecord,
   type RoomTypeRecord,
 } from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -31,6 +32,7 @@ export function RoomsScreen() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   async function reload(): Promise<void> {
     const [nextFloors, nextTypes, nextRooms] = await Promise.all([
@@ -65,7 +67,7 @@ export function RoomsScreen() {
   const openFloors = floors.filter((floor) => floor.active);
   const openTypes = types.filter((roomType) => roomType.active);
 
-  async function run(action: () => Promise<void>, message: string): Promise<void> {
+  async function run(action: () => Promise<void>, message: string): Promise<boolean> {
     setBusy(true);
     setError('');
     setSaved('');
@@ -73,8 +75,10 @@ export function RoomsScreen() {
       await action();
       await reload();
       setSaved(message);
+      return true;
     } catch (caught: unknown) {
       setError(explainApiError(caught, setUser));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -82,39 +86,56 @@ export function RoomsScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.rooms}</h1>
-        <p>
-          Name the floors, the rooms on each floor, the room types, and every charge that makes up a
-          night&apos;s price. Nothing here is fixed.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.rooms}
-        </p>
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.rooms}</h1>
+          <p>
+            Name the floors, the rooms on each floor, the room types, and every charge that makes up
+            a night&apos;s price. Nothing here is fixed.
+          </p>
+          <p lang="ur" dir="rtl">
+            {messages.ur.common.rooms}
+          </p>
+        </div>
+        {canWrite ? (
+          <button
+            className="kz-button kz-form-dialog-trigger"
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => {
+              setError('');
+              setSaved('');
+              setDialogOpen(true);
+            }}
+          >
+            Add floor
+          </button>
+        ) : null}
       </div>
-      {error ? (
-        <p className="kz-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {saved ? <p>{saved}</p> : null}
-      <div className="kz-workspace">
-        <form
-          className="kz-panel kz-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void run(async () => {
-              await api.createRoomFloor({
-                name: floorName.trim(),
-                sortOrder: Number(floorOrder) || 0,
-              });
-              setFloorName('');
-            }, 'Floor added.');
-          }}
+      {canWrite ? (
+        <FormDialog
+          buttonLabel="Add floor"
+          title="Add floor"
+          showTrigger={false}
+          isOpen={dialogOpen}
+          onOpenChange={setDialogOpen}
         >
-          <h2>Floors</h2>
-          {canWrite ? (
-            <div className="kz-form-grid">
+          {({ close }) => (
+            <form
+              className="kz-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(async () => {
+                  await api.createRoomFloor({
+                    name: floorName.trim(),
+                    sortOrder: Number(floorOrder) || 0,
+                  });
+                  setFloorName('');
+                }, 'Floor added.').then((succeeded) => {
+                  if (succeeded) close();
+                });
+              }}
+            >
               <Field label="Floor name" hint="Any name you use, such as Ground or 2.">
                 <input
                   value={floorName}
@@ -132,13 +153,27 @@ export function RoomsScreen() {
                   onChange={(event) => setFloorOrder(event.target.value)}
                 />
               </Field>
-            </div>
-          ) : null}
-          {canWrite ? (
-            <button type="submit" className="kz-button" disabled={busy}>
-              Add floor
-            </button>
-          ) : null}
+              {error ? (
+                <p className="kz-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              <button type="submit" className="kz-button" disabled={busy}>
+                Add floor
+              </button>
+            </form>
+          )}
+        </FormDialog>
+      ) : null}
+      {error ? (
+        <p className="kz-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {saved ? <p>{saved}</p> : null}
+      <div className="kz-workspace kz-workspace-single">
+        <div className="kz-panel kz-stack">
+          <h2>Floors</h2>
           {floors.length === 0 ? <p className="kz-empty">No floors yet.</p> : null}
           <ul className="kz-stack">
             {floors.map((floor) => (
@@ -165,7 +200,7 @@ export function RoomsScreen() {
               </li>
             ))}
           </ul>
-        </form>
+        </div>
         <div className="kz-panel kz-stack">
           <h2>Room types and charges</h2>
           <p className="kz-help">

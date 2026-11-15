@@ -44,23 +44,51 @@ export default function HomePage() {
     );
   }
 
+  const financeUser = account.role === 'AIRLINE_FINANCE';
+
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{account.organisationName}</h1>
-        <p>
-          Signed in as {account.name} for {account.organisationCode}. You only see this
-          airline&apos;s requests, rates, and invoices.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.portalSurface}
-        </p>
-      </div>
+      <header className="kz-partner-hero">
+        <div className="kz-partner-hero-copy">
+          <p className="kz-eyebrow">
+            {financeUser ? 'Karam / Airline finance' : 'Karam / Service workspace'}
+          </p>
+          <h1>{account.organisationName}</h1>
+          <p>
+            {financeUser
+              ? 'Review invoices, resolve bill questions, and follow your airline ledger.'
+              : 'Create flight and room requests, then follow delivery and agreed rates.'}
+          </p>
+          <p className="kz-partner-urdu" lang="ur" dir="rtl">
+            {messages.ur.common.portalSurface}
+          </p>
+          {can(account.role, 'service_requests', 'C') ? (
+            <a className="kz-button" href="/requests">
+              Create a service request
+            </a>
+          ) : can(account.role, 'invoices', 'R') ? (
+            <a className="kz-button" href="/invoices">
+              Review invoices
+            </a>
+          ) : null}
+        </div>
+        <div className="kz-partner-stamp">
+          <span>YOUR ORGANISATION</span>
+          <strong>{account.organisationCode}</strong>
+          <small>Private partner access</small>
+        </div>
+      </header>
       <div className="kz-home-grid">
         {can(account.role, 'service_requests', 'R') ? (
           <a className="kz-panel kz-home-card" href="/requests">
             <h2>{messages.en.common.requests}</h2>
             <p>Ask for meals and snacks for a flight and follow each request.</p>
+          </a>
+        ) : null}
+        {can(account.role, 'room_requests', 'R') ? (
+          <a className="kz-panel kz-home-card" href="/room-requests">
+            <h2>{messages.en.common.roomRequests}</h2>
+            <p>Request rooms for your flight crew and follow each request.</p>
           </a>
         ) : null}
         {can(account.role, 'distribution', 'R') ? (
@@ -75,10 +103,12 @@ export default function HomePage() {
             <p>See what has been posted for your airline.</p>
           </a>
         ) : null}
-        <a className="kz-panel kz-home-card" href="/notifications">
-          <h2>{messages.en.common.notifications}</h2>
-          <p>See messages about your requests, deliveries, and bills.</p>
-        </a>
+        {isAirlineRole(account.role) ? (
+          <a className="kz-panel kz-home-card" href="/notifications">
+            <h2>{messages.en.common.notifications}</h2>
+            <p>See messages about your requests, deliveries, and bills.</p>
+          </a>
+        ) : null}
         {can(account.role, 'disputes', 'R') ? (
           <a className="kz-panel kz-home-card" href="/disputes">
             <h2>{messages.en.common.disputes}</h2>

@@ -6,6 +6,7 @@ import type {
   DisputeRecord,
   AirlineRecord,
   AirlineRole,
+  BillableRequestOption,
   DeliveryPoint,
   GoodsReceiptRecord,
   InvoiceRecord,
@@ -51,6 +52,13 @@ export interface AirlineInput {
   code: string;
   name: string;
   taxNumber?: string;
+}
+
+export interface ManualInvoiceInput {
+  airlineName: string;
+  taxNumber?: string;
+  note?: string;
+  lines: Array<{ recipeId: string; quantity: number; unitPrice: string }>;
 }
 
 export interface AirlineUserInput {
@@ -296,6 +304,14 @@ export class ApiClient {
     return this.request('POST', `/v1/notifications/${id}/read`);
   }
 
+  unreadNotificationCount(): Promise<number> {
+    return this.request('GET', '/v1/notifications/unread-count');
+  }
+
+  markAllNotificationsRead(): Promise<{ count: number; readAt: string }> {
+    return this.request('POST', '/v1/notifications/read-all');
+  }
+
   listDisputes(): Promise<DisputeRecord[]> {
     return this.request('GET', '/v1/disputes');
   }
@@ -336,8 +352,16 @@ export class ApiClient {
     return this.request('GET', '/v1/invoices');
   }
 
+  listBillableRequests(): Promise<BillableRequestOption[]> {
+    return this.request('GET', '/v1/invoices/billable-requests');
+  }
+
   createInvoice(requestId: string, note?: string): Promise<InvoiceRecord> {
     return this.request('POST', '/v1/invoices', { requestId, note });
+  }
+
+  createManualInvoice(input: ManualInvoiceInput): Promise<InvoiceRecord> {
+    return this.request('POST', '/v1/invoices/manual', input);
   }
 
   issueInvoice(id: string): Promise<InvoiceRecord> {

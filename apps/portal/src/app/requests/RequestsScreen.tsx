@@ -24,6 +24,7 @@ import {
   type RateCardRecord,
   type ServiceRequestRecord,
 } from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
 import { useEffect, useState } from 'react';
 
 import { Field } from '../../components/Field';
@@ -77,6 +78,7 @@ export function RequestsScreen() {
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
   const [card, setCard] = useState<RateCardRecord | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     const session = readSessionUser();
@@ -158,6 +160,7 @@ export function RequestsScreen() {
     setQuantities(
       Object.fromEntries(request.lines.map((line) => [line.recipeId, String(line.quantity)])),
     );
+    setDialogOpen(true);
   }
 
   async function save(send: boolean) {
@@ -175,6 +178,7 @@ export function RequestsScreen() {
         setRequests(await api.listRequests());
         resetForm();
         setSaved(`${record.number} is changed.`);
+        setDialogOpen(false);
         return;
       }
       let record = editingId
@@ -189,6 +193,7 @@ export function RequestsScreen() {
       } else {
         setSaved(`${record.number} is saved as a draft.`);
       }
+      setDialogOpen(false);
     } catch (caught: unknown) {
       handleFailure(caught);
     } finally {
@@ -219,7 +224,10 @@ export function RequestsScreen() {
       }
       const record = await api.cancelRequest(request.id, { acceptCharge });
       setRequests(await api.listRequests());
-      if (editingId === request.id) resetForm();
+      if (editingId === request.id) {
+        resetForm();
+        setDialogOpen(false);
+      }
       setSaved(
         acceptCharge
           ? `${record.number} is cancelled and the charge is billed.`
@@ -249,242 +257,275 @@ export function RequestsScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.requests}</h1>
-        <p>
-          Ask for meals and snacks for a flight. Save a draft as often as you like. Karam sees the
-          request once you send it. Send it, or change it, at least 24 hours before delivery. You
-          only see your own airline.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.requests}
-        </p>
-      </div>
-      <div className="kz-workspace">
-        <form
-          className="kz-panel kz-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void save(true);
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.requests}</h1>
+          <p>
+            Ask for meals and snacks for a flight. Save a draft as often as you like. Karam sees the
+            request once you send it. Send it, or change it, at least 24 hours before delivery. You
+            only see your own airline.
+          </p>
+          <p lang="ur" dir="rtl">
+            {messages.ur.common.requests}
+          </p>
+        </div>
+        <button
+          className="kz-button kz-form-dialog-trigger"
+          type="button"
+          aria-haspopup="dialog"
+          onClick={() => {
+            resetForm();
+            setError('');
+            setSaved('');
+            setDialogOpen(true);
           }}
         >
-          <h2>
-            {purpose === 'amend' ? 'Change request' : editingId ? 'Edit draft' : 'New request'}
-          </h2>
-          <div className="kz-form-grid">
-            <Field label="Flight number">
-              <input
-                value={form.flightNumber}
-                maxLength={8}
-                placeholder="PK301"
-                onChange={(event) => update('flightNumber', event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Route">
-              <input
-                value={form.route}
-                maxLength={80}
-                placeholder="KHI-DXB"
-                onChange={(event) => update('route', event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Service date" hint="Shown as DD/MM/YYYY.">
-              <input
-                type="date"
-                value={form.serviceDate}
-                min={todayInKarachi()}
-                onChange={(event) => update('serviceDate', event.target.value)}
-                required
-              />
-            </Field>
-            <Field
-              label="Delivery time"
-              hint={
-                cutOffInstant(form.serviceDate, form.deliveryTime.trim())
-                  ? `Cut-off ${formatKarachiDateTime(cutOffInstant(form.serviceDate, form.deliveryTime.trim()) as Date)}. Change or send the request before then.`
-                  : '24-hour, such as 11:30. The cut-off is 24 hours before this time.'
-              }
+          New request
+        </button>
+      </div>
+      {error && !dialogOpen ? (
+        <p className="kz-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {saved ? <p role="status">{saved}</p> : null}
+      <div className="kz-workspace kz-workspace-single">
+        <FormDialog
+          buttonLabel="New request"
+          title={purpose === 'amend' ? 'Change request' : editingId ? 'Edit draft' : 'New request'}
+          showTrigger={false}
+          isOpen={dialogOpen}
+          onOpenChange={setDialogOpen}
+        >
+          {() => (
+            <form
+              className="kz-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void save(true);
+              }}
             >
-              <input
-                value={form.deliveryTime}
-                maxLength={5}
-                placeholder="11:30"
-                onChange={(event) => update('deliveryTime', event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Deliver to">
-              <select
-                value={form.deliveryPoint}
-                onChange={(event) => update('deliveryPoint', event.target.value as DeliveryPoint)}
-              >
-                {DELIVERY_POINTS.map((point) => (
-                  <option key={point} value={point}>
-                    {DELIVERY_POINT_LABELS[point]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Where exactly" hint="Optional, such as gate or aircraft door.">
-              <input
-                value={form.deliveryDetail}
-                maxLength={120}
-                onChange={(event) => update('deliveryDetail', event.target.value)}
-              />
-            </Field>
-          </div>
-          <h3>Passengers</h3>
-          <div className="kz-form-grid">
-            <CountField label="Adults" value={form.adults} onChange={(v) => update('adults', v)} />
-            <CountField
-              label="Children"
-              value={form.children}
-              onChange={(v) => update('children', v)}
-            />
-            <CountField
-              label="Infants"
-              value={form.infants}
-              onChange={(v) => update('infants', v)}
-            />
-            <CountField label="Crew" value={form.crew} onChange={(v) => update('crew', v)} />
-            <CountField
-              label="Special diets"
-              hint="Counted within the passengers above."
-              value={form.specialDiets}
-              onChange={(v) => update('specialDiets', v)}
-            />
-            <Field label="Special diet note">
-              <input
-                value={form.specialDietNote}
-                maxLength={200}
-                onChange={(event) => update('specialDietNote', event.target.value)}
-              />
-            </Field>
-          </div>
-          <h3>Menu</h3>
-          {menu.length === 0 ? (
-            <p className="kz-empty">No menu items are available yet.</p>
-          ) : (
-            <div className="kz-table-wrap">
-              <table className="kz-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Type</th>
-                    <th>Portions</th>
-                    <th>Price</th>
-                    <th>Charge</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {menu.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.name}</td>
-                      <td>{RECIPE_KIND_LABELS[item.kind]}</td>
-                      <td>
-                        <input
-                          type="number"
-                          min={0}
-                          max={999}
-                          step={1}
-                          inputMode="numeric"
-                          aria-label={`Portions of ${item.name}`}
-                          value={quantities[item.id] ?? ''}
-                          onChange={(event) =>
-                            setQuantities((current) => ({
-                              ...current,
-                              [item.id]: event.target.value,
-                            }))
-                          }
-                        />
-                      </td>
-                      <PriceCells
-                        rate={card?.lines.find((line) => line.recipeId === item.id) ?? null}
-                        charge={preview.lines.find((line) => line.recipeId === item.id) ?? null}
-                      />
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {ordered ? (
-            <p>
-              {preview.total !== null && card
-                ? `Estimated charge: ${preview.total} PKR on ${card.number}. The invoice uses the portions delivered.`
-                : card
-                  ? `One of these items has no price on ${card.number}. Karam will confirm the charge.`
-                  : 'No rate card covers this service date yet. Karam will confirm the charge.'}
-            </p>
-          ) : null}
-          <Field label="Note for Karam">
-            <input
-              value={form.note}
-              maxLength={300}
-              onChange={(event) => update('note', event.target.value)}
-            />
-          </Field>
-          {error ? (
-            <p className="kz-error" role="alert">
-              {error}
-            </p>
-          ) : null}
-          {saved ? <p>{saved}</p> : null}
-          {purpose === 'amend' ? (
-            <Field
-              label="Reason for the change"
-              hint="Karam and your airline keep this with the request."
-            >
-              <input
-                value={amendReason}
-                maxLength={300}
-                onChange={(event) => setAmendReason(event.target.value)}
-                required
-              />
-            </Field>
-          ) : null}
-          <div className="kz-actions">
-            {purpose === 'amend' ? (
-              <button
-                type="button"
-                className="kz-button"
-                disabled={busy}
-                onClick={() => void save(false)}
-              >
-                Save change
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="kz-button"
-                  disabled={busy}
-                  onClick={() => void save(false)}
+              <div className="kz-form-grid">
+                <Field label="Flight number">
+                  <input
+                    value={form.flightNumber}
+                    maxLength={8}
+                    placeholder="PK301"
+                    onChange={(event) => update('flightNumber', event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Route">
+                  <input
+                    value={form.route}
+                    maxLength={80}
+                    placeholder="KHI-DXB"
+                    onChange={(event) => update('route', event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Service date" hint="Shown as DD/MM/YYYY.">
+                  <input
+                    type="date"
+                    value={form.serviceDate}
+                    min={todayInKarachi()}
+                    onChange={(event) => update('serviceDate', event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field
+                  label="Delivery time"
+                  hint={
+                    cutOffInstant(form.serviceDate, form.deliveryTime.trim())
+                      ? `Cut-off ${formatKarachiDateTime(cutOffInstant(form.serviceDate, form.deliveryTime.trim()) as Date)}. Change or send the request before then.`
+                      : '24-hour, such as 11:30. The cut-off is 24 hours before this time.'
+                  }
                 >
-                  Save draft
-                </button>
-                <button type="submit" className="kz-button" disabled={busy}>
-                  Send to Karam
-                </button>
-              </>
-            )}
-            {editingId ? (
-              <button
-                type="button"
-                className="kz-button-quiet"
-                disabled={busy}
-                onClick={() => {
-                  const current = requests.find((row) => row.id === editingId);
-                  if (current) void cancelRequest(current);
-                }}
-              >
-                {purpose === 'amend' ? 'Cancel request' : 'Cancel draft'}
-              </button>
-            ) : null}
-          </div>
-        </form>
+                  <input
+                    value={form.deliveryTime}
+                    maxLength={5}
+                    placeholder="11:30"
+                    onChange={(event) => update('deliveryTime', event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Deliver to">
+                  <select
+                    value={form.deliveryPoint}
+                    onChange={(event) =>
+                      update('deliveryPoint', event.target.value as DeliveryPoint)
+                    }
+                  >
+                    {DELIVERY_POINTS.map((point) => (
+                      <option key={point} value={point}>
+                        {DELIVERY_POINT_LABELS[point]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Where exactly" hint="Optional, such as gate or aircraft door.">
+                  <input
+                    value={form.deliveryDetail}
+                    maxLength={120}
+                    onChange={(event) => update('deliveryDetail', event.target.value)}
+                  />
+                </Field>
+              </div>
+              <h3>Passengers</h3>
+              <div className="kz-form-grid">
+                <CountField
+                  label="Adults"
+                  value={form.adults}
+                  onChange={(v) => update('adults', v)}
+                />
+                <CountField
+                  label="Children"
+                  value={form.children}
+                  onChange={(v) => update('children', v)}
+                />
+                <CountField
+                  label="Infants"
+                  value={form.infants}
+                  onChange={(v) => update('infants', v)}
+                />
+                <CountField label="Crew" value={form.crew} onChange={(v) => update('crew', v)} />
+                <CountField
+                  label="Special diets"
+                  hint="Counted within the passengers above."
+                  value={form.specialDiets}
+                  onChange={(v) => update('specialDiets', v)}
+                />
+                <Field label="Special diet note">
+                  <input
+                    value={form.specialDietNote}
+                    maxLength={200}
+                    onChange={(event) => update('specialDietNote', event.target.value)}
+                  />
+                </Field>
+              </div>
+              <h3>Menu</h3>
+              {menu.length === 0 ? (
+                <p className="kz-empty">No menu items are available yet.</p>
+              ) : (
+                <div className="kz-table-wrap">
+                  <table className="kz-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Type</th>
+                        <th>Portions</th>
+                        <th>Price</th>
+                        <th>Charge</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {menu.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.name}</td>
+                          <td>{RECIPE_KIND_LABELS[item.kind]}</td>
+                          <td>
+                            <input
+                              type="number"
+                              min={0}
+                              max={999}
+                              step={1}
+                              inputMode="numeric"
+                              aria-label={`Portions of ${item.name}`}
+                              value={quantities[item.id] ?? ''}
+                              onChange={(event) =>
+                                setQuantities((current) => ({
+                                  ...current,
+                                  [item.id]: event.target.value,
+                                }))
+                              }
+                            />
+                          </td>
+                          <PriceCells
+                            rate={card?.lines.find((line) => line.recipeId === item.id) ?? null}
+                            charge={preview.lines.find((line) => line.recipeId === item.id) ?? null}
+                          />
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {ordered ? (
+                <p>
+                  {preview.total !== null && card
+                    ? `Estimated charge: ${preview.total} PKR on ${card.number}. The invoice uses the portions delivered.`
+                    : card
+                      ? `One of these items has no price on ${card.number}. Karam will confirm the charge.`
+                      : 'No rate card covers this service date yet. Karam will confirm the charge.'}
+                </p>
+              ) : null}
+              <Field label="Note for Karam">
+                <input
+                  value={form.note}
+                  maxLength={300}
+                  onChange={(event) => update('note', event.target.value)}
+                />
+              </Field>
+              {error ? (
+                <p className="kz-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              {purpose === 'amend' ? (
+                <Field
+                  label="Reason for the change"
+                  hint="Karam and your airline keep this with the request."
+                >
+                  <input
+                    value={amendReason}
+                    maxLength={300}
+                    onChange={(event) => setAmendReason(event.target.value)}
+                    required
+                  />
+                </Field>
+              ) : null}
+              <div className="kz-actions">
+                {purpose === 'amend' ? (
+                  <button
+                    type="button"
+                    className="kz-button"
+                    disabled={busy}
+                    onClick={() => void save(false)}
+                  >
+                    Save change
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="kz-button"
+                      disabled={busy}
+                      onClick={() => void save(false)}
+                    >
+                      Save draft
+                    </button>
+                    <button type="submit" className="kz-button" disabled={busy}>
+                      Send to Karam
+                    </button>
+                  </>
+                )}
+                {editingId ? (
+                  <button
+                    type="button"
+                    className="kz-button-quiet"
+                    disabled={busy}
+                    onClick={() => {
+                      const current = requests.find((row) => row.id === editingId);
+                      if (current) void cancelRequest(current);
+                    }}
+                  >
+                    {purpose === 'amend' ? 'Cancel request' : 'Cancel draft'}
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          )}
+        </FormDialog>
         <div className="kz-panel kz-table-wrap">
           <h2>Your requests</h2>
           {requests.length === 0 ? <p className="kz-empty">No requests yet.</p> : null}

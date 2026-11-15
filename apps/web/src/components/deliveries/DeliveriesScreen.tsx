@@ -12,6 +12,7 @@ import {
   type DeliveryRecord,
   type ServiceRequestRecord,
 } from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -32,6 +33,7 @@ export function DeliveriesScreen() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     const session = readSessionUser();
@@ -101,15 +103,17 @@ export function DeliveriesScreen() {
     setSelectedId(delivery.id);
   }
 
-  async function run(action: () => Promise<DeliveryRecord>, message: string) {
+  async function run(action: () => Promise<DeliveryRecord>, message: string): Promise<boolean> {
     setBusy(true);
     setError('');
     setSaved('');
     try {
       replace(await action());
       setSaved(message);
+      return true;
     } catch (caught: unknown) {
       setError(explainApiError(caught, setUser));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -124,44 +128,86 @@ export function DeliveriesScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.deliveries}</h1>
-        <p>
-          Take an accepted request into production, record what leaves the kitchen, then record what
-          arrives. The invoice uses the portions that arrived.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.deliveries}
-        </p>
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.deliveries}</h1>
+          <p>
+            Take an accepted request into production, record what leaves the kitchen, then record
+            what arrives. The invoice uses the portions that arrived.
+          </p>
+          <p lang="ur" dir="rtl">
+            {messages.ur.common.deliveries}
+          </p>
+        </div>
+        {canStart ? (
+          <button
+            className="kz-button kz-form-dialog-trigger"
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => {
+              setError('');
+              setSaved('');
+              setDialogOpen(true);
+            }}
+          >
+            Start delivery
+          </button>
+        ) : null}
       </div>
       <div className="kz-workspace">
         <div className="kz-stack">
           {canStart ? (
-            <form
-              className="kz-panel kz-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void run(() => api.startDelivery(requestId), 'The request is in production.');
-              }}
+            <FormDialog
+              buttonLabel="Start delivery"
+              title="Start a delivery"
+              showTrigger={false}
+              isOpen={dialogOpen}
+              onOpenChange={setDialogOpen}
             >
-              <h2>Start a delivery</h2>
-              {waiting.length === 0 ? (
-                <p className="kz-empty">No accepted requests are waiting.</p>
-              ) : (
-                <Field label="Request">
-                  <select value={requestId} onChange={(event) => setRequestId(event.target.value)}>
-                    {waiting.map((request) => (
-                      <option key={request.id} value={request.id}>
-                        {request.number} · {request.airlineName} · {request.flightNumber}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+              {({ close }) => (
+                <form
+                  className="kz-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void run(
+                      () => api.startDelivery(requestId),
+                      'The request is in production.',
+                    ).then((succeeded) => {
+                      if (succeeded) close();
+                    });
+                  }}
+                >
+                  {waiting.length === 0 ? (
+                    <p className="kz-empty">No accepted requests are waiting.</p>
+                  ) : (
+                    <Field label="Request">
+                      <select
+                        value={requestId}
+                        onChange={(event) => setRequestId(event.target.value)}
+                      >
+                        {waiting.map((request) => (
+                          <option key={request.id} value={request.id}>
+                            {request.number} · {request.airlineName} · {request.flightNumber}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+                  {error ? (
+                    <p className="kz-error" role="alert">
+                      {error}
+                    </p>
+                  ) : null}
+                  <button
+                    className="kz-button"
+                    type="submit"
+                    disabled={busy || waiting.length === 0}
+                  >
+                    Start
+                  </button>
+                </form>
               )}
-              <button className="kz-button" type="submit" disabled={busy || waiting.length === 0}>
-                Start
-              </button>
-            </form>
+            </FormDialog>
           ) : null}
           <div className="kz-panel kz-table-wrap">
             <h2>Deliveries</h2>

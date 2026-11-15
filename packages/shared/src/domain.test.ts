@@ -31,7 +31,7 @@ import {
   rateCardsOverlap,
 } from './rates';
 import { can, canReadOrganisation } from './rbac';
-import { recipeIngredientQuantity } from './recipes';
+import { recipeIngredientQuantity, recipeStockYield } from './recipes';
 import {
   amendmentError,
   cancellationChargeApplies,
@@ -173,6 +173,27 @@ describe('recipe quantities', () => {
         wastagePercent: '100.01',
       }),
     ).toEqual({ ok: false, reason: 'wastage' });
+  });
+
+  it('estimates whole portions from the limiting ingredient and wastage', () => {
+    expect(
+      recipeStockYield({
+        wastagePercent: '10',
+        lines: [
+          { itemName: 'Rice', quantityPerPortion: '0.15', available: '1.65' },
+          { itemName: 'Chicken', quantityPerPortion: '0.2', available: '0.99' },
+        ],
+      }),
+    ).toEqual({ ok: true, portions: '4', limitingIngredients: ['Chicken'] });
+  });
+
+  it('does not round sub-mill quantities of stock up', () => {
+    expect(
+      recipeStockYield({
+        wastagePercent: '0',
+        lines: [{ itemName: 'Flour', quantityPerPortion: '0.001', available: '0.0009' }],
+      }),
+    ).toEqual({ ok: true, portions: '0', limitingIngredients: ['Flour'] });
   });
 });
 

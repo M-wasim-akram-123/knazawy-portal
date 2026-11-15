@@ -4,6 +4,7 @@ import type { SessionUser } from '@knazawy/auth-client';
 import { messages } from '@knazawy/i18n';
 import { AIRLINE_ROLE_LABELS, AIRLINE_ROLES, USER_STATUS_LABELS, can } from '@knazawy/shared';
 import type { AirlineRecord, AirlineRole } from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -25,6 +26,7 @@ export function AirlinesScreen() {
   const [saved, setSaved] = useState('');
   const [saving, setSaving] = useState(false);
   const [ready, setReady] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     const session = readSessionUser();
@@ -57,79 +59,90 @@ export function AirlinesScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.airlines}</h1>
-        <p>
-          Each airline has its own account. Its users sign in on the portal and see only that
-          airline. A requester places requests. Finance will see rates and invoices.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.airlines}
-        </p>
-      </div>
-      <div className="kz-workspace">
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.airlines}</h1>
+          <p>
+            Each airline has its own account. Its users sign in on the portal and see only that
+            airline. A requester places requests. Finance will see rates and invoices.
+          </p>
+          <p lang="ur" dir="rtl">
+            {messages.ur.common.airlines}
+          </p>
+        </div>
         {canWrite ? (
-          <form
-            className="kz-panel kz-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              setError('');
-              setSaved('');
-              setSaving(true);
-              void api
-                .createAirline({
-                  code: code.trim(),
-                  name: name.trim(),
-                  taxNumber: taxNumber.trim() || undefined,
-                })
-                .then((airline) => {
-                  setAirlines((current) =>
-                    [...current, airline].sort((left, right) =>
-                      left.name.localeCompare(right.name),
-                    ),
-                  );
-                  setSelectedId(airline.id);
-                  setCode('');
-                  setName('');
-                  setTaxNumber('');
-                  setSaved(`${airline.name} is open.`);
-                })
-                .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
-                .finally(() => setSaving(false));
-            }}
+          <FormDialog
+            buttonLabel="New airline"
+            title="New airline"
+            onOpenChange={setDialogOpen}
+            onOpen={() => setError('')}
           >
-            <h2>New airline</h2>
-            <Field label="Code" hint="A short code, such as PIA.">
-              <input value={code} onChange={(event) => setCode(event.target.value)} required />
-            </Field>
-            <Field label="Name">
-              <input value={name} onChange={(event) => setName(event.target.value)} required />
-            </Field>
-            <Field label="Tax number">
-              <input
-                value={taxNumber}
-                onChange={(event) => setTaxNumber(event.target.value)}
-                placeholder="Optional"
-              />
-            </Field>
-            {error ? (
-              <p className="kz-error" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {saved ? <p>{saved}</p> : null}
-            <button className="kz-button" type="submit" disabled={saving}>
-              {saving ? 'Saving' : 'Open airline'}
-            </button>
-          </form>
+            {({ close }) => (
+              <form
+                className="kz-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setError('');
+                  setSaved('');
+                  setSaving(true);
+                  void api
+                    .createAirline({
+                      code: code.trim(),
+                      name: name.trim(),
+                      taxNumber: taxNumber.trim() || undefined,
+                    })
+                    .then((airline) => {
+                      setAirlines((current) =>
+                        [...current, airline].sort((left, right) =>
+                          left.name.localeCompare(right.name),
+                        ),
+                      );
+                      setSelectedId(airline.id);
+                      setCode('');
+                      setName('');
+                      setTaxNumber('');
+                      setSaved(`${airline.name} is open.`);
+                      close();
+                    })
+                    .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
+                    .finally(() => setSaving(false));
+                }}
+              >
+                <Field label="Code" hint="A short code, such as PIA.">
+                  <input value={code} onChange={(event) => setCode(event.target.value)} required />
+                </Field>
+                <Field label="Name">
+                  <input value={name} onChange={(event) => setName(event.target.value)} required />
+                </Field>
+                <Field label="Tax number">
+                  <input
+                    value={taxNumber}
+                    onChange={(event) => setTaxNumber(event.target.value)}
+                    placeholder="Optional"
+                  />
+                </Field>
+                {error ? (
+                  <p className="kz-error" role="alert">
+                    {error}
+                  </p>
+                ) : null}
+                <button className="kz-button" type="submit" disabled={saving}>
+                  {saving ? 'Saving' : 'Open airline'}
+                </button>
+              </form>
+            )}
+          </FormDialog>
         ) : null}
+      </div>
+      {error && !dialogOpen ? (
+        <p className="kz-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {saved ? <p role="status">{saved}</p> : null}
+      <div className="kz-workspace kz-workspace-single">
         <div className="kz-panel kz-stack">
           <h2>Accounts</h2>
-          {!canWrite && error ? (
-            <p className="kz-error" role="alert">
-              {error}
-            </p>
-          ) : null}
           {airlines.length === 0 ? <p className="kz-empty">No airlines yet.</p> : null}
           <div className="kz-table-wrap">
             <table className="kz-table">
