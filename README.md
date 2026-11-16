@@ -10,7 +10,7 @@ Product behaviour is specified in the Product Requirements Document v0.1 (5 Nove
 
 ## Project status
 
-**Scaffold.** Phase 1A (restaurant and inventory) is the first build. The apps boot, the API exposes `/v1/health`, and the shared package holds roles, the request lifecycle, and organisation isolation. Purchasing, stock, OCR, and invoicing are not implemented yet.
+**Phase 1A recipes.** Staff can sign in, keep items, suppliers, and locations, send a purchase, receive it, post a supplier bill, issue stock, transfer stock, count a location, keep a meal or snack recipe, record a production batch that uses stock, and compare a meal's standard cost with what batches actually cost. An administrator can open an airline account and its users can sign in on the portal. An airline can send meal and snack requests for a flight, and operations accepts or rejects them. Finance keeps dated rate cards for each airline, and the airline sees its prices and an estimated charge while it builds a request. Operations records what leaves the kitchen for an accepted request and what arrives. Finance invoices a delivered request from the rate card for its service date, and a correction is a credit note. Issuing either one posts a balanced ledger entry, which finance can export. An airline can change a sent request until 24 hours before delivery, and cancelling after that cut-off bills the order. Both sides get in-app messages, and airline finance can dispute an issued bill without changing it. Automatic bill reading is still waiting for the restaurant's bill copies.
 
 ## Branches
 
@@ -64,7 +64,7 @@ On Windows PowerShell, `copy .env.example .env` creates the local env file. `pnp
 pnpm seed:local
 ```
 
-The seed creates the Karam organisation and `admin@karam.local`. The default password is `1234` and is for this development database only. The script refuses to run when `NODE_ENV=production`.
+The seed creates the Karam organisation, `admin@karam.local`, and one sign-in for each other Karam role: `ops@karam.local`, `store@karam.local`, `kitchen@karam.local`, and `finance@karam.local`. The default password is `1234` (set `SEED_STAFF_PASSWORD` to change the staff one) and is for this development database only. The script refuses to run when `NODE_ENV=production`.
 
 ## Ports
 

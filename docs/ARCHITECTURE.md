@@ -18,11 +18,11 @@ Both Next.js apps rewrite `/v1/:path*` to the API, so the browser stays on the p
 
 `REJECTED` and `CANCELLED` are terminal problem states. Every change is time-stamped with the user. The tone of each status (draft, progress, done, problem) lives in `@knazawy/shared` so both apps colour it the same way.
 
-A meal or snack request is fulfilled from stock and a recipe. A hotel request (Phase 2) is fulfilled by a hotel response. Both paths end on the same invoice and journal.
+A meal or snack request is fulfilled from stock and a recipe. A room request (Phase 2) is fulfilled from rooms Karam owns. An administrator names the floors, the rooms, the room types, and every per-night charge. An airline asks for a number of rooms of a type over a stay, and Karam accepts only when those rooms are free. The accepted stay keeps that nightly price. Both paths end on the same invoice and journal.
 
 ## Data
 
-PostgreSQL via Prisma. The first schema is the tenancy spine: `Organisation`, `User`, and `AuditLog`. Items, receipts, stock movements, recipes, requests, invoices, and journal lines land with the phase that uses them. They reference this spine; they do not grow a second user table.
+PostgreSQL via Prisma. The tenancy spine is `Organisation`, `User`, and `AuditLog`. Phase 1A adds items, suppliers, stock locations, purchases, goods receipts, supplier bills, payables, FIFO stock layers, stock issues, stock transfers, stock counts, recipes, and production batches on that spine. Meal cost is calculated from those records when it is opened. Phase 1B adds airline organisations and their users on the same spine. Phase 1B requests add service requests and their lines, numbered from the restaurant's sequence. Rate cards and their lines hold each airline's dated prices and minimum portions; approved cards for one airline never overlap. A delivery records, for one accepted request, the portions sent and the portions that arrived. An invoice bills those arrived portions at the rate card for the service date, and never below the card's minimum. A credit note reduces an issued invoice. A cancellation, raised when an accepted request is cancelled after the 24-hour cut-off, is issued immediately and posts the same way. Issuing any of these documents posts one balanced journal entry, tagged to the airline, and that entry is not changed. An airline may dispute an issued invoice once. Deciding the dispute does not change the invoice. In-app messages record the request, delivery, invoice, and dispute events for the people who need them.
 
 Redis is started locally and is unused until a feature needs a cache or a queue.
 
@@ -41,7 +41,7 @@ The API must apply that check on every partner query. Hiding a row in the UI is 
 | --- | --- | --- |
 | Airline requester | Airline | Submit requests, track status, confirm delivery |
 | Airline finance | Airline | Rates, invoices, statements, disputes |
-| Hotel coordinator | Hotel | Room availability, rates, check-in (Phase 2) |
+| Hotel coordinator | Unused | Karam owns the rooms. Operations coordinates stays and finance bills them. The role can do nothing. |
 | Operations manager | Karam | Accept requests, plan production, assign distribution |
 | Storekeeper | Karam | Purchases, bill scan, receipts, stock |
 | Kitchen lead | Karam | Production batches, usage, wastage |

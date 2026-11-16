@@ -10,6 +10,7 @@ datasource db {
 enum OrganisationType {
   KARAM
   AIRLINE
+  ONE_OFF_AIRLINE
   HOTEL
   SUPPLIER
 }
@@ -33,30 +34,75 @@ enum UserStatus {
 
 /// Tenancy spine. Items, requests, invoices, and journal lines attach here in later phases.
 model Organisation {
-  id        String             @id @default(cuid())
-  code      String             @unique
-  type      OrganisationType
-  name      String
-  taxNumber String?            @map("tax_number")
-  createdAt DateTime           @default(now()) @map("created_at")
-  updatedAt DateTime           @updatedAt @map("updated_at")
-  users     User[]
+  id                String             @id @default(cuid())
+  code              String             @unique
+  type              OrganisationType
+  name              String
+  taxNumber         String?            @map("tax_number")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  users             User[]
+  items             Item[]
+  suppliers         Supplier[]
+  locations         StockLocation[]
+  sequences         DocumentSequence[]
+  purchases         Purchase[]
+  receipts          GoodsReceipt[]
+  layers            StockLayer[]
+  movements         StockMovement[]
+  issues            StockIssue[]
+  transfers         StockTransfer[]
+  counts            StockCount[]
+  recipes           Recipe[]
+  productionBatches ProductionBatch[]
+  serviceRequests   ServiceRequest[]
+  rateCards         RateCard[]
+  deliveries        Delivery[]
+  invoices          Invoice[]
+  journalEntries    JournalEntry[]
+  disputes          Dispute[]
+  roomFloors        RoomFloor[]
+  roomTypes         RoomType[]
+  hotelRooms        HotelRoom[]
+  roomRequests      RoomRequest[]
+  roomStays         RoomStay[]
+  roomInvoices      RoomInvoice[]
+  payables          SupplierPayable[]
 
   @@map("organisations")
 }
 
 model User {
-  id             String       @id @default(cuid())
-  organisationId String       @map("organisation_id")
-  organisation   Organisation @relation(fields: [organisationId], references: [id])
-  name           String
-  email          String       @unique
-  role           UserRole
-  status         UserStatus   @default(INVITED)
-  passwordHash   String       @map("password_hash")
-  lastLoginAt    DateTime?    @map("last_login_at")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  id                   String           @id @default(cuid())
+  organisationId       String           @map("organisation_id")
+  organisation         Organisation     @relation(fields: [organisationId], references: [id])
+  name                 String
+  email                String           @unique
+  role                 UserRole
+  requestsCreated      ServiceRequest[] @relation("RequestCreatedBy")
+  requestsDecided      ServiceRequest[] @relation("RequestDecidedBy")
+  rateCardsCreated     RateCard[]       @relation("RateCardCreatedBy")
+  rateCardsApproved    RateCard[]       @relation("RateCardApprovedBy")
+  deliveriesCreated    Delivery[]       @relation("DeliveryCreatedBy")
+  deliveriesDispatched Delivery[]       @relation("DeliveryDispatchedBy")
+  deliveriesDelivered  Delivery[]       @relation("DeliveryDeliveredBy")
+  invoicesCreated      Invoice[]        @relation("InvoiceCreatedBy")
+  invoicesIssued       Invoice[]        @relation("InvoiceIssuedBy")
+  journalEntriesPosted JournalEntry[]   @relation("JournalPostedBy")
+  amendmentsCreated    RequestAmendment[] @relation("AmendmentCreatedBy")
+  notifications        Notification[]
+  disputesOpened       Dispute[]        @relation("DisputeOpenedBy")
+  disputesDecided      Dispute[]        @relation("DisputeDecidedBy")
+  roomRequestsCreated  RoomRequest[]    @relation("RoomRequestCreatedBy")
+  roomRequestsDecided  RoomRequest[]    @relation("RoomRequestDecidedBy")
+  roomStaysCheckedIn   RoomStay[]       @relation("RoomStayCheckedInBy")
+  roomStaysCheckedOut  RoomStay[]       @relation("RoomStayCheckedOutBy")
+  roomInvoicesCreated  RoomInvoice[]    @relation("RoomInvoiceCreatedBy")
+  status               UserStatus       @default(INVITED)
+  passwordHash         String           @map("password_hash")
+  lastLoginAt          DateTime?        @map("last_login_at")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
 
   @@index([organisationId])
   @@map("users")
@@ -74,4 +120,1065 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@map("audit_logs")
+}
+
+enum BaseUnit {
+  KG
+  LITRE
+  PIECE
+}
+
+enum StorageType {
+  DRY
+  CHILLED
+  FROZEN
+}
+
+enum LocationType {
+  STORE
+  COLD_ROOM
+  FREEZER
+  KITCHEN
+  VEHICLE
+  BIN
+}
+
+model Item {
+  id               String              @id @default(cuid())
+  organisationId   String              @map("organisation_id")
+  organisation     Organisation        @relation(fields: [organisationId], references: [id])
+  code             String
+  name             String
+  category         String
+  baseUnit         BaseUnit            @map("base_unit")
+  purchaseUnit     String              @map("purchase_unit")
+  conversionToBase Decimal             @map("conversion_to_base") @db.Decimal(14, 4)
+  reorderLevel     Decimal             @map("reorder_level") @db.Decimal(14, 3)
+  shelfLifeDays    Int                 @map("shelf_life_days")
+  storageType      StorageType         @map("storage_type")
+  active           Boolean             @default(true)
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  suppliers        ItemSupplier[]
+  purchaseLines    PurchaseLine[]
+  receiptLines     GoodsReceiptLine[]
+  issueLines       StockIssueLine[]
+  transferLines    StockTransferLine[]
+  countLines       StockCountLine[]
+  recipeLines      RecipeLine[]
+  productionLines  ProductionLine[]
+  layers           StockLayer[]
+  movements        StockMovement[]
+
+  @@unique([organisationId, code])
+  @@index([organisationId])
+  @@map("items")
+}
+
+model Supplier {
+  id               String            @id @default(cuid())
+  organisationId   String            @map("organisation_id")
+  organisation     Organisation      @relation(fields: [organisationId], references: [id])
+  name             String
+  contactName      String?           @map("contact_name")
+  phone            String?
+  email            String?
+  taxNumber        String?           @map("tax_number")
+  paymentTermsDays Int               @default(0) @map("payment_terms_days")
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  items            ItemSupplier[]
+  purchases        Purchase[]
+  receipts         GoodsReceipt[]
+  payables         SupplierPayable[]
+
+  @@unique([organisationId, name])
+  @@index([organisationId])
+  @@map("suppliers")
+}
+
+model ItemSupplier {
+  itemId     String   @map("item_id")
+  supplierId String   @map("supplier_id")
+  item       Item     @relation(fields: [itemId], references: [id])
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+
+  @@id([itemId, supplierId])
+  @@map("item_suppliers")
+}
+
+model StockLocation {
+  id                String            @id @default(cuid())
+  organisationId    String            @map("organisation_id")
+  organisation      Organisation      @relation(fields: [organisationId], references: [id])
+  parentId          String?           @map("parent_id")
+  parent            StockLocation?    @relation("LocationTree", fields: [parentId], references: [id])
+  children          StockLocation[]   @relation("LocationTree")
+  name              String
+  type              LocationType
+  active            Boolean           @default(true)
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  receipts          GoodsReceipt[]
+  layers            StockLayer[]
+  movements         StockMovement[]
+  issues            StockIssue[]
+  transfersOut      StockTransfer[]   @relation("TransferFrom")
+  transfersIn       StockTransfer[]   @relation("TransferTo")
+  counts            StockCount[]
+  productionBatches ProductionBatch[]
+
+  @@index([organisationId])
+  @@index([parentId])
+  @@map("stock_locations")
+}
+
+enum PurchaseStatus {
+  DRAFT
+  SENT
+  PART_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum StockMovementType {
+  RECEIPT
+  ISSUE
+  TRANSFER_OUT
+  TRANSFER_IN
+  COUNT
+  PRODUCTION_USE
+}
+
+enum TransferStatus {
+  SENT
+  RECEIVED
+}
+
+enum StockIssueReason {
+  KITCHEN_USE
+  WASTAGE
+  SPOILAGE
+  DAMAGE
+}
+
+model DocumentSequence {
+  organisationId String       @map("organisation_id")
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  kind           String
+  lastNumber     Int          @default(0) @map("last_number")
+
+  @@id([organisationId, kind])
+  @@map("document_sequences")
+}
+
+model Purchase {
+  id             String         @id @default(cuid())
+  organisationId String         @map("organisation_id")
+  organisation   Organisation   @relation(fields: [organisationId], references: [id])
+  number         String
+  supplierId     String         @map("supplier_id")
+  supplier       Supplier       @relation(fields: [supplierId], references: [id])
+  status         PurchaseStatus @default(DRAFT)
+  orderedOn      DateTime       @map("ordered_on") @db.Date
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  lines          PurchaseLine[]
+  receipts       GoodsReceipt[]
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@map("purchases")
+}
+
+model PurchaseLine {
+  id               String             @id @default(cuid())
+  purchaseId       String             @map("purchase_id")
+  purchase         Purchase           @relation(fields: [purchaseId], references: [id])
+  itemId           String             @map("item_id")
+  item             Item               @relation(fields: [itemId], references: [id])
+  quantity         Decimal            @db.Decimal(14, 3)
+  unitPrice        Decimal            @map("unit_price") @db.Decimal(14, 2)
+  receivedQuantity Decimal            @default(0) @map("received_quantity") @db.Decimal(14, 3)
+  receiptLines     GoodsReceiptLine[]
+
+  @@index([purchaseId])
+  @@map("purchase_lines")
+}
+
+model GoodsReceipt {
+  id              String             @id @default(cuid())
+  organisationId  String             @map("organisation_id")
+  organisation    Organisation       @relation(fields: [organisationId], references: [id])
+  number          String
+  purchaseId      String?            @map("purchase_id")
+  purchase        Purchase?          @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  supplierId      String             @map("supplier_id")
+  supplier        Supplier           @relation(fields: [supplierId], references: [id])
+  locationId      String             @map("location_id")
+  location        StockLocation      @relation(fields: [locationId], references: [id])
+  receivedOn      DateTime           @map("received_on") @db.Date
+  billNumber      String?            @map("bill_number")
+  billTotal       Decimal?           @map("bill_total") @db.Decimal(14, 2)
+  billTax         Decimal            @default(0) @map("bill_tax") @db.Decimal(14, 2)
+  billDiscount    Decimal            @default(0) @map("bill_discount") @db.Decimal(14, 2)
+  billFileName    String?            @map("bill_file_name")
+  billStoredAs    String?            @map("bill_stored_as")
+  billContentType String?            @map("bill_content_type")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  lines           GoodsReceiptLine[]
+  payable         SupplierPayable?
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@index([supplierId])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptLine {
+  id             String         @id @default(cuid())
+  receiptId      String         @map("receipt_id")
+  receipt        GoodsReceipt   @relation(fields: [receiptId], references: [id])
+  itemId         String         @map("item_id")
+  item           Item           @relation(fields: [itemId], references: [id])
+  purchaseLineId String?        @map("purchase_line_id")
+  purchaseLine   PurchaseLine?  @relation(fields: [purchaseLineId], references: [id], onDelete: Restrict)
+  quantity       Decimal        @db.Decimal(14, 3)
+  quantityBase   Decimal        @map("quantity_base") @db.Decimal(14, 4)
+  unitCost       Decimal        @map("unit_cost") @db.Decimal(14, 4)
+  layer          StockLayer?
+  movement       StockMovement?
+
+  @@index([receiptId])
+  @@index([itemId])
+  @@map("goods_receipt_lines")
+}
+
+enum PayableStatus {
+  OPEN
+}
+
+/// What Karam owes the supplier for a posted bill. Payments come with finance.
+model SupplierPayable {
+  id             String        @id @default(cuid())
+  organisationId String        @map("organisation_id")
+  organisation   Organisation  @relation(fields: [organisationId], references: [id])
+  supplierId     String        @map("supplier_id")
+  supplier       Supplier      @relation(fields: [supplierId], references: [id])
+  receiptId      String        @unique @map("receipt_id")
+  receipt        GoodsReceipt  @relation(fields: [receiptId], references: [id])
+  amount         Decimal       @db.Decimal(14, 2)
+  status         PayableStatus @default(OPEN)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([organisationId])
+  @@map("supplier_payables")
+}
+
+/// A receipt opens a cost layer. Later issues consume the oldest open layer first.
+model StockLayer {
+  id             String             @id @default(cuid())
+  organisationId String             @map("organisation_id")
+  organisation   Organisation       @relation(fields: [organisationId], references: [id])
+  itemId         String             @map("item_id")
+  item           Item               @relation(fields: [itemId], references: [id])
+  locationId     String             @map("location_id")
+  location       StockLocation      @relation(fields: [locationId], references: [id])
+  receiptLineId  String?            @unique @map("receipt_line_id")
+  receiptLine    GoodsReceiptLine?  @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
+  transferDrawId String?            @unique @map("transfer_draw_id")
+  transferDraw   StockTransferDraw? @relation(fields: [transferDrawId], references: [id], onDelete: Restrict)
+  countLineId    String?            @unique @map("count_line_id")
+  countLine      StockCountLine?    @relation(fields: [countLineId], references: [id], onDelete: Restrict)
+  quantityBase   Decimal            @map("quantity_base") @db.Decimal(14, 4)
+  unitCost       Decimal            @map("unit_cost") @db.Decimal(14, 4)
+  receivedOn     DateTime           @map("received_on") @db.Date
+  createdAt      DateTime           @default(now()) @map("created_at")
+  movements      StockMovement[]
+
+  @@index([organisationId, itemId, receivedOn])
+  @@map("stock_layers")
+}
+
+/// One row per layer touched. Receipts add (positive). Issues take from a layer (negative).
+model StockMovement {
+  id                String            @id @default(cuid())
+  organisationId    String            @map("organisation_id")
+  organisation      Organisation      @relation(fields: [organisationId], references: [id])
+  itemId            String            @map("item_id")
+  item              Item              @relation(fields: [itemId], references: [id])
+  locationId        String            @map("location_id")
+  location          StockLocation     @relation(fields: [locationId], references: [id])
+  layerId           String            @map("layer_id")
+  layer             StockLayer        @relation(fields: [layerId], references: [id])
+  receiptLineId     String?           @unique @map("receipt_line_id")
+  receiptLine       GoodsReceiptLine? @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
+  issueId           String?           @map("issue_id")
+  issue             StockIssue?       @relation(fields: [issueId], references: [id], onDelete: Restrict)
+  issueLineId       String?           @map("issue_line_id")
+  issueLine         StockIssueLine?   @relation(fields: [issueLineId], references: [id], onDelete: Restrict)
+  transferId        String?           @map("transfer_id")
+  transfer          StockTransfer?    @relation(fields: [transferId], references: [id], onDelete: Restrict)
+  countId           String?           @map("count_id")
+  count             StockCount?       @relation(fields: [countId], references: [id], onDelete: Restrict)
+  countLineId       String?           @map("count_line_id")
+  countLine         StockCountLine?   @relation(fields: [countLineId], references: [id], onDelete: Restrict)
+  productionBatchId String?           @map("production_batch_id")
+  productionBatch   ProductionBatch?  @relation(fields: [productionBatchId], references: [id], onDelete: Restrict)
+  productionLineId  String?           @map("production_line_id")
+  productionLine    ProductionLine?   @relation(fields: [productionLineId], references: [id], onDelete: Restrict)
+  type              StockMovementType
+  quantityBase      Decimal           @map("quantity_base") @db.Decimal(14, 4)
+  unitCost          Decimal           @map("unit_cost") @db.Decimal(14, 4)
+  createdAt         DateTime          @default(now()) @map("created_at")
+
+  @@index([organisationId, itemId])
+  @@index([issueId])
+  @@index([issueLineId])
+  @@index([transferId])
+  @@index([countId])
+  @@index([productionBatchId])
+  @@map("stock_movements")
+}
+
+/// A stock issue takes goods out of one location, oldest cost layer first. Issues are not edited.
+model StockIssue {
+  id             String           @id @default(cuid())
+  organisationId String           @map("organisation_id")
+  organisation   Organisation     @relation(fields: [organisationId], references: [id])
+  number         String
+  locationId     String           @map("location_id")
+  location       StockLocation    @relation(fields: [locationId], references: [id])
+  issuedOn       DateTime         @map("issued_on") @db.Date
+  reason         StockIssueReason
+  note           String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  lines          StockIssueLine[]
+  movements      StockMovement[]
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@map("stock_issues")
+}
+
+model StockIssueLine {
+  id           String          @id @default(cuid())
+  issueId      String          @map("issue_id")
+  issue        StockIssue      @relation(fields: [issueId], references: [id])
+  itemId       String          @map("item_id")
+  item         Item            @relation(fields: [itemId], references: [id])
+  quantityBase Decimal         @map("quantity_base") @db.Decimal(14, 4)
+  cost         Decimal         @db.Decimal(14, 2)
+  movements    StockMovement[]
+
+  @@index([issueId])
+  @@index([itemId])
+  @@map("stock_issue_lines")
+}
+
+/// Goods leave the source when the transfer is sent. They arrive, at the same cost, when the destination confirms.
+model StockTransfer {
+  id             String              @id @default(cuid())
+  organisationId String              @map("organisation_id")
+  organisation   Organisation        @relation(fields: [organisationId], references: [id])
+  number         String
+  fromLocationId String              @map("from_location_id")
+  fromLocation   StockLocation       @relation("TransferFrom", fields: [fromLocationId], references: [id])
+  toLocationId   String              @map("to_location_id")
+  toLocation     StockLocation       @relation("TransferTo", fields: [toLocationId], references: [id])
+  status         TransferStatus      @default(SENT)
+  sentOn         DateTime            @map("sent_on") @db.Date
+  receivedOn     DateTime?           @map("received_on") @db.Date
+  createdAt      DateTime            @default(now()) @map("created_at")
+  lines          StockTransferLine[]
+  movements      StockMovement[]
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@map("stock_transfers")
+}
+
+model StockTransferLine {
+  id           String              @id @default(cuid())
+  transferId   String              @map("transfer_id")
+  transfer     StockTransfer       @relation(fields: [transferId], references: [id])
+  itemId       String              @map("item_id")
+  item         Item                @relation(fields: [itemId], references: [id])
+  quantityBase Decimal             @map("quantity_base") @db.Decimal(14, 4)
+  cost         Decimal             @db.Decimal(14, 2)
+  draws        StockTransferDraw[]
+
+  @@index([transferId])
+  @@index([itemId])
+  @@map("stock_transfer_lines")
+}
+
+enum CountStatus {
+  COUNTING
+  WAITING
+  POSTED
+}
+
+/// A periodic count of one location. Stock changes only when the count is approved.
+model StockCount {
+  id             String           @id @default(cuid())
+  organisationId String           @map("organisation_id")
+  organisation   Organisation     @relation(fields: [organisationId], references: [id])
+  number         String
+  locationId     String           @map("location_id")
+  location       StockLocation    @relation(fields: [locationId], references: [id])
+  status         CountStatus      @default(COUNTING)
+  countedOn      DateTime         @map("counted_on") @db.Date
+  note           String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  lines          StockCountLine[]
+  movements      StockMovement[]
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@index([locationId])
+  @@map("stock_counts")
+}
+
+model StockCountLine {
+  id              String          @id @default(cuid())
+  countId         String          @map("count_id")
+  count           StockCount      @relation(fields: [countId], references: [id])
+  itemId          String          @map("item_id")
+  item            Item            @relation(fields: [itemId], references: [id])
+  bookQuantity    Decimal         @map("book_quantity") @db.Decimal(14, 4)
+  countedQuantity Decimal?        @map("counted_quantity") @db.Decimal(14, 4)
+  varianceCost    Decimal?        @map("variance_cost") @db.Decimal(14, 2)
+  layer           StockLayer?
+  movements       StockMovement[]
+
+  @@unique([countId, itemId])
+  @@index([countId])
+  @@index([itemId])
+  @@map("stock_count_lines")
+}
+
+/// One slice of a source cost layer, kept so the destination opens the same cost on the same day.
+model StockTransferDraw {
+  id           String            @id @default(cuid())
+  lineId       String            @map("line_id")
+  line         StockTransferLine @relation(fields: [lineId], references: [id])
+  quantityBase Decimal           @map("quantity_base") @db.Decimal(14, 4)
+  unitCost     Decimal           @map("unit_cost") @db.Decimal(14, 4)
+  receivedOn   DateTime          @map("received_on") @db.Date
+  layer        StockLayer?
+
+  @@index([lineId])
+  @@map("stock_transfer_draws")
+}
+
+enum RecipeKind {
+  MEAL
+  SNACK
+}
+
+enum RecipeStatus {
+  DRAFT
+  APPROVED
+}
+
+/// A meal or snack, and the ingredients for one portion. Stock is not moved until production.
+model Recipe {
+  id                  String               @id @default(cuid())
+  organisationId      String               @map("organisation_id")
+  organisation        Organisation         @relation(fields: [organisationId], references: [id])
+  code                String
+  name                String
+  kind                RecipeKind
+  portions            Decimal              @db.Decimal(14, 3)
+  wastagePercent      Decimal              @map("wastage_percent") @db.Decimal(5, 2)
+  status              RecipeStatus         @default(DRAFT)
+  active              Boolean              @default(true)
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  lines               RecipeLine[]
+  productionBatches   ProductionBatch[]
+  serviceRequestLines ServiceRequestLine[]
+  rateCardLines       RateCardLine[]
+  deliveryLines       DeliveryLine[]
+  invoiceLines        InvoiceLine[]
+
+  @@unique([organisationId, code])
+  @@index([organisationId])
+  @@map("recipes")
+}
+
+model RecipeLine {
+  id                 String  @id @default(cuid())
+  recipeId           String  @map("recipe_id")
+  recipe             Recipe  @relation(fields: [recipeId], references: [id])
+  itemId             String  @map("item_id")
+  item               Item    @relation(fields: [itemId], references: [id])
+  quantityPerPortion Decimal @map("quantity_per_portion") @db.Decimal(14, 3)
+
+  @@unique([recipeId, itemId])
+  @@index([recipeId])
+  @@index([itemId])
+  @@map("recipe_lines")
+}
+
+enum DeliveryPoint {
+  GATE
+  LOUNGE
+  AIRCRAFT
+  HOTEL
+}
+
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  IN_PRODUCTION
+  DISPATCHED
+  DELIVERED
+  INVOICED
+  CANCELLED
+}
+
+/// A meal or snack request from one airline. Karam numbers it; the airline builds and submits it.
+model ServiceRequest {
+  id              String               @id @default(cuid())
+  organisationId  String               @map("organisation_id")
+  organisation    Organisation         @relation(fields: [organisationId], references: [id])
+  number          String               @unique
+  status          RequestStatus        @default(DRAFT)
+  flightNumber    String               @map("flight_number")
+  route           String
+  serviceDate     DateTime             @map("service_date") @db.Date
+  deliveryTime    String               @map("delivery_time") @db.VarChar(5)
+  deliveryPoint   DeliveryPoint        @map("delivery_point")
+  deliveryDetail  String?              @map("delivery_detail")
+  adults          Int                  @default(0)
+  children        Int                  @default(0)
+  infants         Int                  @default(0)
+  crew            Int                  @default(0)
+  specialDiets    Int                  @default(0) @map("special_diets")
+  specialDietNote String?              @map("special_diet_note")
+  note            String?
+  createdById     String               @map("created_by_id")
+  createdBy       User                 @relation("RequestCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  submittedAt     DateTime?            @map("submitted_at")
+  decidedAt       DateTime?            @map("decided_at")
+  decidedById     String?              @map("decided_by_id")
+  decidedBy       User?                @relation("RequestDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  decisionNote    String?              @map("decision_note")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  lines           ServiceRequestLine[]
+  amendments      RequestAmendment[]
+  delivery        Delivery?
+  invoices        Invoice[]
+
+  @@index([organisationId])
+  @@index([status])
+  @@map("service_requests")
+}
+
+model ServiceRequestLine {
+  id        String         @id @default(cuid())
+  requestId String         @map("request_id")
+  request   ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  recipeId  String         @map("recipe_id")
+  recipe    Recipe         @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  quantity  Int
+
+  @@unique([requestId, recipeId])
+  @@index([requestId])
+  @@index([recipeId])
+  @@map("service_request_lines")
+}
+
+/// A change made after a request was sent. The request keeps its number; this row says who changed it and why.
+model RequestAmendment {
+  id          String         @id @default(cuid())
+  requestId   String         @map("request_id")
+  request     ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  number      String         @unique
+  reason      String
+  createdById String         @map("created_by_id")
+  createdBy   User           @relation("AmendmentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  @@index([requestId])
+  @@map("request_amendments")
+}
+
+/// What left the kitchen for one accepted request, and what arrived. One request has one delivery.
+model Delivery {
+  id             String         @id @default(cuid())
+  organisationId String         @map("organisation_id")
+  organisation   Organisation   @relation(fields: [organisationId], references: [id])
+  requestId      String         @unique @map("request_id")
+  request        ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  number         String         @unique
+  vehicleNote    String?        @map("vehicle_note")
+  receivedBy     String?        @map("received_by")
+  note           String?
+  createdById    String         @map("created_by_id")
+  createdBy      User           @relation("DeliveryCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  dispatchedAt   DateTime?      @map("dispatched_at")
+  dispatchedById String?        @map("dispatched_by_id")
+  dispatchedBy   User?          @relation("DeliveryDispatchedBy", fields: [dispatchedById], references: [id], onDelete: Restrict)
+  deliveredAt    DateTime?      @map("delivered_at")
+  deliveredById  String?        @map("delivered_by_id")
+  deliveredBy    User?          @relation("DeliveryDeliveredBy", fields: [deliveredById], references: [id], onDelete: Restrict)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  lines          DeliveryLine[]
+
+  @@index([organisationId])
+  @@map("deliveries")
+}
+
+model DeliveryLine {
+  id         String   @id @default(cuid())
+  deliveryId String   @map("delivery_id")
+  delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  recipeId   String   @map("recipe_id")
+  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  ordered    Int
+  dispatched Int?
+  delivered  Int?
+
+  @@unique([deliveryId, recipeId])
+  @@index([recipeId])
+  @@map("delivery_lines")
+}
+
+enum InvoiceKind {
+  INVOICE
+  CANCELLATION
+  CREDIT_NOTE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+}
+
+/// What an airline is charged for a delivered request or a one-off sale.
+model Invoice {
+  id              String         @id @default(cuid())
+  organisationId  String         @map("organisation_id")
+  organisation    Organisation   @relation(fields: [organisationId], references: [id])
+  number          String         @unique
+  kind            InvoiceKind    @default(INVOICE)
+  status          InvoiceStatus  @default(DRAFT)
+  requestId       String?        @map("request_id")
+  request         ServiceRequest? @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  rateCardId      String?        @map("rate_card_id")
+  rateCard        RateCard?      @relation(fields: [rateCardId], references: [id], onDelete: Restrict)
+  sourceInvoiceId String?        @map("source_invoice_id")
+  sourceInvoice   Invoice?       @relation("InvoiceCredits", fields: [sourceInvoiceId], references: [id], onDelete: Restrict)
+  creditNotes     Invoice[]      @relation("InvoiceCredits")
+  note            String?
+  reason          String?
+  createdById     String         @map("created_by_id")
+  createdBy       User           @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  issuedAt        DateTime?      @map("issued_at")
+  issuedById      String?        @map("issued_by_id")
+  issuedBy        User?          @relation("InvoiceIssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  lines           InvoiceLine[]
+  dispute         Dispute?
+
+  @@index([organisationId, status])
+  @@index([requestId])
+  @@index([sourceInvoiceId])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id                String     @id @default(cuid())
+  invoiceId         String     @map("invoice_id")
+  invoice           Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  recipeId          String     @map("recipe_id")
+  recipe            Recipe     @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  recipeName        String     @map("recipe_name")
+  kind              RecipeKind
+  deliveredQuantity Int        @map("delivered_quantity")
+  minimumQuantity   Int        @map("minimum_quantity")
+  billedQuantity    Int        @map("billed_quantity")
+  unitPrice         Decimal    @map("unit_price") @db.Decimal(12, 2)
+  amount            Decimal    @db.Decimal(14, 2)
+
+  @@index([invoiceId])
+  @@index([recipeId])
+  @@map("invoice_lines")
+}
+
+enum JournalSide {
+  DEBIT
+  CREDIT
+}
+
+/// One balanced posting in Karam's books. It is written when a bill or a credit note is issued, and it is never changed.
+model JournalEntry {
+  id             String        @id @default(cuid())
+  organisationId String        @map("organisation_id")
+  organisation   Organisation  @relation(fields: [organisationId], references: [id])
+  number         String        @unique
+  sourceType     String        @map("source_type")
+  sourceId       String        @map("source_id")
+  memo           String
+  postedAt       DateTime      @default(now()) @map("posted_at")
+  postedById     String        @map("posted_by_id")
+  postedBy       User          @relation("JournalPostedBy", fields: [postedById], references: [id], onDelete: Restrict)
+  lines          JournalLine[]
+
+  @@unique([sourceType, sourceId])
+  @@index([organisationId])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id      String       @id @default(cuid())
+  entryId String       @map("entry_id")
+  entry   JournalEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  account String
+  side    JournalSide
+  amount  Decimal      @db.Decimal(14, 2)
+
+  @@index([entryId])
+  @@map("journal_lines")
+}
+
+/// A message for one user inside the app. Email and text messages are later.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  title     String
+  body      String
+  entity    String
+  entityId  String    @map("entity_id")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+enum DisputeStatus {
+  OPEN
+  ACCEPTED
+  REJECTED
+}
+
+/// An airline's disagreement with an issued bill. Deciding it does not change the bill.
+model Dispute {
+  id             String         @id @default(cuid())
+  organisationId String         @map("organisation_id")
+  organisation   Organisation   @relation(fields: [organisationId], references: [id])
+  invoiceId      String?        @unique @map("invoice_id")
+  invoice        Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  roomInvoiceId  String?        @unique @map("room_invoice_id")
+  roomInvoice    RoomInvoice?   @relation(fields: [roomInvoiceId], references: [id], onDelete: Restrict)
+  number         String         @unique
+  status         DisputeStatus  @default(OPEN)
+  reason         String
+  resolution     String?
+  openedById     String         @map("opened_by_id")
+  openedBy       User           @relation("DisputeOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+  decidedById    String?        @map("decided_by_id")
+  decidedBy      User?          @relation("DisputeDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  decidedAt      DateTime?      @map("decided_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@index([organisationId])
+  @@map("disputes")
+}
+
+enum RateCardStatus {
+  DRAFT
+  APPROVED
+}
+
+/// Sale prices for one airline over a date range. Approved cards for one airline never overlap.
+model RateCard {
+  id             String         @id @default(cuid())
+  organisationId String         @map("organisation_id")
+  organisation   Organisation   @relation(fields: [organisationId], references: [id])
+  number         String         @unique
+  status         RateCardStatus @default(DRAFT)
+  validFrom      DateTime       @map("valid_from") @db.Date
+  validTo        DateTime?      @map("valid_to") @db.Date
+  note           String?
+  createdById    String         @map("created_by_id")
+  createdBy      User           @relation("RateCardCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedAt     DateTime?      @map("approved_at")
+  approvedById   String?        @map("approved_by_id")
+  approvedBy     User?          @relation("RateCardApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  lines          RateCardLine[]
+  invoices       Invoice[]
+
+  @@index([organisationId, status])
+  @@map("rate_cards")
+}
+
+model RateCardLine {
+  id              String   @id @default(cuid())
+  rateCardId      String   @map("rate_card_id")
+  rateCard        RateCard @relation(fields: [rateCardId], references: [id], onDelete: Restrict)
+  recipeId        String   @map("recipe_id")
+  recipe          Recipe   @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  unitPrice       Decimal  @map("unit_price") @db.Decimal(12, 2)
+  minimumQuantity Int      @default(0) @map("minimum_quantity")
+
+  @@unique([rateCardId, recipeId])
+  @@index([recipeId])
+  @@map("rate_card_lines")
+}
+
+/// A batch of one approved recipe. Its ingredients leave stock, oldest cost layer first, when the batch is recorded.
+model ProductionBatch {
+  id              String           @id @default(cuid())
+  organisationId  String           @map("organisation_id")
+  organisation    Organisation     @relation(fields: [organisationId], references: [id])
+  number          String
+  recipeId        String           @map("recipe_id")
+  recipe          Recipe           @relation(fields: [recipeId], references: [id])
+  locationId      String           @map("location_id")
+  location        StockLocation    @relation(fields: [locationId], references: [id])
+  producedOn      DateTime         @map("produced_on") @db.Date
+  plannedPortions Decimal          @map("planned_portions") @db.Decimal(14, 3)
+  actualPortions  Decimal          @map("actual_portions") @db.Decimal(14, 3)
+  totalCost       Decimal          @map("total_cost") @db.Decimal(14, 2)
+  costPerPortion  Decimal          @map("cost_per_portion") @db.Decimal(14, 2)
+  note            String?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  lines           ProductionLine[]
+  movements       StockMovement[]
+
+  @@unique([organisationId, number])
+  @@index([organisationId])
+  @@index([recipeId])
+  @@map("production_batches")
+}
+
+model ProductionLine {
+  id           String          @id @default(cuid())
+  batchId      String          @map("batch_id")
+  batch        ProductionBatch @relation(fields: [batchId], references: [id])
+  itemId       String          @map("item_id")
+  item         Item            @relation(fields: [itemId], references: [id])
+  quantityBase Decimal         @map("quantity_base") @db.Decimal(14, 4)
+  cost         Decimal         @db.Decimal(14, 2)
+  movements    StockMovement[]
+
+  @@index([batchId])
+  @@index([itemId])
+  @@map("production_lines")
+}
+
+/// A floor the administrator named. The building is not fixed in code.
+model RoomFloor {
+  id             String       @id @default(cuid())
+  organisationId String       @map("organisation_id")
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  name           String
+  sortOrder      Int          @default(0) @map("sort_order")
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  rooms          HotelRoom[]
+
+  @@unique([organisationId, name])
+  @@index([organisationId])
+  @@map("room_floors")
+}
+
+/// A kind of room, such as a single or a suite. The names are the administrator's.
+model RoomType {
+  id             String       @id @default(cuid())
+  organisationId String       @map("organisation_id")
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  name           String
+  note           String?
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  charges        RoomCharge[]
+  rooms          HotelRoom[]
+  requestLines   RoomRequestLine[]
+  invoiceLines   RoomInvoiceLine[]
+
+  @@unique([organisationId, name])
+  @@index([organisationId])
+  @@map("room_types")
+}
+
+/// One named part of a night's price. The administrator adds every charge.
+model RoomCharge {
+  id              String   @id @default(cuid())
+  roomTypeId      String   @map("room_type_id")
+  roomType        RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  name            String
+  amountPerNight  Decimal  @map("amount_per_night") @db.Decimal(12, 2)
+  sortOrder       Int      @default(0) @map("sort_order")
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([roomTypeId, name])
+  @@index([roomTypeId])
+  @@map("room_charges")
+}
+
+/// A room on a floor. Its name is unique on that floor, and its price comes from its type.
+model HotelRoom {
+  id             String       @id @default(cuid())
+  organisationId String       @map("organisation_id")
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  floorId        String       @map("floor_id")
+  floor          RoomFloor    @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  roomTypeId     String       @map("room_type_id")
+  roomType       RoomType     @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  name           String
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  stays          RoomStay[]
+
+  @@unique([floorId, name])
+  @@index([organisationId])
+  @@index([roomTypeId])
+  @@map("hotel_rooms")
+}
+
+enum RoomRequestStatus {
+  DRAFT
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+/// An airline asking for Karam's rooms over a stay. Accepted lines keep the nightly price.
+model RoomRequest {
+  id             String            @id @default(cuid())
+  organisationId String            @map("organisation_id")
+  organisation   Organisation      @relation(fields: [organisationId], references: [id])
+  number         String            @unique
+  status         RoomRequestStatus @default(DRAFT)
+  checkIn        DateTime          @map("check_in") @db.Date
+  checkOut       DateTime          @map("check_out") @db.Date
+  party          String?
+  note           String?
+  createdById    String            @map("created_by_id")
+  createdBy      User              @relation("RoomRequestCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  submittedAt    DateTime?         @map("submitted_at")
+  decidedAt      DateTime?         @map("decided_at")
+  decidedById    String?           @map("decided_by_id")
+  decidedBy      User?             @relation("RoomRequestDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  decisionNote   String?           @map("decision_note")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  lines          RoomRequestLine[]
+  roomInvoices   RoomInvoice[]
+
+  @@index([organisationId])
+  @@index([status])
+  @@map("room_requests")
+}
+
+model RoomRequestLine {
+  id             String      @id @default(cuid())
+  requestId      String      @map("request_id")
+  request        RoomRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  roomTypeId     String      @map("room_type_id")
+  roomType       RoomType    @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  quantity       Int
+  nightlyQuoted  Decimal?    @map("nightly_quoted") @db.Decimal(12, 2)
+  stays          RoomStay[]
+
+  @@unique([requestId, roomTypeId])
+  @@index([requestId])
+  @@index([roomTypeId])
+  @@map("room_request_lines")
+}
+
+/// One room a guest has been checked in to on an accepted stay. Open until checked out.
+model RoomStay {
+  id             String          @id @default(cuid())
+  organisationId String          @map("organisation_id")
+  organisation   Organisation    @relation(fields: [organisationId], references: [id])
+  requestLineId  String          @map("request_line_id")
+  requestLine    RoomRequestLine @relation(fields: [requestLineId], references: [id], onDelete: Restrict)
+  hotelRoomId    String          @map("hotel_room_id")
+  hotelRoom      HotelRoom       @relation(fields: [hotelRoomId], references: [id], onDelete: Restrict)
+  checkedInAt    DateTime        @map("checked_in_at")
+  checkedInById  String          @map("checked_in_by_id")
+  checkedInBy    User            @relation("RoomStayCheckedInBy", fields: [checkedInById], references: [id], onDelete: Restrict)
+  checkedOutAt   DateTime?       @map("checked_out_at")
+  checkedOutById String?         @map("checked_out_by_id")
+  checkedOutBy   User?           @relation("RoomStayCheckedOutBy", fields: [checkedOutById], references: [id], onDelete: Restrict)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  @@index([organisationId])
+  @@index([requestLineId])
+  @@index([hotelRoomId, checkedOutAt])
+  @@map("room_stays")
+}
+
+enum RoomInvoiceKind {
+  INVOICE
+  CREDIT_NOTE
+}
+
+/// A bill for an accepted room stay, or the credit note that reverses it. Issued when it is raised; never changed.
+model RoomInvoice {
+  id              String          @id @default(cuid())
+  organisationId  String          @map("organisation_id")
+  organisation    Organisation    @relation(fields: [organisationId], references: [id])
+  number          String          @unique
+  kind            RoomInvoiceKind
+  roomRequestId   String          @map("room_request_id")
+  roomRequest     RoomRequest     @relation(fields: [roomRequestId], references: [id], onDelete: Restrict)
+  /// The room request id while this bill is the one in force. Cleared when the bill is credited, so the stay can be billed again.
+  openRequestId   String?         @unique @map("open_request_id")
+  sourceInvoiceId String?         @unique @map("source_invoice_id")
+  sourceInvoice   RoomInvoice?    @relation("RoomInvoiceCredits", fields: [sourceInvoiceId], references: [id], onDelete: Restrict)
+  creditNotes     RoomInvoice[]   @relation("RoomInvoiceCredits")
+  reason          String?
+  createdById     String          @map("created_by_id")
+  createdBy       User            @relation("RoomInvoiceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  issuedAt        DateTime        @map("issued_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  lines           RoomInvoiceLine[]
+  dispute         Dispute?
+
+  @@index([organisationId])
+  @@index([roomRequestId])
+  @@map("room_invoices")
+}
+
+model RoomInvoiceLine {
+  id           String      @id @default(cuid())
+  invoiceId    String      @map("invoice_id")
+  invoice      RoomInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  roomTypeId   String      @map("room_type_id")
+  roomType     RoomType    @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  roomTypeName String      @map("room_type_name")
+  rooms        Int
+  nights       Int
+  nightly      Decimal     @db.Decimal(12, 2)
+  amount       Decimal     @db.Decimal(14, 2)
+
+  @@index([invoiceId])
+  @@index([roomTypeId])
+  @@map("room_invoice_lines")
 }

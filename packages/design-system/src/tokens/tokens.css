@@ -1,16 +1,18 @@
 :root {
-  --kz-ink: #1c1917;
-  --kz-ink-soft: #57534e;
-  --kz-paper: #f6f1ea;
-  --kz-card: #fffdfb;
-  --kz-line: #e7e0d6;
-  --kz-brand: #9a3412;
-  --kz-brand-strong: #7c2d12;
+  --kz-ink: #1f302d;
+  --kz-ink-soft: #65746e;
+  --kz-paper: #f3f0e7;
+  --kz-card: #fffcf6;
+  --kz-line: #ddd5c7;
+  --kz-brand: #c28a65;
+  --kz-brand-strong: #92583f;
+  --kz-deep: #173f39;
+  --kz-accent: #c4a45f;
   --kz-draft: #78716c;
   --kz-progress: #1d4ed8;
   --kz-done: #15803d;
   --kz-problem: #b91c1c;
-  --kz-font: "Segoe UI", "Noto Nastaliq Urdu", "Noto Sans", sans-serif;
+  --kz-font: 'Segoe UI', 'Noto Nastaliq Urdu', 'Noto Sans', sans-serif;
   --kz-radius: 16px;
-  --kz-shadow: 0 12px 40px rgba(28, 25, 23, 0.06);
+  --kz-shadow: 0 12px 32px rgba(31, 48, 45, 0.08);
 }

@@ -6,6 +6,27 @@ export interface OrganisationRef {
   name: string;
 }
 
+/** Signed-in user. The API reloads this from the database on each request. */
+export interface Actor {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  organisationId: string;
+}
+
+/** The signed-in person's own organisation. Partners only ever receive their own. */
+export interface AccountRecord {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  organisationId: string;
+  organisationCode: string;
+  organisationName: string;
+  organisationType: OrganisationType;
+}
+
 export interface UserRef {
   id: string;
   email: string;

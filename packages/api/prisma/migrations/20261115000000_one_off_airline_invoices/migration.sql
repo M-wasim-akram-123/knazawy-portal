@@ -1,0 +1,4 @@
+ALTER TYPE "OrganisationType" ADD VALUE 'ONE_OFF_AIRLINE';
+
+ALTER TABLE "invoices" ALTER COLUMN "request_id" DROP NOT NULL;
+ALTER TABLE "invoices" ALTER COLUMN "rate_card_id" DROP NOT NULL;

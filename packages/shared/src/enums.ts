@@ -1,6 +1,7 @@
 export const ORGANISATION_TYPES = {
   KARAM: 'KARAM',
   AIRLINE: 'AIRLINE',
+  ONE_OFF_AIRLINE: 'ONE_OFF_AIRLINE',
   HOTEL: 'HOTEL',
   SUPPLIER: 'SUPPLIER',
 } as const;
@@ -51,14 +52,71 @@ export const REQUEST_STATUSES = [
 
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 
+export const BASE_UNITS = ['KG', 'LITRE', 'PIECE'] as const;
+
+export type BaseUnit = (typeof BASE_UNITS)[number];
+
+export const STORAGE_TYPES = ['DRY', 'CHILLED', 'FROZEN'] as const;
+
+export type StorageType = (typeof STORAGE_TYPES)[number];
+
+export const LOCATION_TYPES = [
+  'STORE',
+  'COLD_ROOM',
+  'FREEZER',
+  'KITCHEN',
+  'VEHICLE',
+  'BIN',
+] as const;
+
+export type LocationType = (typeof LOCATION_TYPES)[number];
+
+export const PURCHASE_STATUSES = [
+  'DRAFT',
+  'SENT',
+  'PART_RECEIVED',
+  'RECEIVED',
+  'CANCELLED',
+] as const;
+
+export type PurchaseStatus = (typeof PURCHASE_STATUSES)[number];
+
+/** Why stock leaves a location. Wastage and damage need a reason; the rest are routine use. */
+export const STOCK_ISSUE_REASONS = ['KITCHEN_USE', 'WASTAGE', 'SPOILAGE', 'DAMAGE'] as const;
+
+export type StockIssueReason = (typeof STOCK_ISSUE_REASONS)[number];
+
+/** A transfer is on the way until the receiving location confirms it. */
+export const TRANSFER_STATUSES = ['SENT', 'RECEIVED'] as const;
+
+export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
+
+/** A count is filled in, then approved, and only then changes stock. */
+export const COUNT_STATUSES = ['COUNTING', 'WAITING', 'POSTED'] as const;
+
+export type CountStatus = (typeof COUNT_STATUSES)[number];
+
+/** A recipe is a meal or a snack. Hotel rooms are not cooked from a recipe. */
+export const RECIPE_KINDS = ['MEAL', 'SNACK'] as const;
+
+export type RecipeKind = (typeof RECIPE_KINDS)[number];
+
+/** An approved recipe is the one production can use. A change sends it back to draft. */
+export const RECIPE_STATUSES = ['DRAFT', 'APPROVED'] as const;
+
+export type RecipeStatus = (typeof RECIPE_STATUSES)[number];
+
 export const AREAS = [
   'service_requests',
+  'room_requests',
+  'rooms',
   'service_rates',
   'purchases',
   'stock',
   'recipes',
   'distribution',
   'invoices',
+  'disputes',
   'ledger',
   'users',
 ] as const;
