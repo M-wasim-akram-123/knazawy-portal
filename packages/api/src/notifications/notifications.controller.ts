@@ -19,6 +19,16 @@ export class NotificationsController {
     return this.notifications.list(actor);
   }
 
+  @Get('unread-count')
+  unreadCount(@CurrentUser() actor: Actor): Promise<number> {
+    return this.notifications.unreadCount(actor);
+  }
+
+  @Post('read-all')
+  markAllRead(@CurrentUser() actor: Actor): Promise<{ count: number; readAt: string }> {
+    return this.notifications.markAllRead(actor);
+  }
+
   @Post(':id/read')
   markRead(@CurrentUser() actor: Actor, @Param('id') id: string): Promise<NotificationRecord> {
     return this.notifications.markRead(actor, id);

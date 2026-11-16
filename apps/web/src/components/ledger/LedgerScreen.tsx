@@ -9,6 +9,7 @@ import {
   todayInKarachi,
   type JournalEntryRecord,
 } from '@knazawy/shared';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -36,7 +37,7 @@ export function LedgerScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see the ledger.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see the ledger.
       </p>
     );
   }

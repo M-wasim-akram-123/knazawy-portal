@@ -15,6 +15,7 @@ import {
   type FreeRoomRecord,
   type RoomRequestRecord,
 } from '@knazawy/shared';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -52,7 +53,7 @@ export function RoomRequestsScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see room requests.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see room requests.
       </p>
     );
   }

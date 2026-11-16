@@ -14,6 +14,8 @@ import {
   type RateCardRecord,
   type RecipeRecord,
 } from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -42,6 +44,7 @@ export function RateCardsScreen() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     const session = readSessionUser();
@@ -63,7 +66,7 @@ export function RateCardsScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see rate cards.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see rate cards.
       </p>
     );
   }
@@ -159,131 +162,173 @@ export function RateCardsScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.rateCards}</h1>
-        <p>
-          The price an airline pays for each meal and snack, for a range of dates. A request uses
-          the card that covers its service date. The airline pays for at least the minimum portions.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.rateCards}
-        </p>
-      </div>
-      <div className="kz-workspace">
-        {showForm ? (
-          <form
-            className="kz-panel kz-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const input = toInput();
-              void run(
-                () =>
-                  editingId ? api.updateRateCard(editingId, input) : api.createRateCard(input),
-                (card) => `${card.number} is saved as a draft.`,
-              ).then((card) => {
-                if (card) resetForm();
-              });
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.rateCards}</h1>
+          <p>
+            The price an airline pays for each meal and snack, for a range of dates. A request uses
+            the card that covers its service date. The airline pays for at least the minimum
+            portions.
+          </p>
+          <p lang="ur" dir="rtl">
+            {messages.ur.common.rateCards}
+          </p>
+        </div>
+        {canCreate ? (
+          <button
+            className="kz-button kz-form-dialog-trigger"
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => {
+              resetForm();
+              setError('');
+              setSaved('');
+              setDialogOpen(true);
             }}
           >
-            <h2>{editingId ? 'Edit draft' : 'New rate card'}</h2>
-            <Field label="Airline">
-              <select
-                value={airlineId}
-                onChange={(event) => setAirlineId(event.target.value)}
-                required
+            New rate card
+          </button>
+        ) : null}
+      </div>
+      <div className="kz-workspace kz-workspace-single">
+        {showForm ? (
+          <FormDialog
+            buttonLabel="New rate card"
+            title={editingId ? 'Edit draft' : 'New rate card'}
+            showTrigger={false}
+            isOpen={dialogOpen}
+            onOpenChange={setDialogOpen}
+          >
+            {({ close }) => (
+              <form
+                className="kz-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const input = toInput();
+                  void run(
+                    () =>
+                      editingId ? api.updateRateCard(editingId, input) : api.createRateCard(input),
+                    (card) => `${card.number} is saved as a draft.`,
+                  ).then((card) => {
+                    if (card) {
+                      resetForm();
+                      close();
+                    }
+                  });
+                }}
               >
-                {airlines.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name} ({option.code})
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Applies from" hint="Shown as DD/MM/YYYY.">
-              <input
-                type="date"
-                value={validFrom}
-                onChange={(event) => setValidFrom(event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Applies until" hint="Leave empty if it has no end date yet.">
-              <input
-                type="date"
-                value={validTo}
-                onChange={(event) => setValidTo(event.target.value)}
-              />
-            </Field>
-            <Field label="Note">
-              <input
-                value={note}
-                maxLength={300}
-                placeholder="Optional"
-                onChange={(event) => setNote(event.target.value)}
-              />
-            </Field>
-            <div className="kz-table-wrap">
-              <table className="kz-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Price (PKR)</th>
-                    <th>Minimum portions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recipes.map((recipe) => (
-                    <tr key={recipe.id}>
-                      <td>
-                        {recipe.name}
-                        <span className="kz-help"> · {RECIPE_KIND_LABELS[recipe.kind]}</span>
-                      </td>
-                      <td>
-                        <input
-                          inputMode="decimal"
-                          aria-label={`Price of ${recipe.name}`}
-                          value={prices[recipe.id]?.unitPrice ?? ''}
-                          onChange={(event) =>
-                            setPrice(recipe.id, { unitPrice: event.target.value })
-                          }
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          min={0}
-                          step={1}
-                          inputMode="numeric"
-                          aria-label={`Minimum portions of ${recipe.name}`}
-                          value={prices[recipe.id]?.minimumQuantity ?? ''}
-                          onChange={(event) =>
-                            setPrice(recipe.id, { minimumQuantity: event.target.value })
-                          }
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {recipes.length === 0 ? <p>Approve a recipe before you price it.</p> : null}
-            <p className="kz-help">Items left without a price are not on this card.</p>
-            <div className="kz-actions">
-              <button
-                className="kz-button"
-                type="submit"
-                disabled={busy || airlines.length === 0 || recipes.length === 0}
-              >
-                {busy ? 'Saving' : 'Save draft'}
-              </button>
-              {editingId ? (
-                <button type="button" className="kz-button-quiet" onClick={resetForm}>
-                  Stop editing
-                </button>
-              ) : null}
-            </div>
-            {airlines.length === 0 ? <p>Open an airline account first.</p> : null}
-          </form>
+                <Field label="Airline">
+                  <select
+                    value={airlineId}
+                    onChange={(event) => setAirlineId(event.target.value)}
+                    required
+                  >
+                    {airlines.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name} ({option.code})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Applies from" hint="Shown as DD/MM/YYYY.">
+                  <input
+                    type="date"
+                    value={validFrom}
+                    onChange={(event) => setValidFrom(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Applies until" hint="Leave empty if it has no end date yet.">
+                  <input
+                    type="date"
+                    value={validTo}
+                    onChange={(event) => setValidTo(event.target.value)}
+                  />
+                </Field>
+                <Field label="Note">
+                  <input
+                    value={note}
+                    maxLength={300}
+                    placeholder="Optional"
+                    onChange={(event) => setNote(event.target.value)}
+                  />
+                </Field>
+                <div className="kz-table-wrap">
+                  <table className="kz-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Price (PKR)</th>
+                        <th>Minimum portions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recipes.map((recipe) => (
+                        <tr key={recipe.id}>
+                          <td>
+                            {recipe.name}
+                            <span className="kz-help"> · {RECIPE_KIND_LABELS[recipe.kind]}</span>
+                          </td>
+                          <td>
+                            <input
+                              inputMode="decimal"
+                              aria-label={`Price of ${recipe.name}`}
+                              value={prices[recipe.id]?.unitPrice ?? ''}
+                              onChange={(event) =>
+                                setPrice(recipe.id, { unitPrice: event.target.value })
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              inputMode="numeric"
+                              aria-label={`Minimum portions of ${recipe.name}`}
+                              value={prices[recipe.id]?.minimumQuantity ?? ''}
+                              onChange={(event) =>
+                                setPrice(recipe.id, { minimumQuantity: event.target.value })
+                              }
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {recipes.length === 0 ? <p>Approve a recipe before you price it.</p> : null}
+                <p className="kz-help">Items left without a price are not on this card.</p>
+                {error ? (
+                  <p className="kz-error" role="alert">
+                    {error}
+                  </p>
+                ) : null}
+                <div className="kz-actions">
+                  <button
+                    className="kz-button"
+                    type="submit"
+                    disabled={busy || airlines.length === 0 || recipes.length === 0}
+                  >
+                    {busy ? 'Saving' : 'Save draft'}
+                  </button>
+                  {editingId ? (
+                    <button
+                      type="button"
+                      className="kz-button-quiet"
+                      onClick={() => {
+                        resetForm();
+                        setDialogOpen(false);
+                      }}
+                    >
+                      Stop editing
+                    </button>
+                  ) : null}
+                </div>
+                {airlines.length === 0 ? <p>Open an airline account first.</p> : null}
+              </form>
+            )}
+          </FormDialog>
         ) : null}
         <div className="kz-stack">
           <div className="kz-panel kz-table-wrap">
@@ -367,7 +412,10 @@ export function RateCardsScreen() {
                     <button
                       type="button"
                       className="kz-button-quiet"
-                      onClick={() => openDraft(selected)}
+                      onClick={() => {
+                        openDraft(selected);
+                        setDialogOpen(true);
+                      }}
                     >
                       Edit draft
                     </button>

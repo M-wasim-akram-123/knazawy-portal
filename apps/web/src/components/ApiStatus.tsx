@@ -4,7 +4,7 @@ import { messages } from '@knazawy/i18n';
 import { useEffect, useState } from 'react';
 
 export function ApiStatus() {
-  const [label, setLabel] = useState<string>(messages.en.common.apiChecking);
+  const [status, setStatus] = useState<'checking' | 'ok' | 'down'>('checking');
 
   useEffect(() => {
     let cancelled = false;
@@ -15,15 +15,26 @@ export function ApiStatus() {
       })
       .then((body) => {
         if (cancelled) return;
-        setLabel(body.status === 'ok' ? messages.en.common.apiOk : messages.en.common.apiDown);
+        setStatus(body.status === 'ok' ? 'ok' : 'down');
       })
       .catch(() => {
-        if (!cancelled) setLabel(messages.en.common.apiDown);
+        if (!cancelled) setStatus('down');
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  return <p className="kz-api">{label}</p>;
+  const label =
+    status === 'ok'
+      ? messages.en.common.apiOk
+      : status === 'down'
+        ? messages.en.common.apiDown
+        : messages.en.common.apiChecking;
+
+  return (
+    <p className="kz-api" data-status={status}>
+      {label}
+    </p>
+  );
 }

@@ -113,6 +113,13 @@ export interface InvoiceCreditRecord {
   total: string;
 }
 
+export interface BillableRequestOption {
+  id: string;
+  number: string;
+  airlineName: string;
+  flightNumber: string;
+}
+
 export interface InvoiceRecord {
   id: string;
   number: string;
@@ -120,11 +127,12 @@ export interface InvoiceRecord {
   status: InvoiceStatus;
   airlineId: string;
   airlineName: string;
-  requestId: string;
-  requestNumber: string;
-  flightNumber: string;
-  serviceDate: string;
-  rateCardNumber: string;
+  airlineTaxNumber: string | null;
+  requestId: string | null;
+  requestNumber: string | null;
+  flightNumber: string | null;
+  serviceDate: string | null;
+  rateCardNumber: string | null;
   sourceInvoiceNumber: string | null;
   note: string | null;
   reason: string | null;

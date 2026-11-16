@@ -38,6 +38,10 @@ export type RecipeQuantityResult =
   | { ok: true; perPortion: string; batch: string }
   | { ok: false; reason: 'quantity' | 'portions' | 'wastage' };
 
+export type RecipeStockYieldResult =
+  | { ok: true; portions: string; limitingIngredients: string[] }
+  | { ok: false; reason: 'ingredients' | 'quantity' | 'available' | 'wastage' };
+
 /** Ingredient for one portion, and for the whole recipe after wastage. */
 export function recipeIngredientQuantity(input: {
   quantityPerPortion: string;
@@ -56,6 +60,43 @@ export function recipeIngredientQuantity(input: {
     ok: true,
     perPortion: formatScaled(quantity, 3),
     batch: formatScaled(batchMilli, 3),
+  };
+}
+
+/** Maximum whole portions a recipe can make from stock at one location. */
+export function recipeStockYield(input: {
+  wastagePercent: string;
+  lines: Array<{ itemName: string; quantityPerPortion: string; available: string }>;
+}): RecipeStockYieldResult {
+  if (input.lines.length === 0) return { ok: false, reason: 'ingredients' };
+  const wastage = parseScaled(input.wastagePercent, 2);
+  if (wastage === null || wastage > 10000n) return { ok: false, reason: 'wastage' };
+  const factor = 10000n + wastage;
+  const capacities: Array<{ itemName: string; portions: bigint }> = [];
+  for (const line of input.lines) {
+    const quantity = parseScaled(line.quantityPerPortion, 3);
+    const available = parseScaled(line.available, 4);
+    if (quantity === null || quantity <= 0n) return { ok: false, reason: 'quantity' };
+    if (available === null) return { ok: false, reason: 'available' };
+    const availableMilli = available / 10n;
+    const denominator = quantity * factor;
+    const maxNumerator = (availableMilli + 1n) * 10000n - 5000n - 1n;
+    capacities.push({
+      itemName: line.itemName,
+      portions: maxNumerator < 0n ? 0n : maxNumerator / denominator,
+    });
+  }
+  const portions = capacities.reduce(
+    (minimum, capacity) => (capacity.portions < minimum ? capacity.portions : minimum),
+    capacities[0]!.portions,
+  );
+  return {
+    ok: true,
+    portions: portions.toString(),
+    limitingIngredients: capacities
+      .filter((capacity) => capacity.portions === portions)
+      .map((capacity) => capacity.itemName)
+      .sort((left, right) => left.localeCompare(right)),
   };
 }
 

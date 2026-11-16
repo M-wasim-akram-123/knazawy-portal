@@ -16,6 +16,8 @@ import {
   type RoomOfferRecord,
   type RoomRequestRecord,
 } from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { Field } from '../../components/Field';
@@ -44,6 +46,7 @@ export function RoomRequestsScreen() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   function handleFailure(caught: unknown): void {
     if (caught instanceof ApiError && caught.status === 401) {
@@ -80,7 +83,7 @@ export function RoomRequestsScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to ask for rooms.
+        <Link href="/login">{messages.en.common.signIn}</Link> to ask for rooms.
       </p>
     );
   }
@@ -120,6 +123,7 @@ export function RoomRequestsScreen() {
     );
     setSaved('');
     setError('');
+    setDialogOpen(true);
   }
 
   async function save(send: boolean): Promise<void> {
@@ -142,6 +146,7 @@ export function RoomRequestsScreen() {
       await reload();
       resetForm();
       setSaved(send ? `${record.number} was sent.` : `${record.number} is saved as a draft.`);
+      setDialogOpen(false);
     } catch (caught: unknown) {
       handleFailure(caught);
     } finally {
@@ -156,7 +161,10 @@ export function RoomRequestsScreen() {
     try {
       const record = await api.cancelRoomRequest(id);
       await reload();
-      if (editingId === id) resetForm();
+      if (editingId === id) {
+        resetForm();
+        setDialogOpen(false);
+      }
       setSaved(`${record.number} is cancelled.`);
     } catch (caught: unknown) {
       handleFailure(caught);
@@ -167,12 +175,29 @@ export function RoomRequestsScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.roomRequests}</h1>
-        <p>Ask for rooms by type. The price is the charges Karam has set for one night.</p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.roomRequests}
-        </p>
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.roomRequests}</h1>
+          <p>Ask for rooms by type. The price is the charges Karam has set for one night.</p>
+          <p lang="ur" dir="rtl">
+            {messages.ur.common.roomRequests}
+          </p>
+        </div>
+        {canWrite ? (
+          <button
+            className="kz-button kz-form-dialog-trigger"
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => {
+              resetForm();
+              setError('');
+              setSaved('');
+              setDialogOpen(true);
+            }}
+          >
+            New stay
+          </button>
+        ) : null}
       </div>
       {error ? (
         <p className="kz-error" role="alert">
@@ -181,144 +206,165 @@ export function RoomRequestsScreen() {
       ) : null}
       {saved ? <p>{saved}</p> : null}
       {canWrite ? (
-        <form
-          className="kz-panel kz-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void save(false);
-          }}
+        <FormDialog
+          buttonLabel="New stay"
+          title={editingId ? 'Edit draft' : 'New stay'}
+          showTrigger={false}
+          isOpen={dialogOpen}
+          onOpenChange={setDialogOpen}
         >
-          <h2>{editingId ? 'Edit draft' : 'New stay'}</h2>
-          <div className="kz-form-grid">
-            <Field label="Branch">
-              <select
-                value={branchId}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  setBranchId(next);
-                  void api.listRoomOffers(next).then(setOffers).catch(handleFailure);
-                }}
-                required
-              >
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Check-in" hint="Shown as DD/MM/YYYY.">
-              <input
-                type="date"
-                value={checkIn}
-                min={todayInKarachi()}
-                onChange={(event) => setCheckIn(event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Check-out" hint="The morning after the last night.">
-              <input
-                type="date"
-                value={checkOut}
-                min={checkIn}
-                onChange={(event) => setCheckOut(event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Who the rooms are for">
-              <input
-                value={party}
-                maxLength={120}
-                onChange={(event) => setParty(event.target.value)}
-              />
-            </Field>
-            <Field label="Note">
-              <input
-                value={note}
-                maxLength={500}
-                onChange={(event) => setNote(event.target.value)}
-              />
-            </Field>
-          </div>
-          {lines.map((line, index) => (
-            <div className="kz-form-grid" key={index}>
-              <Field label="Room type">
-                <select
-                  value={line.roomTypeId}
-                  onChange={(event) =>
-                    setLines((current) =>
-                      current.map((item, itemIndex) =>
-                        itemIndex === index ? { ...item, roomTypeId: event.target.value } : item,
-                      ),
-                    )
-                  }
-                  required
+          {() => (
+            <form
+              className="kz-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void save(false);
+              }}
+            >
+              <div className="kz-form-grid">
+                <Field label="Branch">
+                  <select
+                    value={branchId}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      setBranchId(next);
+                      void api.listRoomOffers(next).then(setOffers).catch(handleFailure);
+                    }}
+                    required
+                  >
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Check-in" hint="Shown as DD/MM/YYYY.">
+                  <input
+                    type="date"
+                    value={checkIn}
+                    min={todayInKarachi()}
+                    onChange={(event) => setCheckIn(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Check-out" hint="The morning after the last night.">
+                  <input
+                    type="date"
+                    value={checkOut}
+                    min={checkIn}
+                    onChange={(event) => setCheckOut(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Who the rooms are for">
+                  <input
+                    value={party}
+                    maxLength={120}
+                    onChange={(event) => setParty(event.target.value)}
+                  />
+                </Field>
+                <Field label="Note">
+                  <input
+                    value={note}
+                    maxLength={500}
+                    onChange={(event) => setNote(event.target.value)}
+                  />
+                </Field>
+              </div>
+              {lines.map((line, index) => (
+                <div className="kz-form-grid" key={index}>
+                  <Field label="Room type">
+                    <select
+                      value={line.roomTypeId}
+                      onChange={(event) =>
+                        setLines((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, roomTypeId: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                      required
+                    >
+                      <option value="">Choose a room type</option>
+                      {offers.map((offer) => (
+                        <option key={offer.id} value={offer.id}>
+                          {offer.name} · {offer.nightlyTotal} PKR · {offer.rooms} rooms
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Rooms">
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={line.rooms}
+                      onChange={(event) =>
+                        setLines((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, rooms: event.target.value } : item,
+                          ),
+                        )
+                      }
+                      required
+                    />
+                  </Field>
+                </div>
+              ))}
+              {error ? (
+                <p className="kz-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              <p>{nights ? `${nights} nights` : 'Choose a check-out after check-in.'}</p>
+              <p>{preview ? `About ${preview} PKR at today's charges.` : null}</p>
+              <div className="kz-actions">
+                <button
+                  type="button"
+                  className="kz-button-quiet"
+                  disabled={busy || lines.length >= 12}
+                  onClick={() => setLines((current) => [...current, emptyLine()])}
                 >
-                  <option value="">Choose a room type</option>
-                  {offers.map((offer) => (
-                    <option key={offer.id} value={offer.id}>
-                      {offer.name} · {offer.nightlyTotal} PKR · {offer.rooms} rooms
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Rooms">
-                <input
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={line.rooms}
-                  onChange={(event) =>
-                    setLines((current) =>
-                      current.map((item, itemIndex) =>
-                        itemIndex === index ? { ...item, rooms: event.target.value } : item,
-                      ),
-                    )
-                  }
-                  required
-                />
-              </Field>
-            </div>
-          ))}
-          <p>{nights ? `${nights} nights` : 'Choose a check-out after check-in.'}</p>
-          <p>{preview ? `About ${preview} PKR at today's charges.` : null}</p>
-          <div className="kz-actions">
-            <button
-              type="button"
-              className="kz-button-quiet"
-              disabled={busy || lines.length >= 12}
-              onClick={() => setLines((current) => [...current, emptyLine()])}
-            >
-              Add a room type
-            </button>
-            {lines.length > 1 ? (
-              <button
-                type="button"
-                className="kz-button-quiet"
-                disabled={busy}
-                onClick={() => setLines((current) => current.slice(0, -1))}
-              >
-                Remove last
-              </button>
-            ) : null}
-            <button type="submit" className="kz-button" disabled={busy}>
-              Save draft
-            </button>
-            <button
-              type="button"
-              className="kz-button"
-              disabled={busy}
-              onClick={() => void save(true)}
-            >
-              Send request
-            </button>
-            {editingId ? (
-              <button type="button" className="kz-button-quiet" disabled={busy} onClick={resetForm}>
-                Clear
-              </button>
-            ) : null}
-          </div>
-        </form>
+                  Add a room type
+                </button>
+                {lines.length > 1 ? (
+                  <button
+                    type="button"
+                    className="kz-button-quiet"
+                    disabled={busy}
+                    onClick={() => setLines((current) => current.slice(0, -1))}
+                  >
+                    Remove last
+                  </button>
+                ) : null}
+                <button type="submit" className="kz-button" disabled={busy}>
+                  Save draft
+                </button>
+                <button
+                  type="button"
+                  className="kz-button"
+                  disabled={busy}
+                  onClick={() => void save(true)}
+                >
+                  Send request
+                </button>
+                {editingId ? (
+                  <button
+                    type="button"
+                    className="kz-button-quiet"
+                    disabled={busy}
+                    onClick={resetForm}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          )}
+        </FormDialog>
       ) : null}
       {requests.length === 0 ? <p className="kz-empty">No room requests yet.</p> : null}
       {requests.map((request) => (

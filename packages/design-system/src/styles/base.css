@@ -3,21 +3,32 @@
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  padding: 0 18px;
+  padding: 0 20px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--kz-brand);
-  color: #fff;
-  font: 600 15px/1 var(--kz-font);
+  color: var(--kz-ink);
+  font: 650 14px/1 var(--kz-font);
   text-decoration: none;
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
 
 .kz-button:hover {
   background: var(--kz-brand-strong);
+  box-shadow: 0 5px 14px rgba(23, 63, 57, 0.16);
+  transform: translateY(-1px);
 }
 
 .kz-button:focus-visible {
-  outline: 3px solid #fdba74;
+  outline: 3px solid var(--kz-accent);
   outline-offset: 2px;
+}
+
+.kz-button:disabled {
+  box-shadow: none;
+  transform: none;
 }

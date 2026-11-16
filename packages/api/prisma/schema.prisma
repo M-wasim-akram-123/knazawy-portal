@@ -10,6 +10,7 @@ datasource db {
 enum OrganisationType {
   KARAM
   AIRLINE
+  ONE_OFF_AIRLINE
   HOTEL
   SUPPLIER
 }
@@ -794,7 +795,7 @@ enum InvoiceStatus {
   ISSUED
 }
 
-/// What an airline is charged for one delivered request. A correction is a credit note, never an edit.
+/// What an airline is charged for a delivered request or a one-off sale.
 model Invoice {
   id              String         @id @default(cuid())
   organisationId  String         @map("organisation_id")
@@ -802,10 +803,10 @@ model Invoice {
   number          String         @unique
   kind            InvoiceKind    @default(INVOICE)
   status          InvoiceStatus  @default(DRAFT)
-  requestId       String         @map("request_id")
-  request         ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
-  rateCardId      String         @map("rate_card_id")
-  rateCard        RateCard       @relation(fields: [rateCardId], references: [id], onDelete: Restrict)
+  requestId       String?        @map("request_id")
+  request         ServiceRequest? @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  rateCardId      String?        @map("rate_card_id")
+  rateCard        RateCard?      @relation(fields: [rateCardId], references: [id], onDelete: Restrict)
   sourceInvoiceId String?        @map("source_invoice_id")
   sourceInvoice   Invoice?       @relation("InvoiceCredits", fields: [sourceInvoiceId], references: [id], onDelete: Restrict)
   creditNotes     Invoice[]      @relation("InvoiceCredits")

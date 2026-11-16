@@ -39,6 +39,12 @@ async function main(): Promise<void> {
       },
     });
 
+    const branch = await prisma.branch.upsert({
+      where: { organisationId_code: { organisationId: organisation.id, code: 'MAIN' } },
+      update: { name: 'Karam Restaurant', active: true },
+      create: { organisationId: organisation.id, code: 'MAIN', name: 'Karam Restaurant' },
+    });
+
     await prisma.user.upsert({
       where: { email },
       update: {
@@ -46,6 +52,7 @@ async function main(): Promise<void> {
         role: UserRole.ADMINISTRATOR,
         status: UserStatus.ACTIVE,
         organisationId: organisation.id,
+        branchId: branch.id,
       },
       create: {
         organisationId: organisation.id,
@@ -54,6 +61,7 @@ async function main(): Promise<void> {
         role: UserRole.ADMINISTRATOR,
         status: UserStatus.ACTIVE,
         passwordHash,
+        branchId: branch.id,
       },
     });
 
@@ -68,6 +76,7 @@ async function main(): Promise<void> {
           role: staff.role,
           status: UserStatus.ACTIVE,
           organisationId: organisation.id,
+          branchId: branch.id,
         },
         create: {
           organisationId: organisation.id,
@@ -76,6 +85,7 @@ async function main(): Promise<void> {
           role: staff.role,
           status: UserStatus.ACTIVE,
           passwordHash: staffHash,
+          branchId: branch.id,
         },
       });
     }

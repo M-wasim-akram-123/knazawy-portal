@@ -5,6 +5,8 @@ import type { SessionUser } from '@knazawy/auth-client';
 import { messages } from '@knazawy/i18n';
 import { LOCATION_TYPE_LABELS, LOCATION_TYPES, can } from '@knazawy/shared';
 import type { LocationRecord } from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { api, clearSession, readSessionUser } from '../../lib/session';
@@ -19,6 +21,7 @@ export function LocationsScreen() {
   const [parentId, setParentId] = useState('');
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   async function reload(): Promise<void> {
     setLocations(await api.listLocations());
@@ -36,7 +39,7 @@ export function LocationsScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see locations.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see locations.
       </p>
     );
   }
@@ -47,72 +50,90 @@ export function LocationsScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.locations}</h1>
-        <p>Stores, rooms, and bins where this branch keeps stock. Switch branch to see another.</p>
-      </div>
-      <div className="kz-workspace">
-        {canCreate ? (
-          <form
-            className="kz-panel kz-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              setError('');
-              void api
-                .createLocation({
-                  name,
-                  type,
-                  ...(parentId ? { parentId } : {}),
-                })
-                .then(() => {
-                  setName('');
-                  setParentId('');
-                  return reload();
-                })
-                .catch((caught: unknown) => setError(explain(caught, setUser)));
-            }}
-          >
-            <h2>New location</h2>
-            <Field label="Name">
-              <input value={name} onChange={(event) => setName(event.target.value)} required />
-            </Field>
-            <Field label="Type">
-              <select
-                value={type}
-                onChange={(event) => setType(event.target.value as (typeof LOCATION_TYPES)[number])}
-              >
-                {LOCATION_TYPES.map((locationType) => (
-                  <option key={locationType} value={locationType}>
-                    {LOCATION_TYPE_LABELS[locationType]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Inside" hint="Leave this empty for a top-level store, room, or vehicle.">
-              <select value={parentId} onChange={(event) => setParentId(event.target.value)}>
-                <option value="">None</option>
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            {error ? (
-              <p className="kz-error" role="alert">
-                {error}
-              </p>
-            ) : null}
-            <button className="kz-button" type="submit">
-              Save location
-            </button>
-          </form>
-        ) : null}
-        {!canCreate && error ? (
-          <p className="kz-error" role="alert">
-            {error}
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.locations}</h1>
+          <p>
+            Stores, rooms, and bins where this branch keeps stock. Switch branch to see another.
           </p>
+        </div>
+        {canCreate ? (
+          <FormDialog
+            buttonLabel="New location"
+            title="New location"
+            onOpenChange={setDialogOpen}
+            onOpen={() => setError('')}
+          >
+            {({ close }) => (
+              <form
+                className="kz-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setError('');
+                  void api
+                    .createLocation({
+                      name,
+                      type,
+                      ...(parentId ? { parentId } : {}),
+                    })
+                    .then(async () => {
+                      await reload();
+                      setName('');
+                      setParentId('');
+                      close();
+                    })
+                    .catch((caught: unknown) => setError(explain(caught, setUser)));
+                }}
+              >
+                <Field label="Name">
+                  <input value={name} onChange={(event) => setName(event.target.value)} required />
+                </Field>
+                <Field label="Type">
+                  <select
+                    value={type}
+                    onChange={(event) =>
+                      setType(event.target.value as (typeof LOCATION_TYPES)[number])
+                    }
+                  >
+                    {LOCATION_TYPES.map((locationType) => (
+                      <option key={locationType} value={locationType}>
+                        {LOCATION_TYPE_LABELS[locationType]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field
+                  label="Inside"
+                  hint="Leave this empty for a top-level store, room, or vehicle."
+                >
+                  <select value={parentId} onChange={(event) => setParentId(event.target.value)}>
+                    <option value="">None</option>
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {error ? (
+                  <p className="kz-error" role="alert">
+                    {error}
+                  </p>
+                ) : null}
+                <button className="kz-button" type="submit">
+                  Save location
+                </button>
+              </form>
+            )}
+          </FormDialog>
         ) : null}
+      </div>
+      {error && !dialogOpen ? (
+        <p className="kz-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="kz-workspace kz-workspace-single">
         <div className="kz-panel kz-table-wrap">
           {locations.length === 0 ? <p className="kz-empty">No locations yet.</p> : null}
           <table className="kz-table">

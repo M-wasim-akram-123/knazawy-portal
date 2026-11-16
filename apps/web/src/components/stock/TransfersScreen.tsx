@@ -10,7 +10,14 @@ import {
   todayInKarachi,
   transferStatusTone,
 } from '@knazawy/shared';
-import type { ItemRecord, LocationRecord, StockOnHandRecord, StockTransferRecord } from '@knazawy/shared';
+import type {
+  ItemRecord,
+  LocationRecord,
+  StockOnHandRecord,
+  StockTransferRecord,
+} from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -37,6 +44,7 @@ export function TransfersScreen() {
   const [saved, setSaved] = useState('');
   const [saving, setSaving] = useState(false);
   const [ready, setReady] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     const session = readSessionUser();
@@ -70,7 +78,7 @@ export function TransfersScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to transfer stock.
+        <Link href="/login">{messages.en.common.signIn}</Link> to transfer stock.
       </p>
     );
   }
@@ -82,147 +90,201 @@ export function TransfersScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.transferStock}</h1>
-        <p>
-          Send goods from one location to another. They leave straight away and arrive, at the same
-          cost, when the receiving location confirms.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.transferStock}
-        </p>
-      </div>
-      <div className="kz-workspace">
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.transferStock}</h1>
+          <p>
+            Send goods from one location to another. They leave straight away and arrive, at the
+            same cost, when the receiving location confirms.
+          </p>
+          <p lang="ur" dir="rtl">
+            {messages.ur.common.transferStock}
+          </p>
+        </div>
         {canSend ? (
-          <form
-            className="kz-panel kz-form"
-            onSubmit={(event) => {
-              event.preventDefault();
+          <button
+            className="kz-button kz-form-dialog-trigger"
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => {
               setError('');
-              setSaved('');
-              setSaving(true);
-              void api
-                .createTransfer({
-                  fromLocationId,
-                  toLocationId,
-                  sentOn,
-                  lines: lines.map((line) => ({ itemId: line.itemId, quantity: line.quantity })),
-                })
-                .then(async (transfer) => {
-                  setTransfers((current) => [transfer, ...current]);
-                  setSaved(`${transfer.number} is on the way to ${transfer.toLocationName}.`);
-                  setLines([blankLine(items[0]?.id ?? '')]);
-                  setStock(await api.listStock());
-                })
-                .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
-                .finally(() => setSaving(false));
+              setDialogOpen(true);
             }}
           >
-            <h2>New transfer</h2>
-            <Field label="From">
-              <select
-                value={fromLocationId}
-                onChange={(event) => setFromLocationId(event.target.value)}
-                required
-              >
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="To">
-              <select value={toLocationId} onChange={(event) => setToLocationId(event.target.value)} required>
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Sent on" hint="Shown as DD/MM/YYYY.">
-              <input type="date" value={sentOn} onChange={(event) => setSentOn(event.target.value)} required />
-            </Field>
-            <div className="kz-table-wrap">
-              <table className="kz-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Quantity</th>
-                    <th>On hand</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((line) => {
-                    const item = itemById.get(line.itemId);
-                    const unit = item ? BASE_UNIT_LABELS[item.baseUnit] : '';
-                    const available = item ? (onHand.get(`${item.id}:${fromLocationId}`) ?? 0) : 0;
-                    return (
-                      <tr key={line.key}>
-                        <td>
-                          <select
-                            value={line.itemId}
-                            onChange={(event) => updateLine(line.key, { itemId: event.target.value })}
-                            required
-                          >
-                            {items.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <input
-                            inputMode="decimal"
-                            value={line.quantity}
-                            onChange={(event) => updateLine(line.key, { quantity: event.target.value })}
-                            placeholder={unit ? `in ${unit}` : ''}
-                            required
-                          />
-                        </td>
-                        <td>{item ? `${available} ${unit}` : '—'}</td>
-                        <td>
-                          {lines.length > 1 ? (
-                            <button
-                              type="button"
-                              className="kz-button-quiet"
-                              onClick={() =>
-                                setLines((current) => current.filter((entry) => entry.key !== line.key))
-                              }
-                            >
-                              Remove
-                            </button>
-                          ) : null}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <button
-              type="button"
-              className="kz-button-quiet"
-              onClick={() => setLines((current) => [...current, blankLine(items[0]?.id ?? '')])}
-            >
-              Add a line
-            </button>
-            {samePlace ? <p className="kz-error">Choose two different locations.</p> : null}
-            {locations.length < 2 ? <p>Add another location before you transfer.</p> : null}
-            {error ? (
-              <p className="kz-error" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {saved ? <p>{saved}</p> : null}
-            <button className="kz-button" type="submit" disabled={saving || samePlace || locations.length < 2}>
-              {saving ? 'Sending' : 'Send transfer'}
-            </button>
-          </form>
+            New transfer
+          </button>
         ) : null}
+      </div>
+      {error && !dialogOpen ? (
+        <p className="kz-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="kz-workspace kz-workspace-single">
+        {canSend ? (
+          <FormDialog
+            buttonLabel="New transfer"
+            title="New transfer"
+            showTrigger={false}
+            isOpen={dialogOpen}
+            onOpenChange={setDialogOpen}
+          >
+            {({ close }) => (
+              <form
+                className="kz-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setError('');
+                  setSaved('');
+                  setSaving(true);
+                  void api
+                    .createTransfer({
+                      fromLocationId,
+                      toLocationId,
+                      sentOn,
+                      lines: lines.map((line) => ({
+                        itemId: line.itemId,
+                        quantity: line.quantity,
+                      })),
+                    })
+                    .then(async (transfer) => {
+                      setTransfers((current) => [transfer, ...current]);
+                      setSaved(`${transfer.number} is on the way to ${transfer.toLocationName}.`);
+                      setLines([blankLine(items[0]?.id ?? '')]);
+                      setStock(await api.listStock());
+                      close();
+                    })
+                    .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
+                    .finally(() => setSaving(false));
+                }}
+              >
+                <Field label="From">
+                  <select
+                    value={fromLocationId}
+                    onChange={(event) => setFromLocationId(event.target.value)}
+                    required
+                  >
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="To">
+                  <select
+                    value={toLocationId}
+                    onChange={(event) => setToLocationId(event.target.value)}
+                    required
+                  >
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Sent on" hint="Shown as DD/MM/YYYY.">
+                  <input
+                    type="date"
+                    value={sentOn}
+                    onChange={(event) => setSentOn(event.target.value)}
+                    required
+                  />
+                </Field>
+                <div className="kz-table-wrap">
+                  <table className="kz-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Quantity</th>
+                        <th>On hand</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lines.map((line) => {
+                        const item = itemById.get(line.itemId);
+                        const unit = item ? BASE_UNIT_LABELS[item.baseUnit] : '';
+                        const available = item
+                          ? (onHand.get(`${item.id}:${fromLocationId}`) ?? 0)
+                          : 0;
+                        return (
+                          <tr key={line.key}>
+                            <td>
+                              <select
+                                value={line.itemId}
+                                onChange={(event) =>
+                                  updateLine(line.key, { itemId: event.target.value })
+                                }
+                                required
+                              >
+                                {items.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <input
+                                inputMode="decimal"
+                                value={line.quantity}
+                                onChange={(event) =>
+                                  updateLine(line.key, { quantity: event.target.value })
+                                }
+                                placeholder={unit ? `in ${unit}` : ''}
+                                required
+                              />
+                            </td>
+                            <td>{item ? `${available} ${unit}` : '—'}</td>
+                            <td>
+                              {lines.length > 1 ? (
+                                <button
+                                  type="button"
+                                  className="kz-button-quiet"
+                                  onClick={() =>
+                                    setLines((current) =>
+                                      current.filter((entry) => entry.key !== line.key),
+                                    )
+                                  }
+                                >
+                                  Remove
+                                </button>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <button
+                  type="button"
+                  className="kz-button-quiet"
+                  onClick={() => setLines((current) => [...current, blankLine(items[0]?.id ?? '')])}
+                >
+                  Add a line
+                </button>
+                {samePlace ? <p className="kz-error">Choose two different locations.</p> : null}
+                {locations.length < 2 ? <p>Add another location before you transfer.</p> : null}
+                {error ? (
+                  <p className="kz-error" role="alert">
+                    {error}
+                  </p>
+                ) : null}
+                <button
+                  className="kz-button"
+                  type="submit"
+                  disabled={saving || samePlace || locations.length < 2}
+                >
+                  {saving ? 'Sending' : 'Send transfer'}
+                </button>
+              </form>
+            )}
+          </FormDialog>
+        ) : null}
+        {saved ? <p role="status">{saved}</p> : null}
         <div className="kz-panel kz-table-wrap">
           <h2>Transfers</h2>
           {transfers.length === 0 ? <p className="kz-empty">No transfers yet.</p> : null}

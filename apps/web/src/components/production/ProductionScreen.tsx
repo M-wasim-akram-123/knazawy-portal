@@ -7,6 +7,7 @@ import {
   can,
   formatDisplayDate,
   recipeIngredientQuantity,
+  recipeStockYield,
   todayInKarachi,
 } from '@knazawy/shared';
 import type {
@@ -15,6 +16,8 @@ import type {
   RecipeRecord,
   StockOnHandRecord,
 } from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -37,6 +40,7 @@ export function ProductionScreen() {
   const [saved, setSaved] = useState('');
   const [saving, setSaving] = useState(false);
   const [ready, setReady] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     const session = readSessionUser();
@@ -74,13 +78,24 @@ export function ProductionScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to record production.
+        <Link href="/login">{messages.en.common.signIn}</Link> to record production.
       </p>
     );
   }
 
   const canRecord = can(user.role, 'recipes', 'C');
   const recipe = recipes.find((row) => row.id === recipeId) ?? null;
+  const stockYield =
+    recipe && locationId
+      ? recipeStockYield({
+          wastagePercent: recipe.wastagePercent,
+          lines: recipe.lines.map((line) => ({
+            itemName: line.itemName,
+            quantityPerPortion: line.quantityPerPortion,
+            available: onHand.get(`${line.itemId}:${locationId}`) ?? '0',
+          })),
+        })
+      : null;
   const preview =
     recipe && actualPortions.trim() !== ''
       ? recipe.lines.map((line) => {
@@ -105,147 +120,185 @@ export function ProductionScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.production}</h1>
-        <p>
-          Record a batch when it is cooked. Its ingredients leave stock straight away, oldest cost
-          first, and the batch shows what each portion cost.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.production}
-        </p>
-      </div>
-      <div className="kz-workspace">
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.production}</h1>
+          <p>
+            Record a batch when it is cooked. Its ingredients leave stock straight away, oldest cost
+            first, and the batch shows what each portion cost.
+          </p>
+          <p lang="ur" dir="rtl">
+            {messages.ur.common.production}
+          </p>
+        </div>
         {canRecord ? (
-          <form
-            className="kz-panel kz-form"
-            onSubmit={(event) => {
-              event.preventDefault();
+          <button
+            className="kz-button kz-form-dialog-trigger"
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => {
               setError('');
-              setSaved('');
-              setSaving(true);
-              void api
-                .createProduction({
-                  recipeId,
-                  locationId,
-                  producedOn,
-                  plannedPortions: plannedPortions.trim(),
-                  actualPortions: actualPortions.trim(),
-                  note: note.trim() || undefined,
-                })
-                .then(async (batch) => {
-                  setBatches((current) => [batch, ...current]);
-                  setSaved(
-                    `${batch.number} is recorded: ${batch.actualPortions} portions at ${batch.costPerPortion} PKR each.`,
-                  );
-                  setPlannedPortions('');
-                  setActualPortions('');
-                  setNote('');
-                  setStock(await api.listStock());
-                })
-                .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
-                .finally(() => setSaving(false));
+              setDialogOpen(true);
             }}
           >
-            <h2>New batch</h2>
-            <Field label="Recipe">
-              <select
-                value={recipeId}
-                onChange={(event) => setRecipeId(event.target.value)}
-                required
+            New batch
+          </button>
+        ) : null}
+      </div>
+      {error && !dialogOpen ? (
+        <p className="kz-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {saved ? <p role="status">{saved}</p> : null}
+      <div className="kz-workspace kz-workspace-single">
+        {canRecord ? (
+          <FormDialog
+            buttonLabel="New batch"
+            title="New batch"
+            showTrigger={false}
+            isOpen={dialogOpen}
+            onOpenChange={setDialogOpen}
+          >
+            {({ close }) => (
+              <form
+                className="kz-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setError('');
+                  setSaved('');
+                  setSaving(true);
+                  void api
+                    .createProduction({
+                      recipeId,
+                      locationId,
+                      producedOn,
+                      plannedPortions: plannedPortions.trim(),
+                      actualPortions: actualPortions.trim(),
+                      note: note.trim() || undefined,
+                    })
+                    .then(async (batch) => {
+                      setBatches((current) => [batch, ...current]);
+                      setSaved(
+                        `${batch.number} is recorded: ${batch.actualPortions} portions at ${batch.costPerPortion} PKR each.`,
+                      );
+                      setPlannedPortions('');
+                      setActualPortions('');
+                      setNote('');
+                      setStock(await api.listStock());
+                      close();
+                    })
+                    .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
+                    .finally(() => setSaving(false));
+                }}
               >
-                {recipes.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Cooked at">
-              <select
-                value={locationId}
-                onChange={(event) => setLocationId(event.target.value)}
-                required
-              >
-                {locations.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Cooked on" hint="Shown as DD/MM/YYYY.">
-              <input
-                type="date"
-                value={producedOn}
-                onChange={(event) => setProducedOn(event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Planned portions">
-              <input
-                inputMode="numeric"
-                value={plannedPortions}
-                onChange={(event) => setPlannedPortions(event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Portions made" hint="Ingredients are taken for these portions.">
-              <input
-                inputMode="numeric"
-                value={actualPortions}
-                onChange={(event) => setActualPortions(event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Note">
-              <input
-                value={note}
-                maxLength={200}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder="Optional"
-              />
-            </Field>
-            {preview.length > 0 ? (
-              <div className="kz-table-wrap">
-                <table className="kz-table">
-                  <thead>
-                    <tr>
-                      <th>Ingredient</th>
-                      <th>Needed</th>
-                      <th>In this location</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.map((row) => (
-                      <tr key={row.itemId}>
-                        <td>{row.itemName}</td>
-                        <td>{row.needed}</td>
-                        <td>
-                          {row.available}
-                          {row.short ? ' · not enough' : ''}
-                        </td>
-                      </tr>
+                <Field label="Recipe">
+                  <select
+                    value={recipeId}
+                    onChange={(event) => setRecipeId(event.target.value)}
+                    required
+                  >
+                    {recipes.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-            {error ? (
-              <p className="kz-error" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {saved ? <p>{saved}</p> : null}
-            <button
-              className="kz-button"
-              type="submit"
-              disabled={saving || recipes.length === 0 || locations.length === 0}
-            >
-              {saving ? 'Recording' : 'Record batch'}
-            </button>
-            {recipes.length === 0 ? <p>Approve a recipe before you cook it.</p> : null}
-          </form>
+                  </select>
+                </Field>
+                <Field label="Cooked at">
+                  <select
+                    value={locationId}
+                    onChange={(event) => setLocationId(event.target.value)}
+                    required
+                  >
+                    {locations.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Cooked on" hint="Shown as DD/MM/YYYY.">
+                  <input
+                    type="date"
+                    value={producedOn}
+                    onChange={(event) => setProducedOn(event.target.value)}
+                    required
+                  />
+                </Field>
+                {stockYield?.ok ? (
+                  <p role="status">
+                    Current stock at this location can make up to {stockYield.portions} portions.
+                    {stockYield.portions === '0'
+                      ? ` Not enough ${stockYield.limitingIngredients.join(', ')} for one portion.`
+                      : ` Limited by ${stockYield.limitingIngredients.join(', ')}.`}
+                  </p>
+                ) : null}
+                <Field label="Planned portions">
+                  <input
+                    inputMode="numeric"
+                    value={plannedPortions}
+                    onChange={(event) => setPlannedPortions(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Portions made" hint="Ingredients are taken for these portions.">
+                  <input
+                    inputMode="numeric"
+                    value={actualPortions}
+                    onChange={(event) => setActualPortions(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Note">
+                  <input
+                    value={note}
+                    maxLength={200}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="Optional"
+                  />
+                </Field>
+                {preview.length > 0 ? (
+                  <div className="kz-table-wrap">
+                    <table className="kz-table">
+                      <thead>
+                        <tr>
+                          <th>Ingredient</th>
+                          <th>Needed</th>
+                          <th>In this location</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {preview.map((row) => (
+                          <tr key={row.itemId}>
+                            <td>{row.itemName}</td>
+                            <td>{row.needed}</td>
+                            <td>
+                              {row.available}
+                              {row.short ? ' · not enough' : ''}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+                {error ? (
+                  <p className="kz-error" role="alert">
+                    {error}
+                  </p>
+                ) : null}
+                <button
+                  className="kz-button"
+                  type="submit"
+                  disabled={saving || recipes.length === 0 || locations.length === 0}
+                >
+                  {saving ? 'Recording' : 'Record batch'}
+                </button>
+                {recipes.length === 0 ? <p>Approve a recipe before you cook it.</p> : null}
+              </form>
+            )}
+          </FormDialog>
         ) : null}
         <div className="kz-panel kz-table-wrap">
           <h2>Batches</h2>

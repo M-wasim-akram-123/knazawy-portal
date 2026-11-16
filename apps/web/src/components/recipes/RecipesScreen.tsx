@@ -12,6 +12,8 @@ import {
   recipeStatusTone,
 } from '@knazawy/shared';
 import type { ItemRecord, RecipeKind, RecipeRecord } from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -39,6 +41,7 @@ export function RecipesScreen() {
   const [saved, setSaved] = useState('');
   const [saving, setSaving] = useState(false);
   const [ready, setReady] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     const session = readSessionUser();
@@ -59,7 +62,7 @@ export function RecipesScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see recipes.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see recipes.
       </p>
     );
   }
@@ -71,201 +74,238 @@ export function RecipesScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.recipes}</h1>
-        <p>
-          A recipe is a meal or a snack. Each ingredient is the amount for one portion. The batch
-          adds the wastage on top. Changing an approved recipe sends it back for approval.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.recipes}
-        </p>
-      </div>
-      <div className="kz-workspace">
-        {canWrite ? (
-          <form
-            className="kz-panel kz-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const payload = {
-                code,
-                name,
-                kind,
-                portions,
-                wastagePercent,
-                lines: lines.map((line) => ({ itemId: line.itemId, quantity: line.quantity })),
-              };
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.recipes}</h1>
+          <p>
+            A recipe is a meal or a snack. Each ingredient is the amount for one portion. The batch
+            adds the wastage on top. Changing an approved recipe sends it back for approval.
+          </p>
+          <p lang="ur" dir="rtl">
+            {messages.ur.common.recipes}
+          </p>
+        </div>
+        {can(user.role, 'recipes', 'C') ? (
+          <button
+            className="kz-button kz-form-dialog-trigger"
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => {
+              setEditingId(null);
+              clearForm(items[0]?.id ?? '');
               setError('');
               setSaved('');
-              setSaving(true);
-              const request = editing
-                ? api.updateRecipe(editing.id, payload)
-                : api.createRecipe(payload);
-              void request
-                .then((recipe) => {
-                  setRecipes((current) =>
-                    [...current.filter((row) => row.id !== recipe.id), recipe].sort((left, right) =>
-                      left.name.localeCompare(right.name),
-                    ),
-                  );
-                  if (editing) {
-                    fill(recipe);
-                    setSaved(
-                      recipe.status === 'DRAFT'
-                        ? `${recipe.name} is a draft again.`
-                        : `${recipe.name} is saved.`,
-                    );
-                  } else {
-                    clearForm(items[0]?.id ?? '');
-                    setSaved(`${recipe.name} is saved as a draft.`);
-                  }
-                })
-                .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
-                .finally(() => setSaving(false));
+              setDialogOpen(true);
             }}
           >
-            <h2>{editing ? `Change ${editing.name}` : 'New recipe'}</h2>
-            {editing ? (
-              <p>
-                <span className="kz-status" data-tone={recipeStatusTone(editing.status)}>
-                  {RECIPE_STATUS_LABELS[editing.status]}
-                </span>
-              </p>
-            ) : null}
-            <Field label="Code">
-              <input value={code} onChange={(event) => setCode(event.target.value)} required />
-            </Field>
-            <Field label="Name">
-              <input value={name} onChange={(event) => setName(event.target.value)} required />
-            </Field>
-            <Field label="Kind">
-              <select value={kind} onChange={(event) => setKind(event.target.value as RecipeKind)}>
-                {RECIPE_KINDS.map((option) => (
-                  <option key={option} value={option}>
-                    {RECIPE_KIND_LABELS[option]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Portions" hint="How many portions this recipe makes.">
-              <input
-                inputMode="decimal"
-                value={portions}
-                onChange={(event) => setPortions(event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Wastage %" hint="Extra ingredients allowed, as a percent.">
-              <input
-                inputMode="decimal"
-                value={wastagePercent}
-                onChange={(event) => setWastagePercent(event.target.value)}
-                required
-              />
-            </Field>
-            <div className="kz-table-wrap">
-              <table className="kz-table">
-                <thead>
-                  <tr>
-                    <th>Ingredient</th>
-                    <th>Per portion</th>
-                    <th>For the batch</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((line) => {
-                    const item = itemById.get(line.itemId);
-                    const unit = item ? BASE_UNIT_LABELS[item.baseUnit] : '';
-                    const batch = recipeIngredientQuantity({
-                      quantityPerPortion: line.quantity,
-                      portions,
-                      wastagePercent,
-                    });
-                    return (
-                      <tr key={line.key}>
-                        <td>
-                          <select
-                            value={line.itemId}
-                            onChange={(event) => updateLine(line.key, { itemId: event.target.value })}
-                            required
-                          >
-                            {items.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <input
-                            inputMode="decimal"
-                            value={line.quantity}
-                            placeholder={unit ? `in ${unit}` : ''}
-                            onChange={(event) => updateLine(line.key, { quantity: event.target.value })}
-                            required
-                          />
-                        </td>
-                        <td>{batch.ok ? `${batch.batch} ${unit}` : '—'}</td>
-                        <td>
-                          {lines.length > 1 ? (
-                            <button
-                              type="button"
-                              className="kz-button-quiet"
-                              onClick={() =>
-                                setLines((current) => current.filter((entry) => entry.key !== line.key))
-                              }
-                            >
-                              Remove
-                            </button>
-                          ) : null}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <button
-              type="button"
-              className="kz-button-quiet"
-              onClick={() => setLines((current) => [...current, blankLine(items[0]?.id ?? '')])}
-            >
-              Add an ingredient
-            </button>
-            {error ? (
-              <p className="kz-error" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {saved ? <p>{saved}</p> : null}
-            <button className="kz-button" type="submit" disabled={saving || items.length === 0}>
-              {saving ? 'Saving' : 'Save recipe'}
-            </button>
-            {editing ? (
-              <button
-                type="button"
-                className="kz-button-quiet"
-                onClick={() => {
-                  setEditingId(null);
-                  clearForm(items[0]?.id ?? '');
+            New recipe
+          </button>
+        ) : null}
+      </div>
+      {error && (!dialogOpen || !canWrite) ? (
+        <p className="kz-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {saved ? <p role="status">{saved}</p> : null}
+      <div className="kz-workspace kz-workspace-single">
+        {canWrite ? (
+          <FormDialog
+            buttonLabel="New recipe"
+            title={editing ? `Change ${editing.name}` : 'New recipe'}
+            showTrigger={false}
+            isOpen={dialogOpen}
+            onOpenChange={setDialogOpen}
+          >
+            {({ close }) => (
+              <form
+                className="kz-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const payload = {
+                    code,
+                    name,
+                    kind,
+                    portions,
+                    wastagePercent,
+                    lines: lines.map((line) => ({ itemId: line.itemId, quantity: line.quantity })),
+                  };
                   setError('');
                   setSaved('');
+                  setSaving(true);
+                  const request = editing
+                    ? api.updateRecipe(editing.id, payload)
+                    : api.createRecipe(payload);
+                  void request
+                    .then((recipe) => {
+                      setRecipes((current) =>
+                        [...current.filter((row) => row.id !== recipe.id), recipe].sort(
+                          (left, right) => left.name.localeCompare(right.name),
+                        ),
+                      );
+                      if (editing) {
+                        fill(recipe);
+                        setSaved(
+                          recipe.status === 'DRAFT'
+                            ? `${recipe.name} is a draft again.`
+                            : `${recipe.name} is saved.`,
+                        );
+                      } else {
+                        clearForm(items[0]?.id ?? '');
+                        setSaved(`${recipe.name} is saved as a draft.`);
+                      }
+                      close();
+                    })
+                    .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
+                    .finally(() => setSaving(false));
                 }}
               >
-                New recipe
-              </button>
-            ) : null}
-          </form>
+                {editing ? (
+                  <p>
+                    <span className="kz-status" data-tone={recipeStatusTone(editing.status)}>
+                      {RECIPE_STATUS_LABELS[editing.status]}
+                    </span>
+                  </p>
+                ) : null}
+                <Field label="Code">
+                  <input value={code} onChange={(event) => setCode(event.target.value)} required />
+                </Field>
+                <Field label="Name">
+                  <input value={name} onChange={(event) => setName(event.target.value)} required />
+                </Field>
+                <Field label="Kind">
+                  <select
+                    value={kind}
+                    onChange={(event) => setKind(event.target.value as RecipeKind)}
+                  >
+                    {RECIPE_KINDS.map((option) => (
+                      <option key={option} value={option}>
+                        {RECIPE_KIND_LABELS[option]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Portions" hint="How many portions this recipe makes.">
+                  <input
+                    inputMode="decimal"
+                    value={portions}
+                    onChange={(event) => setPortions(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Wastage %" hint="Extra ingredients allowed, as a percent.">
+                  <input
+                    inputMode="decimal"
+                    value={wastagePercent}
+                    onChange={(event) => setWastagePercent(event.target.value)}
+                    required
+                  />
+                </Field>
+                <div className="kz-table-wrap">
+                  <table className="kz-table">
+                    <thead>
+                      <tr>
+                        <th>Ingredient</th>
+                        <th>Per portion</th>
+                        <th>For the batch</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lines.map((line) => {
+                        const item = itemById.get(line.itemId);
+                        const unit = item ? BASE_UNIT_LABELS[item.baseUnit] : '';
+                        const batch = recipeIngredientQuantity({
+                          quantityPerPortion: line.quantity,
+                          portions,
+                          wastagePercent,
+                        });
+                        return (
+                          <tr key={line.key}>
+                            <td>
+                              <select
+                                value={line.itemId}
+                                onChange={(event) =>
+                                  updateLine(line.key, { itemId: event.target.value })
+                                }
+                                required
+                              >
+                                {items.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <input
+                                inputMode="decimal"
+                                value={line.quantity}
+                                placeholder={unit ? `in ${unit}` : ''}
+                                onChange={(event) =>
+                                  updateLine(line.key, { quantity: event.target.value })
+                                }
+                                required
+                              />
+                            </td>
+                            <td>{batch.ok ? `${batch.batch} ${unit}` : '—'}</td>
+                            <td>
+                              {lines.length > 1 ? (
+                                <button
+                                  type="button"
+                                  className="kz-button-quiet"
+                                  onClick={() =>
+                                    setLines((current) =>
+                                      current.filter((entry) => entry.key !== line.key),
+                                    )
+                                  }
+                                >
+                                  Remove
+                                </button>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <button
+                  type="button"
+                  className="kz-button-quiet"
+                  onClick={() => setLines((current) => [...current, blankLine(items[0]?.id ?? '')])}
+                >
+                  Add an ingredient
+                </button>
+                {error ? (
+                  <p className="kz-error" role="alert">
+                    {error}
+                  </p>
+                ) : null}
+                <button className="kz-button" type="submit" disabled={saving || items.length === 0}>
+                  {saving ? 'Saving' : 'Save recipe'}
+                </button>
+                {editing ? (
+                  <button
+                    type="button"
+                    className="kz-button-quiet"
+                    onClick={() => {
+                      setEditingId(null);
+                      clearForm(items[0]?.id ?? '');
+                      setError('');
+                      setSaved('');
+                      setDialogOpen(false);
+                    }}
+                  >
+                    New recipe
+                  </button>
+                ) : null}
+              </form>
+            )}
+          </FormDialog>
         ) : null}
         <div className="kz-panel kz-table-wrap">
           <h2>Recipes</h2>
-          {!canWrite && error ? (
-            <p className="kz-error" role="alert">
-              {error}
-            </p>
-          ) : null}
-          {!canWrite && saved ? <p>{saved}</p> : null}
           {recipes.length === 0 ? <p className="kz-empty">No recipes yet.</p> : null}
           <table className="kz-table">
             <thead>
@@ -308,7 +348,15 @@ export function RecipesScreen() {
                   </td>
                   <td>
                     {canWrite ? (
-                      <button type="button" className="kz-button-quiet" onClick={() => fill(recipe)}>
+                      <button
+                        type="button"
+                        className="kz-button-quiet"
+                        onClick={() => {
+                          fill(recipe);
+                          setSaved('');
+                          setDialogOpen(true);
+                        }}
+                      >
                         Open
                       </button>
                     ) : null}{' '}
@@ -342,7 +390,9 @@ export function RecipesScreen() {
                           void api
                             .updateRecipe(recipe.id, { active: false })
                             .then(() => {
-                              setRecipes((current) => current.filter((row) => row.id !== recipe.id));
+                              setRecipes((current) =>
+                                current.filter((row) => row.id !== recipe.id),
+                              );
                               if (editingId === recipe.id) {
                                 setEditingId(null);
                                 clearForm(items[0]?.id ?? '');

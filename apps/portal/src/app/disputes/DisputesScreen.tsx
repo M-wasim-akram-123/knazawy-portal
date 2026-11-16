@@ -13,6 +13,8 @@ import {
   type InvoiceRecord,
   type RoomInvoiceRecord,
 } from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { Field } from '../../components/Field';
@@ -29,6 +31,7 @@ export function DisputesScreen() {
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     const session = readSessionUser();
@@ -55,7 +58,7 @@ export function DisputesScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see disputes.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see disputes.
       </p>
     );
   }
@@ -64,12 +67,15 @@ export function DisputesScreen() {
     ...invoices
       .filter(
         (invoice) =>
+          invoice.requestId !== null &&
           canDisputeInvoice(invoice.kind, invoice.status) &&
           !rows.some((row) => row.invoiceId === invoice.id),
       )
       .map((invoice) => ({
         key: `invoice:${invoice.id}`,
-        label: `${invoice.number} · ${invoice.total} PKR · ${formatDisplayDate(invoice.serviceDate)}`,
+        label: `${invoice.number} · ${invoice.total} PKR${
+          invoice.serviceDate ? ` · ${formatDisplayDate(invoice.serviceDate)}` : ''
+        }`,
       })),
     ...roomBills
       .filter(
@@ -96,6 +102,7 @@ export function DisputesScreen() {
       setReason('');
       setBillKey('');
       setSaved(`${record.number} is open. Karam will decide it. The bill is unchanged.`);
+      setDialogOpen(false);
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : 'The dispute could not be opened.');
     } finally {
@@ -105,53 +112,91 @@ export function DisputesScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.disputes}</h1>
-        <p>
-          Dispute an issued bill for your airline. One dispute per bill. Karam&apos;s decision does
-          not change the bill.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.disputes}
-        </p>
-      </div>
-      {canOpenDispute(user.role) ? (
-        <form
-          className="kz-panel kz-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void openDispute();
-          }}
-        >
-          <h2>Open a dispute</h2>
-          <Field label="Bill">
-            <select value={billKey} onChange={(event) => setBillKey(event.target.value)} required>
-              <option value="">Choose a bill</option>
-              {openable.map((bill) => (
-                <option key={bill.key} value={bill.key}>
-                  {bill.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Reason">
-            <input
-              value={reason}
-              maxLength={300}
-              onChange={(event) => setReason(event.target.value)}
-              required
-            />
-          </Field>
-          {error ? (
-            <p className="kz-error" role="alert">
-              {error}
-            </p>
-          ) : null}
-          {saved ? <p>{saved}</p> : null}
-          <button type="submit" className="kz-button" disabled={busy || reason.trim().length < 3}>
-            Open dispute
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.disputes}</h1>
+          <p>
+            Dispute an issued bill for your airline. One dispute per bill. Karam&apos;s decision
+            does not change the bill.
+          </p>
+          <p lang="ur" dir="rtl">
+            {messages.ur.common.disputes}
+          </p>
+        </div>
+        {canOpenDispute(user.role) ? (
+          <button
+            className="kz-button kz-form-dialog-trigger"
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => {
+              setError('');
+              setSaved('');
+              setDialogOpen(true);
+            }}
+          >
+            Open a dispute
           </button>
-        </form>
+        ) : null}
+      </div>
+      {error && !dialogOpen ? (
+        <p className="kz-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {saved ? <p role="status">{saved}</p> : null}
+      {canOpenDispute(user.role) ? (
+        <FormDialog
+          buttonLabel="Open a dispute"
+          title="Open a dispute"
+          showTrigger={false}
+          isOpen={dialogOpen}
+          onOpenChange={setDialogOpen}
+        >
+          {() => (
+            <form
+              className="kz-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void openDispute();
+              }}
+            >
+              <Field label="Bill">
+                <select
+                  value={billKey}
+                  onChange={(event) => setBillKey(event.target.value)}
+                  required
+                >
+                  <option value="">Choose a bill</option>
+                  {openable.map((bill) => (
+                    <option key={bill.key} value={bill.key}>
+                      {bill.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Reason">
+                <input
+                  value={reason}
+                  maxLength={300}
+                  onChange={(event) => setReason(event.target.value)}
+                  required
+                />
+              </Field>
+              {error ? (
+                <p className="kz-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              <button
+                type="submit"
+                className="kz-button"
+                disabled={busy || reason.trim().length < 3}
+              >
+                Open dispute
+              </button>
+            </form>
+          )}
+        </FormDialog>
       ) : null}
       {rows.length === 0 ? <p className="kz-empty">No disputes yet.</p> : null}
       {rows.map((row) => (

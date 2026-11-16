@@ -10,7 +10,14 @@ import {
   formatDisplayDate,
   todayInKarachi,
 } from '@knazawy/shared';
-import type { ItemRecord, LocationRecord, StockCountLineRecord, StockCountRecord } from '@knazawy/shared';
+import type {
+  ItemRecord,
+  LocationRecord,
+  StockCountLineRecord,
+  StockCountRecord,
+} from '@knazawy/shared';
+import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -32,6 +39,7 @@ export function CountsScreen() {
   const [saved, setSaved] = useState('');
   const [saving, setSaving] = useState(false);
   const [ready, setReady] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     const session = readSessionUser();
@@ -55,7 +63,7 @@ export function CountsScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to count stock.
+        <Link href="/login">{messages.en.common.signIn}</Link> to count stock.
       </p>
     );
   }
@@ -69,76 +77,117 @@ export function CountsScreen() {
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.countStock}</h1>
-        <p>
-          Count one location. The difference waits for approval, then stock is corrected. A shortage
-          leaves at the oldest cost, and anything extra comes in at the latest cost.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.countStock}
-        </p>
-      </div>
-      <div className="kz-workspace">
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{messages.en.common.countStock}</h1>
+          <p>
+            Count one location. The difference waits for approval, then stock is corrected. A
+            shortage leaves at the oldest cost, and anything extra comes in at the latest cost.
+          </p>
+          <p lang="ur" dir="rtl">
+            {messages.ur.common.countStock}
+          </p>
+        </div>
         {canCount ? (
-          <form
-            className="kz-panel kz-form"
-            onSubmit={(event) => {
-              event.preventDefault();
+          <button
+            className="kz-button kz-form-dialog-trigger"
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => {
               setError('');
-              setSaved('');
-              setSaving(true);
-              void api
-                .createCount({ locationId, countedOn, note: note.trim() || undefined })
-                .then((count) => {
-                  setCounts((current) => [count, ...current.filter((row) => row.id !== count.id)]);
-                  setNote('');
-                  show(count);
-                  setSaved(`${count.number} is ready to count at ${count.locationName}.`);
-                })
-                .catch(async (caught: unknown) => {
-                  setError(explainApiError(caught, setUser));
-                  await refresh();
-                })
-                .finally(() => setSaving(false));
+              setDialogOpen(true);
             }}
           >
-            <h2>New count</h2>
-            <Field label="Location">
-              <select value={locationId} onChange={(event) => setLocationId(event.target.value)} required>
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Counted on" hint="Shown as DD/MM/YYYY.">
-              <input
-                type="date"
-                value={countedOn}
-                onChange={(event) => setCountedOn(event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Note">
-              <input
-                value={note}
-                maxLength={200}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder="Optional"
-              />
-            </Field>
-            {error && !sheet ? (
-              <p className="kz-error" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {saved && !sheet ? <p>{saved}</p> : null}
-            <button className="kz-button" type="submit" disabled={saving || locations.length === 0}>
-              {saving ? 'Starting' : 'Start count'}
-            </button>
-          </form>
+            New count
+          </button>
+        ) : null}
+      </div>
+      {error && !dialogOpen && !sheet ? (
+        <p className="kz-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className={`kz-workspace${sheet ? '' : ' kz-workspace-single'}`}>
+        {canCount ? (
+          <FormDialog
+            buttonLabel="New count"
+            title="New count"
+            showTrigger={false}
+            isOpen={dialogOpen}
+            onOpenChange={setDialogOpen}
+          >
+            {({ close }) => (
+              <form
+                className="kz-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setError('');
+                  setSaved('');
+                  setSaving(true);
+                  void api
+                    .createCount({ locationId, countedOn, note: note.trim() || undefined })
+                    .then((count) => {
+                      setCounts((current) => [
+                        count,
+                        ...current.filter((row) => row.id !== count.id),
+                      ]);
+                      setNote('');
+                      show(count);
+                      setSaved(`${count.number} is ready to count at ${count.locationName}.`);
+                      close();
+                    })
+                    .catch(async (caught: unknown) => {
+                      setError(explainApiError(caught, setUser));
+                      await refresh();
+                    })
+                    .finally(() => setSaving(false));
+                }}
+              >
+                <Field label="Location">
+                  <select
+                    value={locationId}
+                    onChange={(event) => setLocationId(event.target.value)}
+                    required
+                  >
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Counted on" hint="Shown as DD/MM/YYYY.">
+                  <input
+                    type="date"
+                    value={countedOn}
+                    onChange={(event) => setCountedOn(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Note">
+                  <input
+                    value={note}
+                    maxLength={200}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="Optional"
+                  />
+                </Field>
+                {error && !sheet ? (
+                  <p className="kz-error" role="alert">
+                    {error}
+                  </p>
+                ) : null}
+                {saved && !sheet ? <p>{saved}</p> : null}
+                <button
+                  className="kz-button"
+                  type="submit"
+                  disabled={saving || locations.length === 0}
+                >
+                  {saving ? 'Starting' : 'Start count'}
+                </button>
+              </form>
+            )}
+          </FormDialog>
         ) : null}
         {sheet ? (
           <form
@@ -181,7 +230,9 @@ export function CountsScreen() {
               {formatDisplayDate(sheet.countedOn)}
             </p>
             {sheet.note ? <p>{sheet.note}</p> : null}
-            {rows.length === 0 ? <p>Nothing is on the book here. Add an item if you found some.</p> : null}
+            {rows.length === 0 ? (
+              <p>Nothing is on the book here. Add an item if you found some.</p>
+            ) : null}
             {rows.length > 0 ? (
               <div className="kz-table-wrap">
                 <table className="kz-table">
@@ -210,15 +261,20 @@ export function CountsScreen() {
                                 value={entered}
                                 placeholder={`in ${unit}`}
                                 onChange={(event) =>
-                                  setCounted((current) => ({ ...current, [row.itemId]: event.target.value }))
+                                  setCounted((current) => ({
+                                    ...current,
+                                    [row.itemId]: event.target.value,
+                                  }))
                                 }
                                 required
                               />
                             ) : (
-                              row.countedQuantity ?? '—'
+                              (row.countedQuantity ?? '—')
                             )}
                           </td>
-                          <td>{differenceText(entered || row.countedQuantity, row.bookQuantity, unit)}</td>
+                          <td>
+                            {differenceText(entered || row.countedQuantity, row.bookQuantity, unit)}
+                          </td>
                         </tr>
                       );
                     })}
@@ -269,7 +325,9 @@ export function CountsScreen() {
                       .approveCount(sheet.id)
                       .then((next) => {
                         remember(next);
-                        setSaved(`${next.number} is posted. Stock at ${next.locationName} matches the count.`);
+                        setSaved(
+                          `${next.number} is posted. Stock at ${next.locationName} matches the count.`,
+                        );
                       })
                       .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
                       .finally(() => setSaving(false));
@@ -405,7 +463,10 @@ function differenceText(counted: string | null, book: string, unit: string): str
 }
 
 function money(value: string): string {
-  return value.replace(/^-/, '').replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+  return value
+    .replace(/^-/, '')
+    .replace(/(\.\d*?)0+$/, '$1')
+    .replace(/\.$/, '');
 }
 
 function toScaled(value: string): number {

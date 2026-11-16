@@ -2,6 +2,7 @@
 
 import { messages } from '@knazawy/i18n';
 import { can, isAirlineRole, type AccountRecord } from '@knazawy/shared';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { ApiError, api, clearSession } from '../lib/session';
@@ -44,58 +45,88 @@ export default function HomePage() {
     );
   }
 
+  const financeUser = account.role === 'AIRLINE_FINANCE';
+
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{account.organisationName}</h1>
-        <p>
-          Signed in as {account.name} for {account.organisationCode}. You only see this
-          airline&apos;s requests, rates, and invoices.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.portalSurface}
-        </p>
-      </div>
+      <header className="kz-partner-hero">
+        <div className="kz-partner-hero-copy">
+          <p className="kz-eyebrow">
+            {financeUser ? 'Karam / Airline finance' : 'Karam / Service workspace'}
+          </p>
+          <h1>{account.organisationName}</h1>
+          <p>
+            {financeUser
+              ? 'Review invoices, resolve bill questions, and follow your airline ledger.'
+              : 'Create flight and room requests, then follow delivery and agreed rates.'}
+          </p>
+          <p className="kz-partner-urdu" lang="ur" dir="rtl">
+            {messages.ur.common.portalSurface}
+          </p>
+          {can(account.role, 'service_requests', 'C') ? (
+            <Link className="kz-button" href="/requests">
+              Create a service request
+            </Link>
+          ) : can(account.role, 'invoices', 'R') ? (
+            <Link className="kz-button" href="/invoices">
+              Review invoices
+            </Link>
+          ) : null}
+        </div>
+        <div className="kz-partner-stamp">
+          <span>YOUR ORGANISATION</span>
+          <strong>{account.organisationCode}</strong>
+          <small>Private partner access</small>
+        </div>
+      </header>
       <div className="kz-home-grid">
         {can(account.role, 'service_requests', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/requests">
+          <Link className="kz-panel kz-home-card" href="/requests">
             <h2>{messages.en.common.requests}</h2>
             <p>Ask for meals and snacks for a flight and follow each request.</p>
-          </a>
+          </Link>
+        ) : null}
+        {can(account.role, 'room_requests', 'R') ? (
+          <Link className="kz-panel kz-home-card" href="/room-requests">
+            <h2>{messages.en.common.roomRequests}</h2>
+            <p>Request rooms for your flight crew and follow each request.</p>
+          </Link>
         ) : null}
         {can(account.role, 'distribution', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/deliveries">
+          <Link className="kz-panel kz-home-card" href="/deliveries">
             <h2>{messages.en.common.deliveries}</h2>
             <p>See what has left the kitchen and what arrived for your flights.</p>
-          </a>
+          </Link>
         ) : null}
         {can(account.role, 'ledger', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/ledger">
+          <Link className="kz-panel kz-home-card" href="/ledger">
             <h2>{messages.en.common.ledger}</h2>
             <p>See what has been posted for your airline.</p>
-          </a>
+          </Link>
         ) : null}
-        <a className="kz-panel kz-home-card" href="/notifications">
-          <h2>{messages.en.common.notifications}</h2>
-          <p>See messages about your requests, deliveries, and bills.</p>
-        </a>
+        {isAirlineRole(account.role) ? (
+          <Link className="kz-panel kz-home-card" href="/notifications">
+            <h2>{messages.en.common.notifications}</h2>
+            <p>See messages about your requests, deliveries, and bills.</p>
+          </Link>
+        ) : null}
         {can(account.role, 'disputes', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/disputes">
+          <Link className="kz-panel kz-home-card" href="/disputes">
             <h2>{messages.en.common.disputes}</h2>
             <p>Question a bill Karam has issued. The bill itself is not changed.</p>
-          </a>
+          </Link>
         ) : null}
         {can(account.role, 'invoices', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/invoices">
+          <Link className="kz-panel kz-home-card" href="/invoices">
             <h2>{messages.en.common.invoices}</h2>
             <p>See the bills Karam has issued and any credit notes.</p>
-          </a>
+          </Link>
         ) : null}
         {can(account.role, 'service_rates', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/rates">
+          <Link className="kz-panel kz-home-card" href="/rates">
             <h2>{messages.en.common.rateCards}</h2>
             <p>See the prices agreed with Karam and the dates they apply.</p>
-          </a>
+          </Link>
         ) : null}
       </div>
     </section>
