@@ -15,6 +15,7 @@ import {
   statusTone,
   type ServiceRequestRecord,
 } from '@knazawy/shared';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -56,7 +57,7 @@ export function RequestsScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see requests.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see requests.
       </p>
     );
   }

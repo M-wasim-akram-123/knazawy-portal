@@ -19,6 +19,7 @@
     "dev:web": "pnpm --filter @knazawy/web dev",
     "dev:portal": "pnpm --filter @knazawy/portal dev",
     "seed:local": "pnpm --filter @knazawy/api seed:local",
+    "seed:demo": "pnpm --filter @knazawy/shared build && pnpm --filter @knazawy/api seed:demo",
     "format": "prettier --write \"**/*.{ts,tsx,json,md,css}\""
   },
   "devDependencies": {

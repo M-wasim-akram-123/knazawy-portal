@@ -2,6 +2,7 @@
 
 import { messages } from '@knazawy/i18n';
 import { formatKarachiDateTime, type NotificationRecord } from '@knazawy/shared';
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import { ApiError, api, clearSession } from '../lib/session';
@@ -193,9 +194,9 @@ export function NotificationBell() {
               )}
             </article>
           ))}
-          <a className="kz-notification-footer" href="/notifications">
+          <Link className="kz-notification-footer" href="/notifications">
             {messages.en.common.viewAllNotifications}
-          </a>
+          </Link>
         </section>
       ) : null}
     </div>

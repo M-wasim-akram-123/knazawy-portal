@@ -9,6 +9,7 @@ import {
   formatDisplayDate,
   type DisputeRecord,
 } from '@knazawy/shared';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -39,7 +40,7 @@ export function DisputesScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see disputes.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see disputes.
       </p>
     );
   }

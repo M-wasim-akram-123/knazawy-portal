@@ -3,6 +3,7 @@
 import type { SessionUser } from '@knazawy/auth-client';
 import { messages } from '@knazawy/i18n';
 import Image from 'next/image';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
@@ -141,13 +142,13 @@ export function StaffFrame({ children }: { children: ReactNode }) {
             <div className="kz-nav-group" key={group.label}>
               <span className="kz-nav-label">{group.label}</span>
               {group.links.map((link) => (
-                <a
+                <Link
                   key={link.href}
                   href={link.href}
                   aria-current={isCurrent(pathname, link.href) ? 'page' : undefined}
                 >
                   {link.label}
-                </a>
+                </Link>
               ))}
             </div>
           ))}

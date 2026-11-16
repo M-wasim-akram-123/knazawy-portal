@@ -5,6 +5,7 @@ import { messages } from '@knazawy/i18n';
 import { AIRLINE_ROLE_LABELS, AIRLINE_ROLES, USER_STATUS_LABELS, can } from '@knazawy/shared';
 import type { AirlineRecord, AirlineRole } from '@knazawy/shared';
 import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -46,7 +47,7 @@ export function AirlinesScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see airlines.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see airlines.
       </p>
     );
   }

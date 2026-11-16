@@ -6,6 +6,7 @@ import { messages } from '@knazawy/i18n';
 import { LOCATION_TYPE_LABELS, LOCATION_TYPES, can } from '@knazawy/shared';
 import type { LocationRecord } from '@knazawy/shared';
 import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { api, clearSession, readSessionUser } from '../../lib/session';
@@ -38,7 +39,7 @@ export function LocationsScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see locations.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see locations.
       </p>
     );
   }

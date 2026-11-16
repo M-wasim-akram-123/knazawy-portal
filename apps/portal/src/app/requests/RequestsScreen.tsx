@@ -25,6 +25,7 @@ import {
   type ServiceRequestRecord,
 } from '@knazawy/shared';
 import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { Field } from '../../components/Field';
@@ -244,7 +245,7 @@ export function RequestsScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see your requests.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see your requests.
       </p>
     );
   }

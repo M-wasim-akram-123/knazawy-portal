@@ -14,6 +14,7 @@ import {
   type RoomInvoiceRecord,
 } from '@knazawy/shared';
 import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { Field } from '../../components/Field';
@@ -57,7 +58,7 @@ export function DisputesScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see disputes.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see disputes.
       </p>
     );
   }

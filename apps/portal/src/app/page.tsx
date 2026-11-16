@@ -2,6 +2,7 @@
 
 import { messages } from '@knazawy/i18n';
 import { can, isAirlineRole, type AccountRecord } from '@knazawy/shared';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { ApiError, api, clearSession } from '../lib/session';
@@ -63,13 +64,13 @@ export default function HomePage() {
             {messages.ur.common.portalSurface}
           </p>
           {can(account.role, 'service_requests', 'C') ? (
-            <a className="kz-button" href="/requests">
+            <Link className="kz-button" href="/requests">
               Create a service request
-            </a>
+            </Link>
           ) : can(account.role, 'invoices', 'R') ? (
-            <a className="kz-button" href="/invoices">
+            <Link className="kz-button" href="/invoices">
               Review invoices
-            </a>
+            </Link>
           ) : null}
         </div>
         <div className="kz-partner-stamp">
@@ -80,52 +81,52 @@ export default function HomePage() {
       </header>
       <div className="kz-home-grid">
         {can(account.role, 'service_requests', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/requests">
+          <Link className="kz-panel kz-home-card" href="/requests">
             <h2>{messages.en.common.requests}</h2>
             <p>Ask for meals and snacks for a flight and follow each request.</p>
-          </a>
+          </Link>
         ) : null}
         {can(account.role, 'room_requests', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/room-requests">
+          <Link className="kz-panel kz-home-card" href="/room-requests">
             <h2>{messages.en.common.roomRequests}</h2>
             <p>Request rooms for your flight crew and follow each request.</p>
-          </a>
+          </Link>
         ) : null}
         {can(account.role, 'distribution', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/deliveries">
+          <Link className="kz-panel kz-home-card" href="/deliveries">
             <h2>{messages.en.common.deliveries}</h2>
             <p>See what has left the kitchen and what arrived for your flights.</p>
-          </a>
+          </Link>
         ) : null}
         {can(account.role, 'ledger', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/ledger">
+          <Link className="kz-panel kz-home-card" href="/ledger">
             <h2>{messages.en.common.ledger}</h2>
             <p>See what has been posted for your airline.</p>
-          </a>
+          </Link>
         ) : null}
         {isAirlineRole(account.role) ? (
-          <a className="kz-panel kz-home-card" href="/notifications">
+          <Link className="kz-panel kz-home-card" href="/notifications">
             <h2>{messages.en.common.notifications}</h2>
             <p>See messages about your requests, deliveries, and bills.</p>
-          </a>
+          </Link>
         ) : null}
         {can(account.role, 'disputes', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/disputes">
+          <Link className="kz-panel kz-home-card" href="/disputes">
             <h2>{messages.en.common.disputes}</h2>
             <p>Question a bill Karam has issued. The bill itself is not changed.</p>
-          </a>
+          </Link>
         ) : null}
         {can(account.role, 'invoices', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/invoices">
+          <Link className="kz-panel kz-home-card" href="/invoices">
             <h2>{messages.en.common.invoices}</h2>
             <p>See the bills Karam has issued and any credit notes.</p>
-          </a>
+          </Link>
         ) : null}
         {can(account.role, 'service_rates', 'R') ? (
-          <a className="kz-panel kz-home-card" href="/rates">
+          <Link className="kz-panel kz-home-card" href="/rates">
             <h2>{messages.en.common.rateCards}</h2>
             <p>See the prices agreed with Karam and the dates they apply.</p>
-          </a>
+          </Link>
         ) : null}
       </div>
     </section>

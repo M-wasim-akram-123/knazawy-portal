@@ -11,6 +11,7 @@ import {
   todayInKarachi,
 } from '@knazawy/shared';
 import type { ItemRecord, LocationRecord, PurchaseRecord } from '@knazawy/shared';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -56,7 +57,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see this purchase.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see this purchase.
       </p>
     );
   }
@@ -84,7 +85,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
   return (
     <section className="kz-stack">
       <p>
-        <a href="/purchases">Back to purchases</a>
+        <Link href="/purchases">Back to purchases</Link>
       </p>
       <div className="kz-page-head">
         <h1>

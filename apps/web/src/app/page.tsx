@@ -2,6 +2,7 @@
 
 import { messages } from '@knazawy/i18n';
 import type { Role } from '@knazawy/shared';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { ApiStatus } from '../components/ApiStatus';
@@ -93,9 +94,9 @@ export default function HomePage() {
             {heroActions
               .filter((action) => canAccessStaffPath(role, action.href))
               .map((action) => (
-                <a className={action.className} href={action.href} key={action.href}>
+                <Link className={action.className} href={action.href} key={action.href}>
                   {action.label}
-                </a>
+                </Link>
               ))}
           </div>
         </div>
@@ -138,7 +139,7 @@ export default function HomePage() {
           {quickActions
             .filter((action) => canAccessStaffPath(role, action.href))
             .map((action) => (
-              <a className="kz-quick-card" href={action.href} key={action.href}>
+              <Link className="kz-quick-card" href={action.href} key={action.href}>
                 <span className="kz-quick-card-top">
                   <span className="kz-quick-number">{action.number}</span>
                   <span className="kz-quick-category">{action.category}</span>
@@ -148,7 +149,7 @@ export default function HomePage() {
                 <span className="kz-quick-arrow" aria-hidden="true">
                   &gt;
                 </span>
-              </a>
+              </Link>
             ))}
         </div>
       </section>
@@ -164,13 +165,13 @@ export default function HomePage() {
           {workAreas
             .filter((area) => canAccessStaffPath(role, area.href))
             .map((area) => (
-              <a className="kz-work-area-card" href={area.href} key={area.href}>
+              <Link className="kz-work-area-card" href={area.href} key={area.href}>
                 <span className="kz-work-area-arrow" aria-hidden="true">
                   &gt;
                 </span>
                 <h3>{area.title}</h3>
                 <p>{area.description}</p>
-              </a>
+              </Link>
             ))}
         </div>
       </section>

@@ -6,6 +6,7 @@ import { messages } from '@knazawy/i18n';
 import { can } from '@knazawy/shared';
 import type { SupplierRecord } from '@knazawy/shared';
 import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { api, clearSession, readSessionUser } from '../../lib/session';
@@ -45,7 +46,7 @@ export function SuppliersScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see suppliers.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see suppliers.
       </p>
     );
   }

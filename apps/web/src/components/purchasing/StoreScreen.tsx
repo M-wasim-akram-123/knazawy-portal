@@ -4,6 +4,7 @@ import type { SessionUser } from '@knazawy/auth-client';
 import { messages } from '@knazawy/i18n';
 import { BASE_UNIT_LABELS, formatDisplayDate } from '@knazawy/shared';
 import type { GoodsReceiptRecord, StockOnHandRecord } from '@knazawy/shared';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -33,7 +34,7 @@ export function StoreScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see stock.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see stock.
       </p>
     );
   }

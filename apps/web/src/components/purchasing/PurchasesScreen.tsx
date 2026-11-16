@@ -10,6 +10,7 @@ import {
   todayInKarachi,
 } from '@knazawy/shared';
 import type { ItemRecord, PurchaseRecord, SupplierRecord } from '@knazawy/shared';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -60,7 +61,7 @@ export function PurchasesScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see purchases.
+        <Link href="/login">{messages.en.common.signIn}</Link> to see purchases.
       </p>
     );
   }
@@ -112,7 +113,7 @@ export function PurchasesScreen() {
               {purchases.map((purchase) => (
                 <tr key={purchase.id}>
                   <td>
-                    <a href={`/purchases/${purchase.id}`}>{purchase.number}</a>
+                    <Link href={`/purchases/${purchase.id}`}>{purchase.number}</Link>
                   </td>
                   <td>{purchase.supplierName}</td>
                   <td>

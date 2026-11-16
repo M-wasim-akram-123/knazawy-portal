@@ -9,6 +9,7 @@ import {
   type RoomTypeRecord,
 } from '@knazawy/shared';
 import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -57,7 +58,7 @@ export function RoomsScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to set up rooms.
+        <Link href="/login">{messages.en.common.signIn}</Link> to set up rooms.
       </p>
     );
   }

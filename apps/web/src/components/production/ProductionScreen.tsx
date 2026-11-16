@@ -17,6 +17,7 @@ import type {
   StockOnHandRecord,
 } from '@knazawy/shared';
 import { FormDialog } from '@knazawy/ui-shell';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
@@ -77,7 +78,7 @@ export function ProductionScreen() {
   if (!user) {
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to record production.
+        <Link href="/login">{messages.en.common.signIn}</Link> to record production.
       </p>
     );
   }
