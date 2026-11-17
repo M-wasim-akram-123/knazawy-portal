@@ -1,16 +1,21 @@
 'use client';
 
-import { messages } from '@knazawy/i18n';
+import { staffSignInCopy } from '@knazawy/i18n';
+import { PasswordInput } from '@knazawy/ui-shell';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { api, tokens, writeSessionUser } from '../../lib/session';
+import { useChrome, useCommon, useCopy } from '../../lib/i18n';
+import { api, writeSessionUser } from '../../lib/session';
 
 import { Field } from './Field';
 
 export function SignInScreen() {
   const router = useRouter();
+  const t = useCopy(staffSignInCopy);
+  const common = useCommon();
+  const chrome = useChrome();
   const [email, setEmail] = useState('admin@karam.local');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,13 +31,12 @@ export function SignInScreen() {
         void api
           .login(email, password)
           .then((result) => {
-            tokens.setAccessToken(result.accessToken);
             writeSessionUser(result.user);
             router.push('/');
             router.refresh();
           })
           .catch((caught: unknown) => {
-            setError(caught instanceof Error ? caught.message : 'Email or password is wrong.');
+            setError(caught instanceof Error ? caught.message : t.wrongCredentials);
           })
           .finally(() => setPending(false));
       }}
@@ -42,12 +46,12 @@ export function SignInScreen() {
           <Image
             className="kz-auth-logo"
             src="/karam-dome-mark.png"
-            alt="Karam Restaurant"
+            alt={t.logoAlt}
             width={64}
             height={64}
             priority
           />
-          <span className="kz-auth-chip">KARAM / STAFF</span>
+          <span className="kz-auth-chip">KARAM / {t.chipStaff}</span>
         </div>
         <div className="kz-auth-visual" aria-hidden="true">
           <svg viewBox="0 0 480 360" role="img">
@@ -102,20 +106,20 @@ export function SignInScreen() {
           </svg>
         </div>
         <div className="kz-auth-copy">
-          <h2>From goods received to meals delivered.</h2>
-          <p>One workspace for the people who keep every service moving.</p>
+          <h2>{t.heading}</h2>
+          <p>{t.subheading}</p>
         </div>
         <div className="kz-auth-foot">
-          STORE <span /> KITCHEN <span /> FINANCE
+          {t.footStore} <span /> {t.footKitchen} <span /> {t.footFinance}
         </div>
       </div>
       <div className="kz-auth-form">
         <div className="kz-page-head">
-          <p className="kz-auth-kicker">Staff workspace</p>
-          <h1>{messages.en.common.signIn}</h1>
-          <p>Use your staff email to open the store, kitchen, and finance tools.</p>
+          <p className="kz-auth-kicker">{t.kicker}</p>
+          <h1>{common.signIn}</h1>
+          <p>{t.intro}</p>
         </div>
-        <Field label="Email">
+        <Field label={t.email}>
           <input
             type="email"
             autoComplete="username"
@@ -124,13 +128,14 @@ export function SignInScreen() {
             required
           />
         </Field>
-        <Field label="Password">
-          <input
-            type="password"
+        <Field label={t.password}>
+          <PasswordInput
             autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             required
+            showLabel={chrome.showPassword}
+            hideLabel={chrome.hidePassword}
           />
         </Field>
         {error ? (
@@ -139,9 +144,9 @@ export function SignInScreen() {
           </p>
         ) : null}
         <button className="kz-button kz-button-block" type="submit" disabled={pending}>
-          {messages.en.common.signIn}
+          {common.signIn}
         </button>
-        <p className="kz-auth-note">Your access follows your staff role.</p>
+        <p className="kz-auth-note">{t.note}</p>
       </div>
     </form>
   );

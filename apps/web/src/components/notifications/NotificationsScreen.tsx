@@ -1,13 +1,16 @@
 'use client';
 
-import { messages } from '@knazawy/i18n';
+import { staffNotificationsCopy } from '@knazawy/i18n';
 import { formatKarachiDateTime, type NotificationRecord } from '@knazawy/shared';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCommon, useCopy } from '../../lib/i18n';
 import { api } from '../../lib/session';
 
 export function NotificationsScreen() {
+  const t = useCopy(staffNotificationsCopy);
+  const common = useCommon();
   const [rows, setRows] = useState<NotificationRecord[] | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState('');
@@ -59,23 +62,18 @@ export function NotificationsScreen() {
   return (
     <section className="kz-stack">
       <div className="kz-page-head">
-        <h1>{messages.en.common.notifications}</h1>
-        <p>Messages about requests, deliveries, invoices, and disputes. These stay in the app.</p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.notifications}
-        </p>
+        <h1>{common.notifications}</h1>
+        <p>{t.intro}</p>
         {unreadCount > 0 ? (
           <div className="kz-notification-page-actions">
-            <span>
-              {unreadCount} {messages.en.common.unread}
-            </span>
+            <span>{fill(t.unreadCount, { count: unreadCount })}</span>
             <button
               type="button"
               className="kz-button-quiet"
               onClick={() => void markAllRead()}
               disabled={markingAll || markingId !== null}
             >
-              {messages.en.common.markAllAsRead}
+              {common.markAllAsRead}
             </button>
           </div>
         ) : null}
@@ -85,9 +83,9 @@ export function NotificationsScreen() {
           {error}
         </p>
       ) : null}
-      {rows === null && !error ? <p>{messages.en.common.notificationsLoading}</p> : null}
+      {rows === null && !error ? <p>{common.notificationsLoading}</p> : null}
       {rows !== null && rows.length === 0 ? (
-        <p className="kz-empty">{messages.en.common.noNotifications}</p>
+        <p className="kz-empty">{common.noNotifications}</p>
       ) : null}
       {rows?.map((row) => (
         <article key={row.id} className="kz-panel kz-stack">
@@ -95,7 +93,7 @@ export function NotificationsScreen() {
             {row.title}{' '}
             {row.readAt ? null : (
               <span className="kz-status" data-tone="progress">
-                {messages.en.common.newNotification}
+                {common.newNotification}
               </span>
             )}
           </h2>
@@ -108,7 +106,7 @@ export function NotificationsScreen() {
               onClick={() => void markRead(row.id)}
               disabled={markingAll || markingId === row.id}
             >
-              {messages.en.common.markAsRead}
+              {common.markAsRead}
             </button>
           )}
         </article>

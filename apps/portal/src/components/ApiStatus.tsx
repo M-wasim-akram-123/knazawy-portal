@@ -1,9 +1,11 @@
 'use client';
 
-import { messages } from '@knazawy/i18n';
 import { useEffect, useState } from 'react';
 
+import { useCommon } from '../lib/i18n';
+
 export function ApiStatus() {
+  const common = useCommon();
   const [status, setStatus] = useState<'checking' | 'ok' | 'down'>('checking');
 
   useEffect(() => {
@@ -26,11 +28,7 @@ export function ApiStatus() {
   }, []);
 
   const label =
-    status === 'ok'
-      ? messages.en.common.apiOk
-      : status === 'down'
-        ? messages.en.common.apiDown
-        : messages.en.common.apiChecking;
+    status === 'ok' ? common.apiOk : status === 'down' ? common.apiDown : common.apiChecking;
 
   return (
     <p className="kz-api" data-status={status}>

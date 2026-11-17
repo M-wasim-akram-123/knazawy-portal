@@ -2,35 +2,20 @@ import type { Actor } from '@knazawy/shared';
 
 export type SessionUser = Actor;
 
-export interface TokenStore {
-  getAccessToken(): string | null;
-  setAccessToken(token: string | null): void;
-}
-
-const TOKEN_KEY = 'knazawy.accessToken';
+/** Where older builds kept the access token. It now lives in an httpOnly cookie. */
+const LEGACY_TOKEN_KEY = 'knazawy.accessToken';
 const USER_KEY = 'knazawy.user';
 
-export function memoryTokenStore(): TokenStore {
-  let accessToken: string | null = null;
-  return {
-    getAccessToken: () => accessToken,
-    setAccessToken: (token) => {
-      accessToken = token;
-    },
-  };
+/** Removes a token an older build left in localStorage, where any script could read it. */
+export function forgetLegacyToken(): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(LEGACY_TOKEN_KEY);
 }
 
-export function browserTokenStore(): TokenStore {
-  return {
-    getAccessToken: () => (typeof window === 'undefined' ? null : window.localStorage.getItem(TOKEN_KEY)),
-    setAccessToken: (token) => {
-      if (typeof window === 'undefined') return;
-      if (token) window.localStorage.setItem(TOKEN_KEY, token);
-      else window.localStorage.removeItem(TOKEN_KEY);
-    },
-  };
-}
-
+/**
+ * The signed-in person's name and role, for the page header and menus. Not a credential: the
+ * API checks the session cookie on every request.
+ */
 export function readSessionUser(): SessionUser | null {
   if (typeof window === 'undefined') return null;
   const raw = window.localStorage.getItem(USER_KEY);

@@ -1,7 +1,7 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { purchasesCopy } from '@knazawy/i18n';
 import {
   BASE_UNIT_LABELS,
   PURCHASE_STATUS_LABELS,
@@ -11,14 +11,19 @@ import {
   todayInKarachi,
 } from '@knazawy/shared';
 import type { ItemRecord, LocationRecord, PurchaseRecord } from '@knazawy/shared';
+import { KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
 export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
+  const t = useCopy(purchasesCopy);
+  const common = useCommon();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [purchase, setPurchase] = useState<PurchaseRecord | null>(null);
   const [items, setItems] = useState<ItemRecord[]>([]);
@@ -53,11 +58,11 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
       .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
   }, [purchaseId]);
 
-  if (!ready) return <p>Loading purchase</p>;
+  if (!ready) return <KaramLoader label={t.loadingPurchase} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see this purchase.
+        <Link href="/login">{common.signIn}</Link> {t.signInSuffixDetail}
       </p>
     );
   }
@@ -67,7 +72,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
         {error}
       </p>
     ) : (
-      <p>Loading purchase</p>
+      <KaramLoader label={t.loadingPurchase} fullPage />
     );
   }
 
@@ -85,7 +90,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
   return (
     <section className="kz-stack">
       <p>
-        <Link href="/purchases">Back to purchases</Link>
+        <Link href="/purchases">{t.backToPurchases}</Link>
       </p>
       <div className="kz-page-head">
         <h1>
@@ -93,19 +98,19 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
         </h1>
         <p>
           <span className="kz-status" data-tone={purchaseStatusTone(purchase.status)}>
-            {PURCHASE_STATUS_LABELS[purchase.status]}
+            {label(PURCHASE_STATUS_LABELS[purchase.status])}
           </span>
-          . Ordered {formatDisplayDate(purchase.orderedOn)}.
+          {fill(t.orderedOn, { date: formatDisplayDate(purchase.orderedOn) })}
         </p>
       </div>
       <div className="kz-panel kz-table-wrap">
         <table className="kz-table">
           <thead>
             <tr>
-              <th>Item</th>
-              <th>Ordered</th>
-              <th>Price</th>
-              <th>Received</th>
+              <th>{t.item}</th>
+              <th>{t.ordered}</th>
+              <th>{t.price}</th>
+              <th>{t.received}</th>
             </tr>
           </thead>
           <tbody>
@@ -141,7 +146,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
               .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
           }}
         >
-          <Field label="Add an item">
+          <Field label={t.addItem}>
             <select value={itemId} onChange={(event) => setItemId(event.target.value)} required>
               {items.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -150,7 +155,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
               ))}
             </select>
           </Field>
-          <Field label="Quantity">
+          <Field label={t.quantity}>
             <input
               inputMode="decimal"
               value={quantity}
@@ -158,7 +163,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
               required
             />
           </Field>
-          <Field label="Price" hint="PKR for one purchase unit.">
+          <Field label={t.price} hint={t.priceHint}>
             <input
               inputMode="decimal"
               value={unitPrice}
@@ -167,7 +172,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
             />
           </Field>
           <button className="kz-button" type="submit">
-            Add line
+            {t.addLine}
           </button>
         </form>
       ) : null}
@@ -185,7 +190,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
                   .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
               }}
             >
-              Send purchase
+              {t.sendPurchase}
             </button>
           ) : null}
           <button
@@ -199,7 +204,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
                 .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
             }}
           >
-            Cancel purchase
+            {t.cancelPurchase}
           </button>
         </div>
       ) : null}
@@ -212,7 +217,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
               .filter((line) => Number(receiveQty[line.id] ?? '') > 0)
               .map((line) => ({ purchaseLineId: line.id, quantity: receiveQty[line.id] ?? '' }));
             if (lines.length === 0) {
-              setError('Enter a quantity to receive.');
+              setError(t.enterQuantity);
               return;
             }
             setError('');
@@ -228,8 +233,8 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
               .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
           }}
         >
-          <h2>Goods received</h2>
-          <Field label="Location">
+          <h2>{t.goodsReceived}</h2>
+          <Field label={t.location}>
             <select
               value={locationId}
               onChange={(event) => setLocationId(event.target.value)}
@@ -242,7 +247,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
               ))}
             </select>
           </Field>
-          <Field label="Received on">
+          <Field label={t.receivedOn}>
             <input
               type="date"
               value={receivedOn}
@@ -254,8 +259,11 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
             Number(line.quantity) > Number(line.receivedQuantity) ? (
               <Field
                 key={line.id}
-                label={`${line.itemName} received`}
-                hint={`${line.purchaseUnit}. One ${line.purchaseUnit} is stocked in ${BASE_UNIT_LABELS[line.baseUnit]}.`}
+                label={fill(t.lineReceived, { item: line.itemName })}
+                hint={fill(t.lineReceivedHint, {
+                  purchaseUnit: line.purchaseUnit,
+                  unit: label(BASE_UNIT_LABELS[line.baseUnit]),
+                })}
               >
                 <input
                   inputMode="decimal"
@@ -268,7 +276,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
             ) : null,
           )}
           <button className="kz-button" type="submit">
-            Receive goods
+            {t.receiveGoods}
           </button>
         </form>
       ) : null}

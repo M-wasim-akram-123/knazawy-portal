@@ -1,41 +1,45 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
-import { AIRLINE_ROLE_LABELS, can, isAirlineRole, type Area, type Role } from '@knazawy/shared';
+import type { CommonCopy, chromeCopy } from '@knazawy/i18n';
+import { ROLE_LABELS, can, isAirlineRole, type Area, type Role } from '@knazawy/shared';
+import { KaramLoader, LanguageSwitcher, LoadingOverlay, useLanguage } from '@knazawy/ui-shell';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 
-import { clearSession, readSessionUser } from '../lib/session';
+import { useChrome, useCommon, useLabel } from '../lib/i18n';
+import { api, clearSession, readSessionUser } from '../lib/session';
 
 import { NotificationBell } from './NotificationBell';
 
+type Chrome = (typeof chromeCopy)['en'];
+
 const navigationGroups: Array<{
-  label: string;
-  links: Array<{ href: string; label: string; area?: Area }>;
+  label: keyof Chrome;
+  links: Array<{ href: string; label: keyof CommonCopy; area?: Area }>;
 }> = [
   {
-    label: 'Overview',
-    links: [{ href: '/', label: messages.en.common.home }],
+    label: 'portalOverview',
+    links: [{ href: '/', label: 'home' }],
   },
   {
-    label: 'Services',
+    label: 'portalServices',
     links: [
-      { href: '/requests', label: messages.en.common.requests, area: 'service_requests' },
-      { href: '/room-requests', label: messages.en.common.roomRequests, area: 'room_requests' },
-      { href: '/deliveries', label: messages.en.common.deliveries, area: 'distribution' },
-      { href: '/rates', label: messages.en.common.rateCards, area: 'service_rates' },
+      { href: '/requests', label: 'requests', area: 'service_requests' },
+      { href: '/room-requests', label: 'roomRequests', area: 'room_requests' },
+      { href: '/deliveries', label: 'deliveries', area: 'distribution' },
+      { href: '/rates', label: 'rateCards', area: 'service_rates' },
     ],
   },
   {
-    label: 'Finance',
+    label: 'portalFinance',
     links: [
-      { href: '/invoices', label: messages.en.common.invoices, area: 'invoices' },
-      { href: '/disputes', label: messages.en.common.disputes, area: 'disputes' },
-      { href: '/ledger', label: messages.en.common.ledger, area: 'ledger' },
+      { href: '/invoices', label: 'invoices', area: 'invoices' },
+      { href: '/disputes', label: 'disputes', area: 'disputes' },
+      { href: '/ledger', label: 'ledger', area: 'ledger' },
     ],
   },
 ];
@@ -46,6 +50,10 @@ export function PortalFrame({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
   const signingIn = pathname === '/login';
+  const common = useCommon();
+  const chrome = useChrome();
+  const label = useLabel();
+  const { dir } = useLanguage();
 
   useEffect(() => {
     const session = readSessionUser();
@@ -62,22 +70,29 @@ export function PortalFrame({ children }: { children: ReactNode }) {
     return (
       <div className="kz-signin">
         <header className="kz-topbar">
-          <Brand />
+          <Brand surface={common.portalSurface} />
+          <LanguageSwitcher label={chrome.language} />
         </header>
-        <main className="kz-signin-main">{children}</main>
+        <main className="kz-signin-main" dir={dir}>
+          {children}
+        </main>
+        <LoadingOverlay subscribe={api.onActivity} label={chrome.loading} />
       </div>
     );
   }
 
-  if (!ready || !user) return <p className="kz-booting">Loading</p>;
+  if (!ready || !user) return <KaramLoader label={chrome.loading} fullPage />;
   if (!canAccessPortalPage(user.role, pathname)) {
-    return <p className="kz-booting">This page is not available for your role.</p>;
+    return <p className="kz-booting">{chrome.notForYourRole}</p>;
   }
 
   const visibleGroups = navigationGroups
     .map((group) => ({
-      ...group,
-      links: group.links.filter((link) => !link.area || can(user.role, link.area, 'R')),
+      key: group.label,
+      label: chrome[group.label],
+      links: group.links
+        .filter((link) => !link.area || can(user.role, link.area, 'R'))
+        .map((link) => ({ href: link.href, label: common[link.label] })),
     }))
     .filter((group) => group.links.length > 0);
   const activeLink = navigationGroups
@@ -87,12 +102,13 @@ export function PortalFrame({ children }: { children: ReactNode }) {
   return (
     <div className="kz-app">
       <header className="kz-topbar">
-        <Brand />
+        <Brand surface={common.portalSurface} />
         <div className="kz-header-context">
-          <span>PARTNER / WORKSPACE</span>
-          <strong>{activeLink?.label ?? messages.en.common.home}</strong>
+          <span>{chrome.partnerContext}</span>
+          <strong>{activeLink ? common[activeLink.label] : common.home}</strong>
         </div>
         <div className="kz-top-user">
+          <LanguageSwitcher label={chrome.language} />
           {isAirlineRole(user.role) ? <NotificationBell /> : null}
           <span className="kz-user-avatar" aria-hidden="true">
             {user.name
@@ -104,7 +120,7 @@ export function PortalFrame({ children }: { children: ReactNode }) {
           </span>
           <p>
             <strong>{user.name}</strong>
-            <span>{roleLabel(user.role)}</span>
+            <span>{label(ROLE_LABELS[user.role])}</span>
           </p>
           <button
             type="button"
@@ -116,14 +132,14 @@ export function PortalFrame({ children }: { children: ReactNode }) {
               router.refresh();
             }}
           >
-            {messages.en.common.signOut}
+            {common.signOut}
           </button>
         </div>
       </header>
       <div className="kz-body">
-        <nav className="kz-side" aria-label="Portal">
+        <nav className="kz-side" dir={dir} aria-label={chrome.portalNav}>
           {visibleGroups.map((group) => (
-            <div className="kz-nav-group" key={group.label}>
+            <div className="kz-nav-group" key={group.key}>
               <span className="kz-nav-label">{group.label}</span>
               {group.links.map((link) => (
                 <Link
@@ -138,28 +154,25 @@ export function PortalFrame({ children }: { children: ReactNode }) {
           ))}
           <div className="kz-side-footer">
             <span className="kz-footer-dot" aria-hidden="true" />
-            Private partner access
+            {chrome.partnerFooter}
           </div>
         </nav>
-        <main className="kz-content">{children}</main>
+        <main className="kz-content" dir={dir}>
+          {children}
+        </main>
+        <LoadingOverlay subscribe={api.onActivity} label={chrome.loading} />
       </div>
     </div>
   );
 }
 
-function Brand() {
+function Brand({ surface }: { surface: string }) {
   return (
     <div className="kz-brand">
       <Image className="kz-brand-logo" src="/karam-dome-mark.png" alt="" width={48} height={48} />
       <span className="kz-brand-copy">
         <strong>KARAM</strong>
-        <span>
-          {messages.en.common.portalSurface}
-          {' · '}
-          <span lang="ur" dir="rtl">
-            {messages.ur.common.portalSurface}
-          </span>
-        </span>
+        <span>{surface}</span>
       </span>
     </div>
   );
@@ -176,10 +189,4 @@ function canAccessPortalPage(role: Role, pathname: string): boolean {
     .flatMap((group) => group.links)
     .find((link) => isCurrent(pathname, link.href));
   return !route?.area || can(role, route.area, 'R');
-}
-
-function roleLabel(role: Role): string {
-  if (isAirlineRole(role)) return AIRLINE_ROLE_LABELS[role];
-  const words = role.toLowerCase().split('_');
-  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }

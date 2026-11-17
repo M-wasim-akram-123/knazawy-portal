@@ -3,6 +3,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { useLanguage } from './language';
+
 export interface FormDialogControls {
   open: () => void;
   close: () => void;
@@ -19,6 +21,9 @@ export interface FormDialogProps {
   children: (controls: FormDialogControls) => ReactNode;
 }
 
+/** The close button's spoken name, in the page language. */
+const CLOSE: Record<string, string> = { en: 'Close', ur: 'بند کریں', ar: 'إغلاق' };
+
 export function FormDialog({
   buttonLabel,
   title,
@@ -29,6 +34,7 @@ export function FormDialog({
   onOpen,
   children,
 }: FormDialogProps) {
+  const { locale } = useLanguage();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -91,7 +97,7 @@ export function FormDialog({
             <button
               className="kz-button-quiet kz-form-dialog-close"
               type="button"
-              aria-label={`Close ${title}`}
+              aria-label={`${CLOSE[locale] ?? CLOSE.en} ${title}`}
               onClick={close}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -99,7 +105,7 @@ export function FormDialog({
               </svg>
             </button>
           </div>
-          {children({ open, close })}
+          <div className="kz-form-dialog-body">{children({ open, close })}</div>
         </div>
       </dialog>
     </>

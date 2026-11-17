@@ -2,13 +2,14 @@
 
 import { ApiError } from '@knazawy/api-client';
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { suppliersCopy } from '@knazawy/i18n';
 import { can } from '@knazawy/shared';
 import type { SupplierRecord } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { fill, useCommon, useCopy } from '../../lib/i18n';
 import { api, clearSession, readSessionUser } from '../../lib/session';
 
 import { Field } from './Field';
@@ -23,6 +24,8 @@ const empty = {
 };
 
 export function SuppliersScreen() {
+  const t = useCopy(suppliersCopy);
+  const common = useCommon();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [suppliers, setSuppliers] = useState<SupplierRecord[]>([]);
   const [form, setForm] = useState(empty);
@@ -39,14 +42,17 @@ export function SuppliersScreen() {
     setUser(session);
     setReady(true);
     if (!session) return;
-    void reload().catch((caught: unknown) => setError(explain(caught, setUser)));
+    void reload().catch((caught: unknown) => setError(explain(caught, setUser, t)));
   }, []);
 
-  if (!ready) return <p>Loading suppliers</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
+    const [beforeLink, afterLink] = t.signInToSee.split('{signIn}');
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see suppliers.
+        {beforeLink}
+        <Link href="/login">{common.signIn}</Link>
+        {afterLink}
       </p>
     );
   }
@@ -58,13 +64,13 @@ export function SuppliersScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.suppliers}</h1>
-          <p>Who supplies the kitchen, and how soon they are paid.</p>
+          <h1>{common.suppliers}</h1>
+          <p>{t.intro}</p>
         </div>
         {canCreate ? (
           <FormDialog
-            buttonLabel="New supplier"
-            title="New supplier"
+            buttonLabel={t.newSupplier}
+            title={t.newSupplier}
             onOpenChange={setDialogOpen}
             onOpen={() => setError('')}
           >
@@ -88,42 +94,42 @@ export function SuppliersScreen() {
                       setForm(empty);
                       close();
                     })
-                    .catch((caught: unknown) => setError(explain(caught, setUser)));
+                    .catch((caught: unknown) => setError(explain(caught, setUser, t)));
                 }}
               >
-                <Field label="Name">
+                <Field label={t.name}>
                   <input
                     value={form.name}
                     onChange={(event) => setForm({ ...form, name: event.target.value })}
                     required
                   />
                 </Field>
-                <Field label="Contact name">
+                <Field label={t.contactName}>
                   <input
                     value={form.contactName}
                     onChange={(event) => setForm({ ...form, contactName: event.target.value })}
                   />
                 </Field>
-                <Field label="Phone">
+                <Field label={t.phone}>
                   <input
                     value={form.phone}
                     onChange={(event) => setForm({ ...form, phone: event.target.value })}
                   />
                 </Field>
-                <Field label="Email">
+                <Field label={t.email}>
                   <input
                     type="email"
                     value={form.email}
                     onChange={(event) => setForm({ ...form, email: event.target.value })}
                   />
                 </Field>
-                <Field label="Tax number">
+                <Field label={t.taxNumber}>
                   <input
                     value={form.taxNumber}
                     onChange={(event) => setForm({ ...form, taxNumber: event.target.value })}
                   />
                 </Field>
-                <Field label="Payment terms (days)">
+                <Field label={t.paymentTerms}>
                   <input
                     inputMode="numeric"
                     value={form.paymentTermsDays}
@@ -137,7 +143,7 @@ export function SuppliersScreen() {
                   </p>
                 ) : null}
                 <button className="kz-button kz-span-2" type="submit">
-                  Save supplier
+                  {t.saveSupplier}
                 </button>
               </form>
             )}
@@ -151,14 +157,14 @@ export function SuppliersScreen() {
       ) : null}
       <div className="kz-workspace kz-workspace-single">
         <div className="kz-panel kz-table-wrap">
-          {suppliers.length === 0 ? <p className="kz-empty">No suppliers yet.</p> : null}
+          {suppliers.length === 0 ? <p className="kz-empty">{t.noSuppliers}</p> : null}
           <table className="kz-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Contact</th>
-                <th>Phone</th>
-                <th>Pay in</th>
+                <th>{t.name}</th>
+                <th>{t.contact}</th>
+                <th>{t.phone}</th>
+                <th>{t.payIn}</th>
                 <th></th>
               </tr>
             </thead>
@@ -168,7 +174,7 @@ export function SuppliersScreen() {
                   <td>{supplier.name}</td>
                   <td>{supplier.contactName ?? ''}</td>
                   <td>{supplier.phone ?? ''}</td>
-                  <td>{supplier.paymentTermsDays} days</td>
+                  <td>{fill(t.days, { count: supplier.paymentTermsDays })}</td>
                   <td>
                     {canArchive ? (
                       <button
@@ -179,10 +185,10 @@ export function SuppliersScreen() {
                           void api
                             .archiveSupplier(supplier.id)
                             .then(() => reload())
-                            .catch((caught: unknown) => setError(explain(caught, setUser)));
+                            .catch((caught: unknown) => setError(explain(caught, setUser, t)));
                         }}
                       >
-                        {messages.en.common.archive}
+                        {common.archive}
                       </button>
                     ) : null}
                   </td>
@@ -196,11 +202,15 @@ export function SuppliersScreen() {
   );
 }
 
-function explain(error: unknown, setUser: (user: SessionUser | null) => void): string {
+function explain(
+  error: unknown,
+  setUser: (user: SessionUser | null) => void,
+  t: { signInToContinue: string; somethingWentWrong: string },
+): string {
   if (error instanceof ApiError && error.status === 401) {
     clearSession();
     setUser(null);
-    return 'Sign in to continue.';
+    return t.signInToContinue;
   }
-  return error instanceof Error ? error.message : 'Something went wrong.';
+  return error instanceof Error ? error.message : t.somethingWentWrong;
 }

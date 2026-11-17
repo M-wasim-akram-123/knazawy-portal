@@ -1,7 +1,7 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { staffDeliveriesCopy } from '@knazawy/i18n';
 import {
   DELIVERY_POINT_LABELS,
   RECIPE_KIND_LABELS,
@@ -12,15 +12,19 @@ import {
   type DeliveryRecord,
   type ServiceRequestRecord,
 } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
 export function DeliveriesScreen() {
+  const t = useCopy(staffDeliveriesCopy);
+  const common = useCommon();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
   const [requests, setRequests] = useState<ServiceRequestRecord[]>([]);
@@ -74,16 +78,16 @@ export function DeliveriesScreen() {
     setNote('');
   }, [selected]);
 
-  if (!ready) return <p>Loading deliveries</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see deliveries.
+        <Link href="/login">{common.signIn}</Link> {t.signInToSee}
       </p>
     );
   }
   if (!can(user.role, 'distribution', 'R')) {
-    return <p>Deliveries are handled by operations.</p>;
+    return <p>{t.operationsOnly}</p>;
   }
 
   const canStart = can(user.role, 'distribution', 'C');
@@ -131,14 +135,8 @@ export function DeliveriesScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.deliveries}</h1>
-          <p>
-            Take an accepted request into production, record what leaves the kitchen, then record
-            what arrives. The invoice uses the portions that arrived.
-          </p>
-          <p lang="ur" dir="rtl">
-            {messages.ur.common.deliveries}
-          </p>
+          <h1>{common.deliveries}</h1>
+          <p>{t.intro}</p>
         </div>
         {canStart ? (
           <button
@@ -151,16 +149,16 @@ export function DeliveriesScreen() {
               setDialogOpen(true);
             }}
           >
-            Start delivery
+            {t.startDelivery}
           </button>
         ) : null}
       </div>
-      <div className="kz-workspace">
+      <div className="kz-workspace kz-workspace-stacked">
         <div className="kz-stack">
           {canStart ? (
             <FormDialog
-              buttonLabel="Start delivery"
-              title="Start a delivery"
+              buttonLabel={t.startDelivery}
+              title={t.startADelivery}
               showTrigger={false}
               isOpen={dialogOpen}
               onOpenChange={setDialogOpen}
@@ -170,18 +168,17 @@ export function DeliveriesScreen() {
                   className="kz-form"
                   onSubmit={(event) => {
                     event.preventDefault();
-                    void run(
-                      () => api.startDelivery(requestId),
-                      'The request is in production.',
-                    ).then((succeeded) => {
-                      if (succeeded) close();
-                    });
+                    void run(() => api.startDelivery(requestId), t.inProduction).then(
+                      (succeeded) => {
+                        if (succeeded) close();
+                      },
+                    );
                   }}
                 >
                   {waiting.length === 0 ? (
-                    <p className="kz-empty">No accepted requests are waiting.</p>
+                    <p className="kz-empty">{t.noWaiting}</p>
                   ) : (
-                    <Field label="Request">
+                    <Field label={t.request}>
                       <select
                         value={requestId}
                         onChange={(event) => setRequestId(event.target.value)}
@@ -204,23 +201,23 @@ export function DeliveriesScreen() {
                     type="submit"
                     disabled={busy || waiting.length === 0}
                   >
-                    Start
+                    {t.start}
                   </button>
                 </form>
               )}
             </FormDialog>
           ) : null}
           <div className="kz-panel kz-table-wrap">
-            <h2>Deliveries</h2>
-            {deliveries.length === 0 ? <p className="kz-empty">No deliveries yet.</p> : null}
+            <h2>{common.deliveries}</h2>
+            {deliveries.length === 0 ? <p className="kz-empty">{t.noDeliveries}</p> : null}
             {deliveries.length > 0 ? (
               <table className="kz-table">
                 <thead>
                   <tr>
-                    <th>Number</th>
-                    <th>Flight</th>
-                    <th>Service date</th>
-                    <th>Status</th>
+                    <th>{t.number}</th>
+                    <th>{t.flight}</th>
+                    <th>{t.serviceDate}</th>
+                    <th>{t.status}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -245,7 +242,7 @@ export function DeliveriesScreen() {
                       <td>{formatDisplayDate(delivery.serviceDate)}</td>
                       <td>
                         <span className="kz-status" data-tone={statusTone(delivery.status)}>
-                          {REQUEST_STATUS_LABELS[delivery.status]}
+                          {label(REQUEST_STATUS_LABELS[delivery.status])}
                         </span>
                       </td>
                     </tr>
@@ -263,21 +260,25 @@ export function DeliveriesScreen() {
               </h2>
               <p>
                 <span className="kz-status" data-tone={statusTone(selected.status)}>
-                  {REQUEST_STATUS_LABELS[selected.status]}
+                  {label(REQUEST_STATUS_LABELS[selected.status])}
                 </span>
                 {' · '}
-                {selected.requestNumber}, flight {selected.flightNumber} {selected.route},{' '}
-                {formatDisplayDate(selected.serviceDate)},{' '}
-                {DELIVERY_POINT_LABELS[selected.deliveryPoint]}
+                {fill(t.summary, {
+                  request: selected.requestNumber,
+                  flight: selected.flightNumber,
+                  route: selected.route,
+                  date: formatDisplayDate(selected.serviceDate),
+                  point: label(DELIVERY_POINT_LABELS[selected.deliveryPoint]),
+                })}
               </p>
               <div className="kz-table-wrap">
                 <table className="kz-table">
                   <thead>
                     <tr>
-                      <th>Item</th>
-                      <th>Ordered</th>
-                      <th>{selected.status === 'IN_PRODUCTION' ? 'Sending' : 'Sent'}</th>
-                      <th>{selected.status === 'DISPATCHED' ? 'Arrived' : 'Received'}</th>
+                      <th>{t.item}</th>
+                      <th>{t.ordered}</th>
+                      <th>{selected.status === 'IN_PRODUCTION' ? t.sending : t.sent}</th>
+                      <th>{selected.status === 'DISPATCHED' ? t.arrived : t.received}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -285,13 +286,13 @@ export function DeliveriesScreen() {
                       <tr key={line.recipeId}>
                         <td>
                           {line.recipeName}
-                          <span className="kz-help"> · {RECIPE_KIND_LABELS[line.kind]}</span>
+                          <span className="kz-help"> · {label(RECIPE_KIND_LABELS[line.kind])}</span>
                         </td>
                         <td>{line.ordered}</td>
                         <td>
                           {selected.status === 'IN_PRODUCTION' && canUpdate ? (
                             <QuantityInput
-                              label={`Portions of ${line.recipeName} to send`}
+                              label={fill(t.portionsToSend, { name: line.recipeName })}
                               max={line.ordered}
                               value={quantities[line.recipeId] ?? ''}
                               onChange={(value) =>
@@ -305,7 +306,7 @@ export function DeliveriesScreen() {
                         <td>
                           {selected.status === 'DISPATCHED' && canUpdate ? (
                             <QuantityInput
-                              label={`Portions of ${line.recipeName} that arrived`}
+                              label={fill(t.portionsArrived, { name: line.recipeName })}
                               max={line.dispatched ?? 0}
                               value={quantities[line.recipeId] ?? ''}
                               onChange={(value) =>
@@ -323,7 +324,7 @@ export function DeliveriesScreen() {
               </div>
               {selected.status === 'IN_PRODUCTION' && canUpdate ? (
                 <>
-                  <Field label="Vehicle or driver" hint="Optional.">
+                  <Field label={t.vehicle} hint={t.optionalHint}>
                     <input
                       value={vehicleNote}
                       maxLength={120}
@@ -341,24 +342,24 @@ export function DeliveriesScreen() {
                             vehicleNote: vehicleNote.trim() || undefined,
                             lines: quantitiesFor(selected),
                           }),
-                        `${selected.number} has left the kitchen.`,
+                        fill(t.leftKitchen, { number: selected.number }),
                       )
                     }
                   >
-                    Send out
+                    {t.sendOut}
                   </button>
                 </>
               ) : null}
               {selected.status === 'DISPATCHED' && canUpdate ? (
                 <>
-                  <Field label="Received by">
+                  <Field label={t.receivedBy}>
                     <input
                       value={receivedBy}
                       maxLength={120}
                       onChange={(event) => setReceivedBy(event.target.value)}
                     />
                   </Field>
-                  <Field label="Note" hint="Say why if nothing arrived.">
+                  <Field label={t.note} hint={t.noteHint}>
                     <input
                       value={note}
                       maxLength={300}
@@ -377,20 +378,24 @@ export function DeliveriesScreen() {
                             note: note.trim() || undefined,
                             lines: quantitiesFor(selected),
                           }),
-                        `${selected.number} is recorded as delivered.`,
+                        fill(t.recordedDelivered, { number: selected.number }),
                       )
                     }
                   >
-                    Record arrival
+                    {t.recordArrival}
                   </button>
                 </>
               ) : null}
-              {selected.vehicleNote ? <p>Sent with {selected.vehicleNote}.</p> : null}
-              {selected.receivedBy ? <p>Received by {selected.receivedBy}.</p> : null}
+              {selected.vehicleNote ? (
+                <p>{fill(t.sentWith, { vehicle: selected.vehicleNote })}</p>
+              ) : null}
+              {selected.receivedBy ? (
+                <p>{fill(t.receivedByValue, { name: selected.receivedBy })}</p>
+              ) : null}
               {selected.note ? <p>{selected.note}</p> : null}
             </>
           ) : (
-            <p className="kz-empty">Choose a delivery to see it.</p>
+            <p className="kz-empty">{t.chooseDelivery}</p>
           )}
           {error ? (
             <p className="kz-error" role="alert">

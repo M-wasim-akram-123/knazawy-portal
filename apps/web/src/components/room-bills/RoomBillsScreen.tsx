@@ -1,7 +1,7 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { roomBillsCopy } from '@knazawy/i18n';
 import {
   ROOM_INVOICE_KIND_LABELS,
   canRaiseRoomInvoice,
@@ -9,10 +9,12 @@ import {
   type RoomBillableRecord,
   type RoomInvoiceRecord,
 } from '@knazawy/shared';
+import { KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCopy, useCommon, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
@@ -30,6 +32,9 @@ export function RoomBillsScreen() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
+  const t = useCopy(roomBillsCopy);
+  const common = useCommon();
+  const label = useLabel();
 
   useEffect(() => {
     const session = readSessionUser();
@@ -44,16 +49,16 @@ export function RoomBillsScreen() {
       .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
   }, []);
 
-  if (!ready) return <p>Loading room bills</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see room bills.
+        <Link href="/login">{common.signIn}</Link> {t.signInSuffix}
       </p>
     );
   }
   if (!canRaiseRoomInvoice(user.role)) {
-    return <p>Room bills are kept by finance.</p>;
+    return <p>{t.financeOnly}</p>;
   }
 
   async function run(action: () => Promise<RoomInvoiceRecord>, message: string): Promise<void> {
@@ -78,15 +83,8 @@ export function RoomBillsScreen() {
   return (
     <section className="kz-stack">
       <div className="kz-page-head">
-        <h1>{messages.en.common.roomBills}</h1>
-        <p>
-          Bill an accepted room stay for every booked night, at the nightly price fixed when it was
-          accepted. A correction is a credit note for the whole bill. Once a bill is credited, the
-          stay can be billed again.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.roomBills}
-        </p>
+        <h1>{common.roomBills}</h1>
+        <p>{t.intro}</p>
       </div>
       {error ? (
         <p className="kz-error" role="alert">
@@ -96,19 +94,19 @@ export function RoomBillsScreen() {
       {saved ? <p>{saved}</p> : null}
 
       <section className="kz-panel kz-stack">
-        <h2>Stays to bill</h2>
+        <h2>{t.staysToBill}</h2>
         {billable.length === 0 ? (
-          <p className="kz-empty">No accepted room stays are waiting for a bill.</p>
+          <p className="kz-empty">{t.noBillable}</p>
         ) : (
           <div className="kz-table-wrap">
             <table className="kz-table">
               <thead>
                 <tr>
-                  <th>Number</th>
-                  <th>Airline</th>
-                  <th>Stay</th>
-                  <th>Nights</th>
-                  <th>Total</th>
+                  <th>{t.number}</th>
+                  <th>{t.airline}</th>
+                  <th>{t.stay}</th>
+                  <th>{t.nights}</th>
+                  <th>{t.total}</th>
                   <th />
                 </tr>
               </thead>
@@ -118,7 +116,10 @@ export function RoomBillsScreen() {
                     <td>{row.number}</td>
                     <td>{row.airlineName}</td>
                     <td>
-                      {formatDisplayDate(row.checkIn)} to {formatDisplayDate(row.checkOut)}
+                      {fill(t.dateRange, {
+                        from: formatDisplayDate(row.checkIn),
+                        to: formatDisplayDate(row.checkOut),
+                      })}
                     </td>
                     <td>{row.nights}</td>
                     <td>{row.total} PKR</td>
@@ -130,11 +131,11 @@ export function RoomBillsScreen() {
                         onClick={() =>
                           void run(
                             () => api.raiseRoomInvoice(row.roomRequestId),
-                            `${row.number} is billed.`,
+                            fill(t.isBilled, { number: row.number }),
                           )
                         }
                       >
-                        Raise bill
+                        {t.raiseBill}
                       </button>
                     </td>
                   </tr>
@@ -146,29 +147,34 @@ export function RoomBillsScreen() {
       </section>
 
       <section className="kz-stack">
-        <h2>Room bills</h2>
-        {bills.length === 0 ? (
-          <p className="kz-empty">No room bills have been raised yet.</p>
-        ) : null}
+        <h2>{common.roomBills}</h2>
+        {bills.length === 0 ? <p className="kz-empty">{t.noBills}</p> : null}
         {bills.map((bill) => (
           <article key={bill.id} className="kz-panel kz-stack">
             <h3>
-              {bill.number} · {ROOM_INVOICE_KIND_LABELS[bill.kind]}
+              {bill.number} · {label(ROOM_INVOICE_KIND_LABELS[bill.kind])}
             </h3>
             <p className="kz-help">
-              {bill.airlineName}, {bill.roomRequestNumber}, {formatDisplayDate(bill.checkIn)} to{' '}
-              {formatDisplayDate(bill.checkOut)}, {bill.nights} nights
-              {bill.sourceInvoiceNumber ? `, credits ${bill.sourceInvoiceNumber}` : ''}
+              {fill(t.billDetails, {
+                airline: bill.airlineName,
+                request: bill.roomRequestNumber,
+                from: formatDisplayDate(bill.checkIn),
+                to: formatDisplayDate(bill.checkOut),
+                nights: bill.nights,
+              })}
+              {bill.sourceInvoiceNumber
+                ? fill(t.creditsSuffix, { number: bill.sourceInvoiceNumber })
+                : ''}
             </p>
             <div className="kz-table-wrap">
               <table className="kz-table">
                 <thead>
                   <tr>
-                    <th>Room type</th>
-                    <th>Rooms</th>
-                    <th>Nights</th>
-                    <th>Nightly</th>
-                    <th>Amount</th>
+                    <th>{t.roomType}</th>
+                    <th>{t.rooms}</th>
+                    <th>{t.nights}</th>
+                    <th>{t.nightly}</th>
+                    <th>{t.amount}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -184,11 +190,11 @@ export function RoomBillsScreen() {
                 </tbody>
               </table>
             </div>
-            <p>Total {bill.total} PKR.</p>
-            {bill.reason ? <p>Reason: {bill.reason}</p> : null}
+            <p>{fill(t.totalLine, { total: bill.total })}</p>
+            {bill.reason ? <p>{fill(t.reasonLine, { reason: bill.reason })}</p> : null}
 
             {bill.kind === 'INVOICE' && bill.creditNumber ? (
-              <p>Credited by {bill.creditNumber}.</p>
+              <p>{fill(t.creditedBy, { number: bill.creditNumber })}</p>
             ) : null}
             {bill.kind === 'INVOICE' && !bill.creditNumber && creditingId === bill.id ? (
               <form
@@ -197,11 +203,11 @@ export function RoomBillsScreen() {
                   event.preventDefault();
                   void run(
                     () => api.creditRoomInvoice(bill.id, reason.trim()),
-                    `${bill.number} is credited.`,
+                    fill(t.isCredited, { number: bill.number }),
                   );
                 }}
               >
-                <Field label="Reason for the credit note">
+                <Field label={t.reasonForCredit}>
                   <input
                     value={reason}
                     maxLength={300}
@@ -214,7 +220,7 @@ export function RoomBillsScreen() {
                     className="kz-button"
                     disabled={busy || reason.trim().length < 3}
                   >
-                    Issue credit note
+                    {t.issueCreditNote}
                   </button>
                   <button
                     type="button"
@@ -225,7 +231,7 @@ export function RoomBillsScreen() {
                       setReason('');
                     }}
                   >
-                    Cancel
+                    {t.cancel}
                   </button>
                 </div>
               </form>
@@ -241,7 +247,7 @@ export function RoomBillsScreen() {
                     setReason('');
                   }}
                 >
-                  Credit this bill
+                  {t.creditThisBill}
                 </button>
               </div>
             ) : null}

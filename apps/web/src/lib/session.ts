@@ -1,13 +1,14 @@
 import { ApiClient, ApiError } from '@knazawy/api-client';
-import { browserTokenStore, readSessionUser, writeSessionUser } from '@knazawy/auth-client';
+import { forgetLegacyToken, readSessionUser, writeSessionUser } from '@knazawy/auth-client';
 
-export const tokens = browserTokenStore();
+export const api = new ApiClient('', 'staff');
 
-export const api = new ApiClient('', tokens);
+forgetLegacyToken();
 
 export { ApiError, readSessionUser, writeSessionUser };
 
+/** Signs out: the API clears the session cookie, and the page forgets who was signed in. */
 export function clearSession(): void {
-  tokens.setAccessToken(null);
+  void api.logout().catch(() => undefined);
   writeSessionUser(null);
 }

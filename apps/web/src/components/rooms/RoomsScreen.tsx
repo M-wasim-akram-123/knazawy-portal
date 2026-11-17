@@ -1,18 +1,19 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { roomsCopy } from '@knazawy/i18n';
 import {
   can,
   type HotelRoomRecord,
   type RoomFloorRecord,
   type RoomTypeRecord,
 } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCopy, useCommon } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
@@ -34,6 +35,8 @@ export function RoomsScreen() {
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const t = useCopy(roomsCopy);
+  const common = useCommon();
 
   async function reload(): Promise<void> {
     const [nextFloors, nextTypes, nextRooms] = await Promise.all([
@@ -54,11 +57,11 @@ export function RoomsScreen() {
     void reload().catch((caught: unknown) => setError(explainApiError(caught, setUser)));
   }, []);
 
-  if (!ready) return <p>Loading</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to set up rooms.
+        <Link href="/login">{common.signIn}</Link> {t.signInSuffix}
       </p>
     );
   }
@@ -89,14 +92,8 @@ export function RoomsScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.rooms}</h1>
-          <p>
-            Floors and rooms belong to the branch you are working in. Room types and the charges
-            that make up a night&apos;s price are shared by every branch.
-          </p>
-          <p lang="ur" dir="rtl">
-            {messages.ur.common.rooms}
-          </p>
+          <h1>{common.rooms}</h1>
+          <p>{t.intro}</p>
         </div>
         {canWrite ? (
           <button
@@ -109,14 +106,14 @@ export function RoomsScreen() {
               setDialogOpen(true);
             }}
           >
-            Add floor
+            {t.addFloor}
           </button>
         ) : null}
       </div>
       {canWrite ? (
         <FormDialog
-          buttonLabel="Add floor"
-          title="Add floor"
+          buttonLabel={t.addFloor}
+          title={t.addFloor}
           showTrigger={false}
           isOpen={dialogOpen}
           onOpenChange={setDialogOpen}
@@ -132,12 +129,12 @@ export function RoomsScreen() {
                     sortOrder: Number(floorOrder) || 0,
                   });
                   setFloorName('');
-                }, 'Floor added.').then((succeeded) => {
+                }, t.floorAdded).then((succeeded) => {
                   if (succeeded) close();
                 });
               }}
             >
-              <Field label="Floor name" hint="Any name you use, such as Ground or 2.">
+              <Field label={t.floorName} hint={t.floorNameHint}>
                 <input
                   value={floorName}
                   maxLength={80}
@@ -145,7 +142,7 @@ export function RoomsScreen() {
                   required
                 />
               </Field>
-              <Field label="Order" hint="Lower numbers are listed first.">
+              <Field label={t.order} hint={t.orderHint}>
                 <input
                   type="number"
                   min={0}
@@ -160,7 +157,7 @@ export function RoomsScreen() {
                 </p>
               ) : null}
               <button type="submit" className="kz-button" disabled={busy}>
-                Add floor
+                {t.addFloor}
               </button>
             </form>
           )}
@@ -174,14 +171,14 @@ export function RoomsScreen() {
       {saved ? <p>{saved}</p> : null}
       <div className="kz-workspace kz-workspace-single">
         <div className="kz-panel kz-stack">
-          <h2>Floors</h2>
-          {floors.length === 0 ? <p className="kz-empty">No floors yet.</p> : null}
+          <h2>{t.floors}</h2>
+          {floors.length === 0 ? <p className="kz-empty">{t.noFloors}</p> : null}
           <ul className="kz-stack">
             {floors.map((floor) => (
               <li key={floor.id}>
                 {floor.name}
-                {floor.active ? '' : ' (archived)'}
-                <span className="kz-help"> · order {floor.sortOrder}</span>
+                {floor.active ? '' : t.archivedSuffix}
+                <span className="kz-help">{fill(t.orderValue, { order: floor.sortOrder })}</span>
                 {canChange && floor.active ? (
                   <button
                     type="button"
@@ -191,11 +188,11 @@ export function RoomsScreen() {
                       void run(
                         () =>
                           api.updateRoomFloor(floor.id, { active: false }).then(() => undefined),
-                        `${floor.name} is archived.`,
+                        fill(t.isArchived, { name: floor.name }),
                       )
                     }
                   >
-                    Archive
+                    {common.archive}
                   </button>
                 ) : null}
               </li>
@@ -203,11 +200,8 @@ export function RoomsScreen() {
           </ul>
         </div>
         <div className="kz-panel kz-stack">
-          <h2>Room types and charges</h2>
-          <p className="kz-help">
-            A night&apos;s price is the active charges added together. Add a charge for the room,
-            for breakfast, or for anything else you bill per night.
-          </p>
+          <h2>{t.typesAndCharges}</h2>
+          <p className="kz-help">{t.typesHelp}</p>
           {canWrite ? (
             <form
               className="kz-form"
@@ -216,10 +210,10 @@ export function RoomsScreen() {
                 void run(async () => {
                   await api.createRoomType({ name: typeName.trim() });
                   setTypeName('');
-                }, 'Room type added.');
+                }, t.roomTypeAdded);
               }}
             >
-              <Field label="Room type">
+              <Field label={t.roomType}>
                 <input
                   value={typeName}
                   maxLength={80}
@@ -228,23 +222,23 @@ export function RoomsScreen() {
                 />
               </Field>
               <button type="submit" className="kz-button" disabled={busy}>
-                Add room type
+                {t.addRoomType}
               </button>
             </form>
           ) : null}
-          {types.length === 0 ? <p className="kz-empty">No room types yet.</p> : null}
+          {types.length === 0 ? <p className="kz-empty">{t.noRoomTypes}</p> : null}
           {types.map((roomType) => (
             <article key={roomType.id} className="kz-stack">
               <h3>
                 {roomType.name}
-                {roomType.active ? '' : ' (archived)'}
+                {roomType.active ? '' : t.archivedSuffix}
               </h3>
-              <p>Per night {roomType.nightlyTotal} PKR</p>
+              <p>{fill(t.perNight, { amount: roomType.nightlyTotal })}</p>
               <ul>
                 {roomType.charges.map((charge) => (
                   <li key={charge.id}>
                     {charge.name}: {charge.amountPerNight} PKR
-                    {charge.active ? '' : ' (archived)'}
+                    {charge.active ? '' : t.archivedSuffix}
                     {canChange && charge.active ? (
                       <button
                         type="button"
@@ -256,11 +250,11 @@ export function RoomsScreen() {
                               api
                                 .updateRoomCharge(roomType.id, charge.id, { active: false })
                                 .then(() => undefined),
-                            `${charge.name} is archived.`,
+                            fill(t.isArchived, { name: charge.name }),
                           )
                         }
                       >
-                        Archive
+                        {common.archive}
                       </button>
                     ) : null}
                   </li>
@@ -278,10 +272,10 @@ export function RoomsScreen() {
                       });
                       setChargeName((current) => ({ ...current, [roomType.id]: '' }));
                       setChargeAmount((current) => ({ ...current, [roomType.id]: '' }));
-                    }, 'Charge added.');
+                    }, t.chargeAdded);
                   }}
                 >
-                  <Field label="Charge name">
+                  <Field label={t.chargeName}>
                     <input
                       value={chargeName[roomType.id] ?? ''}
                       maxLength={80}
@@ -294,7 +288,7 @@ export function RoomsScreen() {
                       required
                     />
                   </Field>
-                  <Field label="Per night (PKR)">
+                  <Field label={t.perNightPkr}>
                     <input
                       value={chargeAmount[roomType.id] ?? ''}
                       inputMode="decimal"
@@ -308,7 +302,7 @@ export function RoomsScreen() {
                     />
                   </Field>
                   <button type="submit" className="kz-button" disabled={busy}>
-                    Add charge
+                    {t.addCharge}
                   </button>
                 </form>
               ) : null}
@@ -321,11 +315,11 @@ export function RoomsScreen() {
                     void run(
                       () =>
                         api.updateRoomType(roomType.id, { active: false }).then(() => undefined),
-                      `${roomType.name} is archived.`,
+                      fill(t.isArchived, { name: roomType.name }),
                     )
                   }
                 >
-                  Archive type
+                  {t.archiveType}
                 </button>
               ) : null}
             </article>
@@ -343,19 +337,19 @@ export function RoomsScreen() {
               name: roomName.trim(),
             });
             setRoomName('');
-          }, 'Room added.');
+          }, t.roomAdded);
         }}
       >
-        <h2>Rooms by floor</h2>
+        <h2>{t.roomsByFloor}</h2>
         {canWrite ? (
           <div className="kz-form-grid">
-            <Field label="Floor">
+            <Field label={t.floor}>
               <select
                 value={roomFloorId}
                 onChange={(event) => setRoomFloorId(event.target.value)}
                 required
               >
-                <option value="">Choose a floor</option>
+                <option value="">{t.chooseFloor}</option>
                 {openFloors.map((floor) => (
                   <option key={floor.id} value={floor.id}>
                     {floor.name}
@@ -363,13 +357,13 @@ export function RoomsScreen() {
                 ))}
               </select>
             </Field>
-            <Field label="Room type">
+            <Field label={t.roomType}>
               <select
                 value={roomTypeId}
                 onChange={(event) => setRoomTypeId(event.target.value)}
                 required
               >
-                <option value="">Choose a type</option>
+                <option value="">{t.chooseType}</option>
                 {openTypes.map((roomType) => (
                   <option key={roomType.id} value={roomType.id}>
                     {roomType.name} · {roomType.nightlyTotal} PKR
@@ -377,7 +371,7 @@ export function RoomsScreen() {
                 ))}
               </select>
             </Field>
-            <Field label="Room name" hint="Unique on this floor, such as 101.">
+            <Field label={t.roomName} hint={t.roomNameHint}>
               <input
                 value={roomName}
                 maxLength={80}
@@ -389,10 +383,10 @@ export function RoomsScreen() {
         ) : null}
         {canWrite ? (
           <button type="submit" className="kz-button" disabled={busy}>
-            Add room
+            {t.addRoom}
           </button>
         ) : null}
-        {rooms.length === 0 ? <p className="kz-empty">No rooms yet.</p> : null}
+        {rooms.length === 0 ? <p className="kz-empty">{t.noRooms}</p> : null}
         {floors.map((floor) => {
           const onFloor = rooms.filter((room) => room.floorId === floor.id);
           if (onFloor.length === 0) return null;
@@ -403,7 +397,7 @@ export function RoomsScreen() {
                 {onFloor.map((room) => (
                   <li key={room.id}>
                     {room.name} · {room.roomTypeName}
-                    {room.active ? '' : ' (archived)'}
+                    {room.active ? '' : t.archivedSuffix}
                     {canChange && room.active ? (
                       <button
                         type="button"
@@ -413,11 +407,11 @@ export function RoomsScreen() {
                           void run(
                             () =>
                               api.updateHotelRoom(room.id, { active: false }).then(() => undefined),
-                            `${room.name} is archived.`,
+                            fill(t.isArchived, { name: room.name }),
                           )
                         }
                       >
-                        Archive
+                        {common.archive}
                       </button>
                     ) : null}
                   </li>

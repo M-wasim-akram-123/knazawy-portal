@@ -2,7 +2,7 @@
 
 import type { RateCardInput } from '@knazawy/api-client';
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { ratesCopy } from '@knazawy/i18n';
 import {
   RATE_CARD_STATUS_LABELS,
   RECIPE_KIND_LABELS,
@@ -14,13 +14,16 @@ import {
   type RateCardRecord,
   type RecipeRecord,
 } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
+
+import { AirlineTermsPanel } from './AirlineTermsPanel';
 
 interface PriceRow {
   unitPrice: string;
@@ -28,6 +31,9 @@ interface PriceRow {
 }
 
 export function RateCardsScreen() {
+  const t = useCopy(ratesCopy);
+  const common = useCommon();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
   const [airlines, setAirlines] = useState<AirlineOption[]>([]);
@@ -62,16 +68,16 @@ export function RateCardsScreen() {
       .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
   }, []);
 
-  if (!ready) return <p>Loading rate cards</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see rate cards.
+        <Link href="/login">{common.signIn}</Link> {t.signInToSee}
       </p>
     );
   }
   if (!can(user.role, 'service_rates', 'R')) {
-    return <p>Rate cards are kept by finance.</p>;
+    return <p>{t.financeOnly}</p>;
   }
 
   const canCreate = can(user.role, 'service_rates', 'C');
@@ -164,15 +170,8 @@ export function RateCardsScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.rateCards}</h1>
-          <p>
-            The price an airline pays for each meal and snack, for a range of dates. A request uses
-            the card that covers its service date. The airline pays for at least the minimum
-            portions.
-          </p>
-          <p lang="ur" dir="rtl">
-            {messages.ur.common.rateCards}
-          </p>
+          <h1>{common.rateCards}</h1>
+          <p>{t.intro}</p>
         </div>
         {canCreate ? (
           <button
@@ -186,15 +185,15 @@ export function RateCardsScreen() {
               setDialogOpen(true);
             }}
           >
-            New rate card
+            {t.newRateCard}
           </button>
         ) : null}
       </div>
       <div className="kz-workspace kz-workspace-single">
         {showForm ? (
           <FormDialog
-            buttonLabel="New rate card"
-            title={editingId ? 'Edit draft' : 'New rate card'}
+            buttonLabel={t.newRateCard}
+            title={editingId ? t.editDraft : t.newRateCard}
             showTrigger={false}
             isOpen={dialogOpen}
             onOpenChange={setDialogOpen}
@@ -208,7 +207,7 @@ export function RateCardsScreen() {
                   void run(
                     () =>
                       editingId ? api.updateRateCard(editingId, input) : api.createRateCard(input),
-                    (card) => `${card.number} is saved as a draft.`,
+                    (card) => fill(t.savedAsDraft, { number: card.number }),
                   ).then((card) => {
                     if (card) {
                       resetForm();
@@ -217,7 +216,7 @@ export function RateCardsScreen() {
                   });
                 }}
               >
-                <Field label="Airline">
+                <Field label={t.airline}>
                   <select
                     value={airlineId}
                     onChange={(event) => setAirlineId(event.target.value)}
@@ -230,7 +229,7 @@ export function RateCardsScreen() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Applies from" hint="Shown as DD/MM/YYYY.">
+                <Field label={t.appliesFrom} hint={t.appliesFromHint}>
                   <input
                     type="date"
                     value={validFrom}
@@ -238,18 +237,18 @@ export function RateCardsScreen() {
                     required
                   />
                 </Field>
-                <Field label="Applies until" hint="Leave empty if it has no end date yet.">
+                <Field label={t.appliesUntil} hint={t.appliesUntilHint}>
                   <input
                     type="date"
                     value={validTo}
                     onChange={(event) => setValidTo(event.target.value)}
                   />
                 </Field>
-                <Field label="Note">
+                <Field label={t.note}>
                   <input
                     value={note}
                     maxLength={300}
-                    placeholder="Optional"
+                    placeholder={t.optional}
                     onChange={(event) => setNote(event.target.value)}
                   />
                 </Field>
@@ -257,9 +256,9 @@ export function RateCardsScreen() {
                   <table className="kz-table">
                     <thead>
                       <tr>
-                        <th>Item</th>
-                        <th>Price (PKR)</th>
-                        <th>Minimum portions</th>
+                        <th>{t.item}</th>
+                        <th>{t.pricePkr}</th>
+                        <th>{t.minimumPortions}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -267,12 +266,15 @@ export function RateCardsScreen() {
                         <tr key={recipe.id}>
                           <td>
                             {recipe.name}
-                            <span className="kz-help"> · {RECIPE_KIND_LABELS[recipe.kind]}</span>
+                            <span className="kz-help">
+                              {' '}
+                              · {label(RECIPE_KIND_LABELS[recipe.kind])}
+                            </span>
                           </td>
                           <td>
                             <input
                               inputMode="decimal"
-                              aria-label={`Price of ${recipe.name}`}
+                              aria-label={fill(t.priceOf, { name: recipe.name })}
                               value={prices[recipe.id]?.unitPrice ?? ''}
                               onChange={(event) =>
                                 setPrice(recipe.id, { unitPrice: event.target.value })
@@ -285,7 +287,7 @@ export function RateCardsScreen() {
                               min={0}
                               step={1}
                               inputMode="numeric"
-                              aria-label={`Minimum portions of ${recipe.name}`}
+                              aria-label={fill(t.minimumOf, { name: recipe.name })}
                               value={prices[recipe.id]?.minimumQuantity ?? ''}
                               onChange={(event) =>
                                 setPrice(recipe.id, { minimumQuantity: event.target.value })
@@ -297,8 +299,8 @@ export function RateCardsScreen() {
                     </tbody>
                   </table>
                 </div>
-                {recipes.length === 0 ? <p>Approve a recipe before you price it.</p> : null}
-                <p className="kz-help">Items left without a price are not on this card.</p>
+                {recipes.length === 0 ? <p>{t.approveRecipeFirst}</p> : null}
+                <p className="kz-help">{t.unpricedNotOnCard}</p>
                 {error ? (
                   <p className="kz-error" role="alert">
                     {error}
@@ -310,7 +312,7 @@ export function RateCardsScreen() {
                     type="submit"
                     disabled={busy || airlines.length === 0 || recipes.length === 0}
                   >
-                    {busy ? 'Saving' : 'Save draft'}
+                    {busy ? t.saving : t.saveDraft}
                   </button>
                   {editingId ? (
                     <button
@@ -321,27 +323,27 @@ export function RateCardsScreen() {
                         setDialogOpen(false);
                       }}
                     >
-                      Stop editing
+                      {t.stopEditing}
                     </button>
                   ) : null}
                 </div>
-                {airlines.length === 0 ? <p>Open an airline account first.</p> : null}
+                {airlines.length === 0 ? <p>{t.openAirlineFirst}</p> : null}
               </form>
             )}
           </FormDialog>
         ) : null}
         <div className="kz-stack">
           <div className="kz-panel kz-table-wrap">
-            <h2>Cards</h2>
-            {cards.length === 0 ? <p className="kz-empty">No rate cards yet.</p> : null}
+            <h2>{t.cards}</h2>
+            {cards.length === 0 ? <p className="kz-empty">{t.noCards}</p> : null}
             {cards.length > 0 ? (
               <table className="kz-table">
                 <thead>
                   <tr>
-                    <th>Number</th>
-                    <th>Airline</th>
-                    <th>Applies</th>
-                    <th>Status</th>
+                    <th>{t.number}</th>
+                    <th>{t.airline}</th>
+                    <th>{t.applies}</th>
+                    <th>{t.status}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -360,10 +362,10 @@ export function RateCardsScreen() {
                         </a>
                       </td>
                       <td>{card.airlineName}</td>
-                      <td>{periodLabel(card)}</td>
+                      <td>{periodLabel(card, t)}</td>
                       <td>
                         <span className="kz-status" data-tone={rateCardStatusTone(card.status)}>
-                          {RATE_CARD_STATUS_LABELS[card.status]}
+                          {label(RATE_CARD_STATUS_LABELS[card.status])}
                         </span>
                       </td>
                     </tr>
@@ -379,20 +381,22 @@ export function RateCardsScreen() {
               </h2>
               <p>
                 <span className="kz-status" data-tone={rateCardStatusTone(selected.status)}>
-                  {RATE_CARD_STATUS_LABELS[selected.status]}
+                  {label(RATE_CARD_STATUS_LABELS[selected.status])}
                 </span>
                 {' · '}
-                {periodLabel(selected)}
-                {selected.approvedByName ? ` · approved by ${selected.approvedByName}` : ''}
+                {periodLabel(selected, t)}
+                {selected.approvedByName
+                  ? ` · ${fill(t.approvedBy, { name: selected.approvedByName })}`
+                  : ''}
               </p>
               {selected.note ? <p>{selected.note}</p> : null}
               <div className="kz-table-wrap">
                 <table className="kz-table">
                   <thead>
                     <tr>
-                      <th>Item</th>
-                      <th>Price</th>
-                      <th>Minimum portions</th>
+                      <th>{t.item}</th>
+                      <th>{t.price}</th>
+                      <th>{t.minimumPortions}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -417,7 +421,7 @@ export function RateCardsScreen() {
                         setDialogOpen(true);
                       }}
                     >
-                      Edit draft
+                      {t.editDraft}
                     </button>
                   ) : null}
                   {canDecide ? (
@@ -428,18 +432,18 @@ export function RateCardsScreen() {
                       onClick={() =>
                         void run(
                           () => api.approveRateCard(selected.id),
-                          (card) => `${card.number} is approved.`,
+                          (card) => fill(t.approved, { number: card.number }),
                         )
                       }
                     >
-                      Approve
+                      {t.approve}
                     </button>
                   ) : null}
                 </div>
               ) : null}
               {selected.status === 'APPROVED' && canDecide ? (
                 <div className="kz-actions">
-                  <Field label="Last day it applies" hint="Days already past keep their prices.">
+                  <Field label={t.lastDay} hint={t.lastDayHint}>
                     <input
                       type="date"
                       value={endOn}
@@ -454,11 +458,12 @@ export function RateCardsScreen() {
                     onClick={() =>
                       void run(
                         () => api.endRateCard(selected.id, endOn),
-                        (card) => `${card.number} now ends on ${formatDisplayDate(endOn)}.`,
+                        (card) =>
+                          fill(t.endsOn, { number: card.number, date: formatDisplayDate(endOn) }),
                       )
                     }
                   >
-                    End card
+                    {t.endCard}
                   </button>
                 </div>
               ) : null}
@@ -472,13 +477,14 @@ export function RateCardsScreen() {
           {saved ? <p>{saved}</p> : null}
         </div>
       </div>
+      <AirlineTermsPanel role={user.role} setUser={setUser} />
     </section>
   );
 }
 
-function periodLabel(card: RateCardRecord): string {
+function periodLabel(card: RateCardRecord, t: { periodRange: string; periodOpen: string }): string {
   const from = formatDisplayDate(card.validFrom);
   return card.validTo
-    ? `${from} to ${formatDisplayDate(card.validTo)}`
-    : `From ${from}, no end date`;
+    ? fill(t.periodRange, { from, to: formatDisplayDate(card.validTo) })
+    : fill(t.periodOpen, { from });
 }

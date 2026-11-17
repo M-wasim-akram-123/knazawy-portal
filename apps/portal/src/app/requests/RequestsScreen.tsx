@@ -2,7 +2,7 @@
 
 import type { ServiceRequestInput } from '@knazawy/api-client';
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { portalRequestsCopy } from '@knazawy/i18n';
 import {
   DELIVERY_POINT_LABELS,
   DELIVERY_POINTS,
@@ -15,6 +15,7 @@ import {
   formatKarachiDateTime,
   isAirlineRole,
   isPastCutOff,
+  passengerTotal,
   previewCharges,
   statusTone,
   todayInKarachi,
@@ -24,11 +25,19 @@ import {
   type RateCardRecord,
   type ServiceRequestRecord,
 } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import {
+  FormDialog,
+  KaramLoader,
+  Pagination,
+  RequestFilters,
+  usePage,
+  useRequestFilters,
+} from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { Field } from '../../components/Field';
+import { fill, useChrome, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { ApiError, api, clearSession, readSessionUser } from '../../lib/session';
 
 interface FormState {
@@ -66,6 +75,10 @@ function emptyForm(): FormState {
 }
 
 export function RequestsScreen() {
+  const t = useCopy(portalRequestsCopy);
+  const common = useCommon();
+  const chrome = useChrome();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
   const [menu, setMenu] = useState<MenuItemRecord[]>([]);
@@ -80,6 +93,11 @@ export function RequestsScreen() {
   const [busy, setBusy] = useState(false);
   const [card, setCard] = useState<RateCardRecord | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailCard, setDetailCard] = useState<RateCardRecord | null>(null);
+  const filters = useRequestFilters(requests, requestSearchText);
+  const page = usePage(filters.shown, 10);
 
   useEffect(() => {
     const session = readSessionUser();
@@ -116,13 +134,36 @@ export function RequestsScreen() {
     };
   }, [airlineUser, serviceDate]);
 
+  const selected = requests.find((row) => row.id === selectedId) ?? null;
+  const selectedServiceDate = selected?.serviceDate ?? null;
+
+  // The pop-up prices the order with the rate card valid on its own service date.
+  useEffect(() => {
+    if (!airlineUser || !detailOpen || !selectedServiceDate) {
+      setDetailCard(null);
+      return;
+    }
+    let live = true;
+    void api
+      .currentRateCard(selectedServiceDate)
+      .then((next) => {
+        if (live) setDetailCard(next);
+      })
+      .catch(() => {
+        if (live) setDetailCard(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [airlineUser, detailOpen, selectedServiceDate]);
+
   function handleFailure(caught: unknown) {
     if (caught instanceof ApiError && caught.status === 401) {
       clearSession();
       setUser(null);
       return;
     }
-    setError(caught instanceof Error ? caught.message : 'Something went wrong. Try again.');
+    setError(caught instanceof Error ? caught.message : t.genericError);
   }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -172,13 +213,13 @@ export function RequestsScreen() {
       const input = toInput(form, quantities);
       if (purpose === 'amend' && editingId) {
         if (amendReason.trim().length < 3) {
-          setError('Give a reason for this change.');
+          setError(t.reasonRequired);
           return;
         }
         const record = await api.amendRequest(editingId, { ...input, reason: amendReason.trim() });
         setRequests(await api.listRequests());
         resetForm();
-        setSaved(`${record.number} is changed.`);
+        setSaved(fill(t.changed, { number: record.number }));
         setDialogOpen(false);
         return;
       }
@@ -190,9 +231,9 @@ export function RequestsScreen() {
       setRequests(await api.listRequests());
       if (send) {
         resetForm();
-        setSaved(`${record.number} is sent to Karam.`);
+        setSaved(fill(t.sent, { number: record.number }));
       } else {
-        setSaved(`${record.number} is saved as a draft.`);
+        setSaved(fill(t.savedDraft, { number: record.number }));
       }
       setDialogOpen(false);
     } catch (caught: unknown) {
@@ -216,9 +257,10 @@ export function RequestsScreen() {
       ) {
         const current = await api.currentRateCard(request.serviceDate);
         const charge = previewCharges(request.lines, current);
-        const total = charge.total ?? 'an amount Karam will confirm';
         const confirmed = window.confirm(
-          `Cancelling ${request.number} now costs ${total} PKR. Karam bills that charge straight away.`,
+          charge.total !== null
+            ? fill(t.cancelConfirm, { number: request.number, total: charge.total })
+            : fill(t.cancelConfirmUnknown, { number: request.number }),
         );
         if (!confirmed) return;
         acceptCharge = true;
@@ -229,11 +271,7 @@ export function RequestsScreen() {
         resetForm();
         setDialogOpen(false);
       }
-      setSaved(
-        acceptCharge
-          ? `${record.number} is cancelled and the charge is billed.`
-          : `${record.number} is cancelled.`,
-      );
+      setSaved(fill(acceptCharge ? t.cancelledBilled : t.cancelled, { number: record.number }));
     } catch (caught: unknown) {
       handleFailure(caught);
     } finally {
@@ -241,34 +279,51 @@ export function RequestsScreen() {
     }
   }
 
-  if (!ready) return <p>Loading</p>;
+  if (!ready) return <KaramLoader label={chrome.loading} fullPage />;
   if (!user) {
+    const [beforeLink, afterLink] = t.signInToSee.split('{link}');
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see your requests.
+        {beforeLink}
+        <Link href="/login">{common.signIn}</Link>
+        {afterLink}
       </p>
     );
   }
   if (!isAirlineRole(user.role)) {
-    return <p>This page is for airline staff. Karam staff use the staff app.</p>;
+    return <p>{t.notAirline}</p>;
   }
 
   const preview = previewCharges(toInput(form, quantities).lines, card);
   const ordered = preview.lines.length > 0;
 
+  function canAmend(request: ServiceRequestRecord): boolean {
+    return (
+      amendmentError(
+        request.status,
+        isPastCutOff(request.serviceDate, request.deliveryTime),
+        false,
+      ) === null
+    );
+  }
+
+  function canCancel(request: ServiceRequestRecord): boolean {
+    return request.status === 'SUBMITTED' || request.status === 'ACCEPTED';
+  }
+
+  function showDetail(request: ServiceRequestRecord) {
+    setSelectedId(request.id);
+    setDetailOpen(true);
+    setError('');
+    setSaved('');
+  }
+
   return (
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.requests}</h1>
-          <p>
-            Ask for meals and snacks for a flight. Save a draft as often as you like. Karam sees the
-            request once you send it. Send it, or change it, at least 24 hours before delivery. You
-            only see your own airline.
-          </p>
-          <p lang="ur" dir="rtl">
-            {messages.ur.common.requests}
-          </p>
+          <h1>{common.requests}</h1>
+          <p>{t.intro}</p>
         </div>
         <button
           className="kz-button kz-form-dialog-trigger"
@@ -281,19 +336,19 @@ export function RequestsScreen() {
             setDialogOpen(true);
           }}
         >
-          New request
+          {t.newRequest}
         </button>
       </div>
-      {error && !dialogOpen ? (
+      {error && !dialogOpen && !detailOpen ? (
         <p className="kz-error" role="alert">
           {error}
         </p>
       ) : null}
-      {saved ? <p role="status">{saved}</p> : null}
+      {saved && !detailOpen ? <p role="status">{saved}</p> : null}
       <div className="kz-workspace kz-workspace-single">
         <FormDialog
-          buttonLabel="New request"
-          title={purpose === 'amend' ? 'Change request' : editingId ? 'Edit draft' : 'New request'}
+          buttonLabel={t.newRequest}
+          title={purpose === 'amend' ? t.changeRequest : editingId ? t.editDraft : t.newRequest}
           showTrigger={false}
           isOpen={dialogOpen}
           onOpenChange={setDialogOpen}
@@ -307,7 +362,7 @@ export function RequestsScreen() {
               }}
             >
               <div className="kz-form-grid">
-                <Field label="Flight number">
+                <Field label={t.flightNumber}>
                   <input
                     value={form.flightNumber}
                     maxLength={8}
@@ -316,7 +371,7 @@ export function RequestsScreen() {
                     required
                   />
                 </Field>
-                <Field label="Route">
+                <Field label={t.route}>
                   <input
                     value={form.route}
                     maxLength={80}
@@ -325,7 +380,7 @@ export function RequestsScreen() {
                     required
                   />
                 </Field>
-                <Field label="Service date" hint="Shown as DD/MM/YYYY.">
+                <Field label={t.serviceDate} hint={t.dateHint}>
                   <input
                     type="date"
                     value={form.serviceDate}
@@ -335,11 +390,15 @@ export function RequestsScreen() {
                   />
                 </Field>
                 <Field
-                  label="Delivery time"
+                  label={t.deliveryTime}
                   hint={
                     cutOffInstant(form.serviceDate, form.deliveryTime.trim())
-                      ? `Cut-off ${formatKarachiDateTime(cutOffInstant(form.serviceDate, form.deliveryTime.trim()) as Date)}. Change or send the request before then.`
-                      : '24-hour, such as 11:30. The cut-off is 24 hours before this time.'
+                      ? fill(t.cutOffHint, {
+                          time: formatKarachiDateTime(
+                            cutOffInstant(form.serviceDate, form.deliveryTime.trim()) as Date,
+                          ),
+                        })
+                      : t.timeHint
                   }
                 >
                   <input
@@ -350,7 +409,7 @@ export function RequestsScreen() {
                     required
                   />
                 </Field>
-                <Field label="Deliver to">
+                <Field label={t.deliverTo}>
                   <select
                     value={form.deliveryPoint}
                     onChange={(event) =>
@@ -359,12 +418,12 @@ export function RequestsScreen() {
                   >
                     {DELIVERY_POINTS.map((point) => (
                       <option key={point} value={point}>
-                        {DELIVERY_POINT_LABELS[point]}
+                        {label(DELIVERY_POINT_LABELS[point])}
                       </option>
                     ))}
                   </select>
                 </Field>
-                <Field label="Where exactly" hint="Optional, such as gate or aircraft door.">
+                <Field label={t.whereExactly} hint={t.whereExactlyHint}>
                   <input
                     value={form.deliveryDetail}
                     maxLength={120}
@@ -372,31 +431,31 @@ export function RequestsScreen() {
                   />
                 </Field>
               </div>
-              <h3>Passengers</h3>
+              <h3>{t.passengers}</h3>
               <div className="kz-form-grid">
                 <CountField
-                  label="Adults"
+                  label={t.adults}
                   value={form.adults}
                   onChange={(v) => update('adults', v)}
                 />
                 <CountField
-                  label="Children"
+                  label={t.children}
                   value={form.children}
                   onChange={(v) => update('children', v)}
                 />
                 <CountField
-                  label="Infants"
+                  label={t.infants}
                   value={form.infants}
                   onChange={(v) => update('infants', v)}
                 />
-                <CountField label="Crew" value={form.crew} onChange={(v) => update('crew', v)} />
+                <CountField label={t.crew} value={form.crew} onChange={(v) => update('crew', v)} />
                 <CountField
-                  label="Special diets"
-                  hint="Counted within the passengers above."
+                  label={t.specialDiets}
+                  hint={t.specialDietsHint}
                   value={form.specialDiets}
                   onChange={(v) => update('specialDiets', v)}
                 />
-                <Field label="Special diet note">
+                <Field label={t.specialDietNote}>
                   <input
                     value={form.specialDietNote}
                     maxLength={200}
@@ -404,26 +463,26 @@ export function RequestsScreen() {
                   />
                 </Field>
               </div>
-              <h3>Menu</h3>
+              <h3>{t.menu}</h3>
               {menu.length === 0 ? (
-                <p className="kz-empty">No menu items are available yet.</p>
+                <p className="kz-empty">{t.noMenu}</p>
               ) : (
                 <div className="kz-table-wrap">
                   <table className="kz-table">
                     <thead>
                       <tr>
-                        <th>Item</th>
-                        <th>Type</th>
-                        <th>Portions</th>
-                        <th>Price</th>
-                        <th>Charge</th>
+                        <th>{t.item}</th>
+                        <th>{t.type}</th>
+                        <th>{t.portions}</th>
+                        <th>{t.price}</th>
+                        <th>{t.charge}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {menu.map((item) => (
                         <tr key={item.id}>
                           <td>{item.name}</td>
-                          <td>{RECIPE_KIND_LABELS[item.kind]}</td>
+                          <td>{label(RECIPE_KIND_LABELS[item.kind])}</td>
                           <td>
                             <input
                               type="number"
@@ -431,7 +490,7 @@ export function RequestsScreen() {
                               max={999}
                               step={1}
                               inputMode="numeric"
-                              aria-label={`Portions of ${item.name}`}
+                              aria-label={fill(t.portionsOf, { name: item.name })}
                               value={quantities[item.id] ?? ''}
                               onChange={(event) =>
                                 setQuantities((current) => ({
@@ -454,13 +513,13 @@ export function RequestsScreen() {
               {ordered ? (
                 <p>
                   {preview.total !== null && card
-                    ? `Estimated charge: ${preview.total} PKR on ${card.number}. The invoice uses the portions delivered.`
+                    ? fill(t.estimate, { total: preview.total, card: card.number })
                     : card
-                      ? `One of these items has no price on ${card.number}. Karam will confirm the charge.`
-                      : 'No rate card covers this service date yet. Karam will confirm the charge.'}
+                      ? fill(t.missingPrice, { card: card.number })
+                      : t.noCard}
                 </p>
               ) : null}
-              <Field label="Note for Karam">
+              <Field label={t.noteForKaram}>
                 <input
                   value={form.note}
                   maxLength={300}
@@ -473,10 +532,7 @@ export function RequestsScreen() {
                 </p>
               ) : null}
               {purpose === 'amend' ? (
-                <Field
-                  label="Reason for the change"
-                  hint="Karam and your airline keep this with the request."
-                >
+                <Field label={t.changeReason} hint={t.changeReasonHint}>
                   <input
                     value={amendReason}
                     maxLength={300}
@@ -493,7 +549,7 @@ export function RequestsScreen() {
                     disabled={busy}
                     onClick={() => void save(false)}
                   >
-                    Save change
+                    {t.saveChange}
                   </button>
                 ) : (
                   <>
@@ -503,10 +559,10 @@ export function RequestsScreen() {
                       disabled={busy}
                       onClick={() => void save(false)}
                     >
-                      Save draft
+                      {t.saveDraft}
                     </button>
                     <button type="submit" className="kz-button" disabled={busy}>
-                      Send to Karam
+                      {t.sendToKaram}
                     </button>
                   </>
                 )}
@@ -520,7 +576,7 @@ export function RequestsScreen() {
                       if (current) void cancelRequest(current);
                     }}
                   >
-                    {purpose === 'amend' ? 'Cancel request' : 'Cancel draft'}
+                    {purpose === 'amend' ? t.cancelRequest : t.cancelDraft}
                   </button>
                 ) : null}
               </div>
@@ -528,83 +584,323 @@ export function RequestsScreen() {
           )}
         </FormDialog>
         <div className="kz-panel kz-table-wrap">
-          <h2>Your requests</h2>
-          {requests.length === 0 ? <p className="kz-empty">No requests yet.</p> : null}
+          <h2>{t.yourRequests}</h2>
+          <RequestFilters
+            filters={filters}
+            copy={t}
+            statusLabel={(status) =>
+              label(REQUEST_STATUS_LABELS[status as keyof typeof REQUEST_STATUS_LABELS])
+            }
+            onChange={() => page.setPage(1)}
+            showAirline={false}
+          />
+          {requests.length === 0 ? <p className="kz-empty">{t.empty}</p> : null}
+          {requests.length > 0 && filters.shown.length === 0 ? (
+            <p className="kz-empty">{t.noMatches}</p>
+          ) : null}
           {requests.length > 0 ? (
             <table className="kz-table">
               <thead>
                 <tr>
-                  <th>Number</th>
-                  <th>Flight</th>
-                  <th>Route</th>
-                  <th>Service date</th>
-                  <th>Status</th>
-                  <th />
+                  <th>{t.number}</th>
+                  <th>{t.flight}</th>
+                  <th>{t.route}</th>
+                  <th>{t.serviceDate}</th>
+                  <th>{t.status}</th>
+                  <th className="kz-actions-head">{t.actions}</th>
                 </tr>
               </thead>
               <tbody>
-                {requests.map((request) => (
-                  <tr key={request.id}>
-                    <td>{request.number}</td>
+                {page.rows.map((request) => (
+                  <tr
+                    key={request.id}
+                    className="kz-row-clickable"
+                    aria-selected={request.id === selectedId}
+                    onClick={() => showDetail(request)}
+                  >
+                    <td>
+                      {/* The number stays a link so the row can be reached and opened from the keyboard. */}
+                      <a
+                        href={`#${request.id}`}
+                        aria-current={request.id === selectedId ? 'true' : undefined}
+                        onClick={(event) => event.preventDefault()}
+                      >
+                        {request.number}
+                      </a>
+                    </td>
                     <td>{request.flightNumber}</td>
                     <td>{request.route}</td>
                     <td>{formatDisplayDate(request.serviceDate)}</td>
                     <td>
                       <span className="kz-status" data-tone={statusTone(request.status)}>
-                        {REQUEST_STATUS_LABELS[request.status]}
+                        {label(REQUEST_STATUS_LABELS[request.status])}
                       </span>
                       {request.status === 'REJECTED' && request.decisionNote ? (
                         <span className="kz-help"> {request.decisionNote}</span>
                       ) : null}
                     </td>
-                    <td>
-                      {request.status === 'DRAFT' ? (
-                        <button
-                          type="button"
-                          className="kz-button-quiet"
-                          onClick={() => openRequest(request, 'draft')}
-                        >
-                          Edit
-                        </button>
-                      ) : null}
-                      {amendmentError(
-                        request.status,
-                        isPastCutOff(request.serviceDate, request.deliveryTime),
-                        false,
-                      ) === null ? (
-                        <button
-                          type="button"
-                          className="kz-button-quiet"
-                          onClick={() => openRequest(request, 'amend')}
-                        >
-                          Change
-                        </button>
-                      ) : null}
-                      {request.status === 'SUBMITTED' || request.status === 'ACCEPTED' ? (
-                        <button
-                          type="button"
-                          className="kz-button-quiet"
-                          disabled={busy}
-                          onClick={() => void cancelRequest(request)}
-                        >
-                          Cancel
-                        </button>
-                      ) : null}
-                      {request.amendments.length > 0 ? (
-                        <span className="kz-help">
-                          {' '}
-                          {request.amendments[request.amendments.length - 1]?.number}
-                        </span>
-                      ) : null}
+                    <td className="kz-actions-cell">
+                      <div className="kz-row-actions">
+                        {request.status === 'DRAFT' ? (
+                          <button
+                            type="button"
+                            className="kz-button-quiet"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openRequest(request, 'draft');
+                            }}
+                          >
+                            {t.edit}
+                          </button>
+                        ) : null}
+                        {canAmend(request) ? (
+                          <button
+                            type="button"
+                            className="kz-button-quiet"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openRequest(request, 'amend');
+                            }}
+                          >
+                            {t.change}
+                          </button>
+                        ) : null}
+                        {canCancel(request) ? (
+                          <button
+                            type="button"
+                            className="kz-button-quiet kz-button-danger"
+                            disabled={busy}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void cancelRequest(request);
+                            }}
+                          >
+                            {t.cancel}
+                          </button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           ) : null}
+          <Pagination
+            page={page.page}
+            pageCount={page.pageCount}
+            total={page.total}
+            from={page.from}
+            to={page.to}
+            onPage={page.setPage}
+            labels={common}
+          />
         </div>
       </div>
+      <FormDialog
+        buttonLabel={selected?.number ?? ''}
+        title={selected?.number ?? ''}
+        showTrigger={false}
+        isOpen={detailOpen && selected !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailOpen(false);
+        }}
+      >
+        {() => (
+          <div className="kz-order">
+            {selected ? (
+              <RequestDetail
+                request={selected}
+                card={detailCard}
+                busy={busy}
+                canAmend={canAmend(selected)}
+                canCancel={canCancel(selected)}
+                onEdit={() => {
+                  setDetailOpen(false);
+                  openRequest(selected, 'draft');
+                }}
+                onChange={() => {
+                  setDetailOpen(false);
+                  openRequest(selected, 'amend');
+                }}
+                onCancel={() => void cancelRequest(selected)}
+              />
+            ) : null}
+            {error ? (
+              <p className="kz-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            {saved ? (
+              <p className="kz-order-saved" role="status">
+                {saved}
+              </p>
+            ) : null}
+          </div>
+        )}
+      </FormDialog>
     </section>
+  );
+}
+
+function RequestDetail({
+  request,
+  card,
+  busy,
+  canAmend,
+  canCancel,
+  onEdit,
+  onChange,
+  onCancel,
+}: {
+  request: ServiceRequestRecord;
+  card: RateCardRecord | null;
+  busy: boolean;
+  canAmend: boolean;
+  canCancel: boolean;
+  onEdit: () => void;
+  onChange: () => void;
+  onCancel: () => void;
+}) {
+  const t = useCopy(portalRequestsCopy);
+  const label = useLabel();
+  const charges = previewCharges(request.lines, card);
+  const canEdit = request.status === 'DRAFT';
+  const hasNotes = Boolean(request.note || request.decisionNote || request.amendments.length > 0);
+  return (
+    <>
+      <div className="kz-order-head">
+        <span className="kz-status" data-tone={statusTone(request.status)}>
+          {label(REQUEST_STATUS_LABELS[request.status])}
+        </span>
+        <span className="kz-order-flight">
+          {fill(t.flightRoute, { flight: request.flightNumber, route: request.route })}
+        </span>
+      </div>
+
+      <dl className="kz-order-facts">
+        <div>
+          <dt>{t.factService}</dt>
+          <dd>
+            {formatDisplayDate(request.serviceDate)} · {request.deliveryTime}
+          </dd>
+        </div>
+        <div>
+          <dt>{t.factDelivery}</dt>
+          <dd>
+            {label(DELIVERY_POINT_LABELS[request.deliveryPoint])}
+            {request.deliveryDetail ? <small>{request.deliveryDetail}</small> : null}
+          </dd>
+        </div>
+        <div>
+          <dt>{t.factCutOff}</dt>
+          <dd>
+            {request.cutOffAt ? formatKarachiDateTime(new Date(request.cutOffAt)) : '—'}
+            <small>{t.factCutOffHint}</small>
+          </dd>
+        </div>
+        <div>
+          <dt>{t.factPassengers}</dt>
+          <dd>
+            {passengerTotal(request.passengers)}
+            <small>
+              {fill(t.passengerSplit, {
+                adults: request.passengers.adults,
+                children: request.passengers.children,
+                infants: request.passengers.infants,
+                crew: request.passengers.crew,
+              })}
+            </small>
+          </dd>
+        </div>
+        <div>
+          <dt>{t.factSpecialDiets}</dt>
+          <dd>
+            {request.passengers.specialDiets}
+            {request.specialDietNote ? <small>{request.specialDietNote}</small> : null}
+          </dd>
+        </div>
+        <div>
+          <dt>{t.totalPortions}</dt>
+          <dd>{request.lines.reduce((sum, line) => sum + line.quantity, 0)}</dd>
+        </div>
+      </dl>
+
+      <section className="kz-order-section">
+        <h3>{t.itemsOrdered}</h3>
+        <div className="kz-table-wrap">
+          <table className="kz-table">
+            <thead>
+              <tr>
+                <th>{t.item}</th>
+                <th>{t.type}</th>
+                <th>{t.portions}</th>
+                <th>{t.price}</th>
+                <th>{t.charge}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {request.lines.map((line) => (
+                <tr key={line.recipeId}>
+                  <td>{line.recipeName}</td>
+                  <td>{label(RECIPE_KIND_LABELS[line.kind])}</td>
+                  <td>{line.quantity}</td>
+                  <PriceCells
+                    rate={card?.lines.find((rate) => rate.recipeId === line.recipeId) ?? null}
+                    charge={charges.lines.find((row) => row.recipeId === line.recipeId) ?? null}
+                  />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {hasNotes ? (
+        <section className="kz-order-section">
+          <h3>{t.notesTitle}</h3>
+          <ul className="kz-order-notes">
+            {request.note ? <li>{fill(t.yourNote, { note: request.note })}</li> : null}
+            {request.decisionNote ? (
+              <li>{fill(t.karamNote, { note: request.decisionNote })}</li>
+            ) : null}
+            {request.amendments.map((amendment) => (
+              <li key={amendment.id}>
+                <strong>{amendment.number}</strong> {amendment.reason}{' '}
+                <span className="kz-help">({amendment.createdByName})</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {canEdit || canAmend || canCancel ? (
+        <section className="kz-order-section kz-order-decision">
+          <h3>{t.actionsTitle}</h3>
+          <div className="kz-order-actions">
+            {canCancel ? (
+              <button
+                type="button"
+                className="kz-button kz-button-outline"
+                disabled={busy}
+                onClick={onCancel}
+              >
+                {t.cancelRequest}
+              </button>
+            ) : null}
+            {canEdit ? (
+              <button type="button" className="kz-button" disabled={busy} onClick={onEdit}>
+                {t.editDraft}
+              </button>
+            ) : null}
+            {canAmend ? (
+              <button type="button" className="kz-button" disabled={busy} onClick={onChange}>
+                {t.changeRequest}
+              </button>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+    </>
   );
 }
 
@@ -615,18 +911,19 @@ function PriceCells({
   rate: RateCardRecord['lines'][number] | null;
   charge: ChargePreviewLine | null;
 }) {
+  const t = useCopy(portalRequestsCopy);
   return (
     <>
       <td>
         {rate ? `${rate.unitPrice} PKR` : '—'}
         {rate && rate.minimumQuantity > 0 ? (
-          <span className="kz-help"> · at least {rate.minimumQuantity}</span>
+          <span className="kz-help">{fill(t.atLeast, { count: rate.minimumQuantity })}</span>
         ) : null}
       </td>
       <td>
         {charge?.amount ? `${charge.amount} PKR` : '—'}
         {charge && charge.billedQuantity > charge.quantity ? (
-          <span className="kz-help"> · billed as {charge.billedQuantity}</span>
+          <span className="kz-help">{fill(t.billedAs, { count: charge.billedQuantity })}</span>
         ) : null}
       </td>
     </>
@@ -688,4 +985,9 @@ function count(value: string): number {
 function optional(value: string): string | undefined {
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
+}
+
+/** What the search box looks in. */
+function requestSearchText(row: ServiceRequestRecord): string {
+  return [row.number, row.flightNumber, row.route].join(' ');
 }

@@ -119,15 +119,15 @@
 }
 
 .kz-form-dialog {
-  width: min(900px, calc(100vw - 32px));
+  width: min(960px, calc(100vw - 32px));
   max-width: none;
-  max-height: min(90dvh, 840px);
+  max-height: min(92dvh, 900px);
   margin: auto;
   padding: 0;
   overflow: auto;
-  border: 1px solid var(--kz-line);
+  border: 0;
   border-radius: 20px;
-  background: var(--kz-card);
+  background: var(--kz-paper);
   color: var(--kz-ink);
   box-shadow: 0 24px 80px rgba(20, 48, 43, 0.3);
 }
@@ -163,26 +163,39 @@
 }
 
 .kz-form-dialog-content {
-  padding: clamp(20px, 4vw, 32px);
+  padding: 0;
+}
+
+/* The body scrolls under a header that stays put. */
+.kz-form-dialog-body {
+  padding: clamp(18px, 3vw, 28px);
 }
 
 .kz-form-dialog-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 24px;
+  margin: 0;
+  padding: 18px clamp(18px, 3vw, 28px);
+  background: linear-gradient(120deg, var(--kz-deep), #24574e);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(20, 48, 43, 0.18);
 }
 
 .kz-form-dialog-header h2 {
   margin: 0;
-  font-size: 23px;
-  letter-spacing: -0.03em;
+  color: #fff;
+  font-size: 21px;
+  letter-spacing: -0.02em;
 }
 
 .kz-form-dialog-header p {
-  margin: 8px 0 0;
-  color: var(--kz-ink-soft);
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.78);
   font-size: 13px;
 }
 
@@ -238,4 +251,620 @@
 }
 .kz-tone-problem {
   color: var(--kz-problem);
+}
+
+/* Password field with a show/hide eye button. */
+.kz-password {
+  position: relative;
+  display: block;
+}
+
+.kz-password input {
+  width: 100%;
+  padding-inline-end: 44px;
+}
+
+.kz-password-toggle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 4px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--kz-ink-soft);
+  cursor: pointer;
+}
+
+.kz-password-toggle:hover,
+.kz-password-toggle:focus-visible {
+  color: var(--kz-deep);
+}
+
+.kz-password-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Language switcher in the header and on sign-in. */
+.kz-language {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--kz-ink-soft);
+}
+
+.kz-language select {
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid var(--kz-line);
+  border-radius: 10px;
+  background: var(--kz-card);
+  color: var(--kz-ink);
+  font: inherit;
+}
+
+.kz-language-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Right-to-left pages (Urdu, Arabic) keep tables and forms aligned to the start edge. */
+[dir='rtl'] .kz-table th,
+[dir='rtl'] .kz-table td {
+  text-align: right;
+}
+
+/* Page controls under a long list. */
+.kz-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 14px;
+  font-size: 0.9rem;
+  color: var(--kz-ink-soft);
+}
+
+.kz-pagination-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.kz-pagination-page {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid var(--kz-line);
+  border-radius: 10px;
+  background: var(--kz-card);
+  color: var(--kz-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.kz-pagination-page[aria-current='page'] {
+  border-color: var(--kz-deep);
+  background: var(--kz-deep);
+  color: #fff;
+}
+
+/* ---- Lists, filters, row actions, and record pop-ups, shared by the staff and airline apps. ---- */
+
+/* Users: filters side by side, and a row of quiet actions in a table cell. */
+.kz-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
+}
+
+.kz-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+/* A list that needs every column: full width, with the details underneath. */
+.kz-workspace.kz-workspace-stacked,
+.kz-workspace.kz-workspace-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* A table row that opens its record when clicked anywhere. */
+.kz-row-clickable {
+  cursor: pointer;
+}
+
+.kz-row-clickable:hover td {
+  background: rgba(196, 164, 95, 0.12);
+}
+
+.kz-row-clickable[aria-selected='true'] td {
+  background: rgba(196, 164, 95, 0.2);
+}
+
+/* An order opened in a pop-up: a summary card, a facts panel, section cards, and a decision
+   bar that stays at the bottom of the pop-up while the rest scrolls. */
+.kz-order {
+  display: grid;
+  gap: 16px;
+}
+
+.kz-order-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 16px 20px;
+  border: 1px solid var(--kz-line);
+  border-radius: 14px;
+  background: var(--kz-card);
+}
+
+.kz-order-head .kz-status {
+  order: 3;
+  margin-inline-start: auto;
+}
+
+.kz-order-airline {
+  font-size: 1.2rem;
+  color: var(--kz-ink);
+}
+
+.kz-order-flight {
+  color: var(--kz-ink-soft);
+  font-weight: 600;
+}
+
+/* Facts as one panel with hairline dividers; the last row stretches, so no empty cells. */
+.kz-order-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--kz-line);
+  border-radius: 14px;
+  background: var(--kz-line);
+}
+
+.kz-order-facts > div {
+  flex: 1 1 260px;
+  padding: 14px 16px;
+  background: var(--kz-card);
+}
+
+.kz-order-facts dt {
+  margin-bottom: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--kz-ink-soft);
+}
+
+.kz-order-facts dd {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--kz-ink);
+}
+
+.kz-order-facts dd small {
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--kz-ink-soft);
+}
+
+.kz-order-section {
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid var(--kz-line);
+  border-radius: 14px;
+  background: var(--kz-card);
+}
+
+.kz-order-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--kz-deep);
+}
+
+.kz-order-section h3::before {
+  content: '';
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--kz-accent);
+}
+
+.kz-order-section .kz-table input[type='number'] {
+  width: 110px;
+  min-height: 38px;
+}
+
+.kz-order-section .kz-table-wrap {
+  margin: 0;
+  border: 1px solid var(--kz-line);
+  border-radius: 10px;
+}
+
+.kz-order-notes {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kz-order-notes li {
+  padding: 10px 12px;
+  border-inline-start: 3px solid var(--kz-accent);
+  border-radius: 8px;
+  background: var(--kz-paper);
+}
+
+/* The decision bar sits on the bottom edge of the pop-up and stays there while scrolling:
+   reason on the left, the two buttons on the right, on one row. */
+.kz-order-section.kz-order-decision {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px 16px;
+  margin: 4px calc(-1 * clamp(18px, 3vw, 28px)) calc(-1 * clamp(18px, 3vw, 28px));
+  padding: 14px clamp(18px, 3vw, 28px) 16px;
+  border: 0;
+  border-top: 1px solid var(--kz-line);
+  border-radius: 0;
+  background: var(--kz-card);
+  box-shadow: 0 -10px 24px rgba(20, 48, 43, 0.08);
+}
+
+.kz-order-decision > h3,
+.kz-order-decision > .kz-order-warning {
+  grid-column: 1 / -1;
+}
+
+.kz-order-decision .kz-field {
+  margin: 0;
+}
+
+.kz-order-decision .kz-order-actions {
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 720px) {
+  .kz-order-section.kz-order-decision {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kz-order-decision .kz-order-actions {
+    flex-wrap: wrap;
+  }
+}
+
+.kz-order-warning {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(185, 28, 28, 0.08);
+  color: var(--kz-problem);
+}
+
+.kz-order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.kz-order-actions .kz-button {
+  min-width: 150px;
+}
+
+.kz-order-saved {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(21, 128, 61, 0.1);
+  color: var(--kz-done);
+}
+
+@media (max-width: 640px) {
+  .kz-order-actions > button {
+    flex: 1 1 100%;
+  }
+}
+
+/* The outline button is drawn for the dark page banner; on the light pop-up it needs dark ink. */
+.kz-order .kz-button-outline,
+.kz-app .kz-order .kz-button.kz-button-outline {
+  border: 1px solid var(--kz-deep);
+  background: transparent;
+  color: var(--kz-deep);
+}
+
+.kz-order .kz-button-outline:hover:not(:disabled),
+.kz-app .kz-order .kz-button.kz-button-outline:hover:not(:disabled) {
+  background: rgba(23, 63, 57, 0.08);
+}
+
+/* Checkboxes and radios are not text boxes: the input styles above must not stretch them. */
+.kz-app input[type='checkbox'],
+.kz-app input[type='radio'],
+.kz-app .kz-field input[type='checkbox'],
+.kz-app .kz-field input[type='radio'] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
+  accent-color: var(--kz-deep);
+  cursor: pointer;
+}
+
+/* A list of choices, such as the suppliers for an item: a grid of tick boxes. */
+.kz-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 8px 12px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--kz-line);
+  border-radius: 12px;
+}
+
+.kz-check-grid legend {
+  padding: 0 6px;
+}
+
+.kz-app .kz-check {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--kz-line);
+  border-radius: 10px;
+  background: var(--kz-card);
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+}
+
+.kz-app .kz-check:has(input:checked) {
+  border-color: var(--kz-deep);
+  background: rgba(23, 63, 57, 0.06);
+}
+
+/* Filters above a list: search wide, selects narrow, all on one row where there is room. */
+.kz-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) repeat(auto-fit, minmax(150px, 1fr));
+  align-items: end;
+  gap: 12px 14px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--kz-line);
+  border-radius: 12px;
+  background: var(--kz-paper);
+}
+
+.kz-filters .kz-field {
+  margin: 0;
+}
+
+.kz-filters-clear {
+  justify-self: start;
+  min-height: 44px;
+}
+
+/* Row actions in a table: equal buttons side by side, never stacked in a tall column. */
+.kz-actions-head {
+  text-align: end;
+}
+
+.kz-table td.kz-actions-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.kz-table .kz-row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.kz-app .kz-table .kz-row-actions .kz-button,
+.kz-app .kz-table .kz-row-actions .kz-button-quiet {
+  min-width: 78px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  box-shadow: none;
+}
+
+.kz-app .kz-button-quiet.kz-button-danger {
+  color: var(--kz-problem);
+}
+
+.kz-app .kz-button-quiet.kz-button-danger:hover {
+  border-color: var(--kz-problem);
+  background: rgba(185, 28, 28, 0.08);
+  color: var(--kz-problem);
+}
+
+/* ---- The Karam loader: the cloche filling with water, a wave drifting on top. ---- */
+.kz-loader {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 40px 16px;
+  color: var(--kz-ink-soft);
+}
+
+/* A loader on its own sits in the middle of the window, whatever the page around it. */
+.kz-loader-page {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  align-content: center;
+  padding: 16px;
+  background: var(--kz-paper);
+}
+
+.kz-loader-mark {
+  position: relative;
+  display: block;
+  width: var(--kz-loader-size, 88px);
+  height: var(--kz-loader-size, 88px);
+}
+
+.kz-loader-shape {
+  position: absolute;
+  inset: 0;
+  -webkit-mask: var(--kz-logo) center / contain no-repeat;
+  mask: var(--kz-logo) center / contain no-repeat;
+}
+
+/* The empty cloche: a faint outline of the logo the water fills. */
+.kz-loader-empty {
+  background: rgba(23, 63, 57, 0.16);
+}
+
+.kz-loader-water {
+  overflow: hidden;
+}
+
+/* Rises from the bottom to just over the top, holds, then starts again. */
+.kz-loader-rise {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 112%;
+  transform: translateY(100%);
+  animation: kz-water-rise 2.6s cubic-bezier(0.45, 0.05, 0.35, 1) infinite;
+}
+
+/* Twice as wide as the logo so it can drift sideways without showing an edge. */
+.kz-loader-wave {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 200%;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 20' preserveAspectRatio='none'%3E%3Cpath d='M0 10 Q 25 0 50 10 T 100 10 V20 H0 Z' fill='%23317f70'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, #317f70 0%, var(--kz-deep) 70%, #102e29 100%);
+  background-repeat: repeat-x, no-repeat;
+  background-size:
+    50% 14%,
+    100% 100%;
+  background-position:
+    0 0,
+    0 12%;
+  animation: kz-water-drift 1.6s linear infinite;
+}
+
+/* A gold glint on the surface. */
+.kz-loader-wave::after {
+  content: '';
+  position: absolute;
+  inset: 6% 0 auto;
+  height: 3%;
+  background: linear-gradient(90deg, transparent, rgba(196, 164, 95, 0.55), transparent);
+  background-size: 25% 100%;
+}
+
+.kz-loader-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+@keyframes kz-water-rise {
+  0% {
+    transform: translateY(100%);
+  }
+  78%,
+  100% {
+    transform: translateY(-8%);
+  }
+}
+
+@keyframes kz-water-drift {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kz-loader-rise {
+    animation: none;
+    transform: translateY(45%);
+  }
+
+  .kz-loader-wave {
+    animation: none;
+  }
+}
+
+/* Over the page while the API answers: the page stays visible, softly dimmed. */
+.kz-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(243, 240, 231, 0.55);
+  backdrop-filter: blur(2px);
+  animation: kz-overlay-in 160ms ease-out both;
+}
+
+.kz-loading-overlay .kz-loader {
+  padding: 26px 34px 22px;
+  border: 1px solid var(--kz-line);
+  border-radius: 18px;
+  background: var(--kz-card);
+  box-shadow: 0 18px 50px rgba(20, 48, 43, 0.18);
+}
+
+@keyframes kz-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

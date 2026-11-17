@@ -1,11 +1,12 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { portalRoomRequestsCopy } from '@knazawy/i18n';
 import {
   ROOM_REQUEST_STATUS_LABELS,
   canRequestRooms,
   formatDisplayDate,
+  formatKarachiDateTime,
   isRoomRequestEditable,
   nextRoomRequestStatus,
   roomNights,
@@ -16,11 +17,19 @@ import {
   type RoomOfferRecord,
   type RoomRequestRecord,
 } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import {
+  FormDialog,
+  KaramLoader,
+  Pagination,
+  RequestFilters,
+  usePage,
+  useRequestFilters,
+} from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { Field } from '../../components/Field';
+import { fill, useChrome, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { ApiError, api, clearSession, readSessionUser } from '../../lib/session';
 
 interface LineForm {
@@ -31,6 +40,10 @@ interface LineForm {
 const emptyLine = (): LineForm => ({ roomTypeId: '', rooms: '1' });
 
 export function RoomRequestsScreen() {
+  const t = useCopy(portalRoomRequestsCopy);
+  const common = useCommon();
+  const chrome = useChrome();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
   const [offers, setOffers] = useState<RoomOfferRecord[]>([]);
@@ -47,6 +60,10 @@ export function RoomRequestsScreen() {
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const filters = useRequestFilters(requests, requestSearchText);
+  const page = usePage(filters.shown, 10);
 
   function handleFailure(caught: unknown): void {
     if (caught instanceof ApiError && caught.status === 401) {
@@ -54,7 +71,7 @@ export function RoomRequestsScreen() {
       setUser(null);
       return;
     }
-    setError(caught instanceof Error ? caught.message : 'Something went wrong. Try again.');
+    setError(caught instanceof Error ? caught.message : t.genericError);
   }
 
   async function reload(chosenBranch?: string): Promise<RoomRequestRecord[]> {
@@ -79,11 +96,14 @@ export function RoomRequestsScreen() {
     void reload().catch((caught: unknown) => handleFailure(caught));
   }, []);
 
-  if (!ready) return <p>Loading</p>;
+  if (!ready) return <KaramLoader label={chrome.loading} fullPage />;
   if (!user) {
+    const [beforeLink, afterLink] = t.signInToAsk.split('{link}');
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to ask for rooms.
+        {beforeLink}
+        <Link href="/login">{common.signIn}</Link>
+        {afterLink}
       </p>
     );
   }
@@ -123,8 +143,23 @@ export function RoomRequestsScreen() {
     );
     setSaved('');
     setError('');
+    // Only one dialog is open at a time, so the detail pop-up closes first.
+    setDetailOpen(false);
     setDialogOpen(true);
   }
+
+  function openDetail(request: RoomRequestRecord): void {
+    setSelectedId(request.id);
+    setSaved('');
+    setError('');
+    setDetailOpen(true);
+  }
+
+  const selected = requests.find((row) => row.id === selectedId) ?? null;
+  const canEdit = (request: RoomRequestRecord): boolean =>
+    canWrite && isRoomRequestEditable(request.status);
+  const canCancel = (request: RoomRequestRecord): boolean =>
+    canWrite && nextRoomRequestStatus(request.status, 'cancel') !== null;
 
   async function save(send: boolean): Promise<void> {
     setBusy(true);
@@ -145,7 +180,7 @@ export function RoomRequestsScreen() {
       const record = send ? await api.submitRoomRequest(draft.id) : draft;
       await reload();
       resetForm();
-      setSaved(send ? `${record.number} was sent.` : `${record.number} is saved as a draft.`);
+      setSaved(fill(send ? t.sent : t.savedDraft, { number: record.number }));
       setDialogOpen(false);
     } catch (caught: unknown) {
       handleFailure(caught);
@@ -165,7 +200,7 @@ export function RoomRequestsScreen() {
         resetForm();
         setDialogOpen(false);
       }
-      setSaved(`${record.number} is cancelled.`);
+      setSaved(fill(t.cancelled, { number: record.number }));
     } catch (caught: unknown) {
       handleFailure(caught);
     } finally {
@@ -177,11 +212,8 @@ export function RoomRequestsScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.roomRequests}</h1>
-          <p>Ask for rooms by type. The price is the charges Karam has set for one night.</p>
-          <p lang="ur" dir="rtl">
-            {messages.ur.common.roomRequests}
-          </p>
+          <h1>{common.roomRequests}</h1>
+          <p>{t.intro}</p>
         </div>
         {canWrite ? (
           <button
@@ -195,20 +227,20 @@ export function RoomRequestsScreen() {
               setDialogOpen(true);
             }}
           >
-            New stay
+            {t.newStay}
           </button>
         ) : null}
       </div>
-      {error ? (
+      {error && !detailOpen ? (
         <p className="kz-error" role="alert">
           {error}
         </p>
       ) : null}
-      {saved ? <p>{saved}</p> : null}
+      {saved && !detailOpen ? <p>{saved}</p> : null}
       {canWrite ? (
         <FormDialog
-          buttonLabel="New stay"
-          title={editingId ? 'Edit draft' : 'New stay'}
+          buttonLabel={t.newStay}
+          title={editingId ? t.editDraft : t.newStay}
           showTrigger={false}
           isOpen={dialogOpen}
           onOpenChange={setDialogOpen}
@@ -222,7 +254,7 @@ export function RoomRequestsScreen() {
               }}
             >
               <div className="kz-form-grid">
-                <Field label="Branch">
+                <Field label={t.branch}>
                   <select
                     value={branchId}
                     onChange={(event) => {
@@ -239,7 +271,7 @@ export function RoomRequestsScreen() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Check-in" hint="Shown as DD/MM/YYYY.">
+                <Field label={t.checkIn} hint={t.checkInHint}>
                   <input
                     type="date"
                     value={checkIn}
@@ -248,7 +280,7 @@ export function RoomRequestsScreen() {
                     required
                   />
                 </Field>
-                <Field label="Check-out" hint="The morning after the last night.">
+                <Field label={t.checkOut} hint={t.checkOutHint}>
                   <input
                     type="date"
                     value={checkOut}
@@ -257,14 +289,14 @@ export function RoomRequestsScreen() {
                     required
                   />
                 </Field>
-                <Field label="Who the rooms are for">
+                <Field label={t.party}>
                   <input
                     value={party}
                     maxLength={120}
                     onChange={(event) => setParty(event.target.value)}
                   />
                 </Field>
-                <Field label="Note">
+                <Field label={t.note}>
                   <input
                     value={note}
                     maxLength={500}
@@ -274,7 +306,7 @@ export function RoomRequestsScreen() {
               </div>
               {lines.map((line, index) => (
                 <div className="kz-form-grid" key={index}>
-                  <Field label="Room type">
+                  <Field label={t.roomType}>
                     <select
                       value={line.roomTypeId}
                       onChange={(event) =>
@@ -288,15 +320,19 @@ export function RoomRequestsScreen() {
                       }
                       required
                     >
-                      <option value="">Choose a room type</option>
+                      <option value="">{t.chooseRoomType}</option>
                       {offers.map((offer) => (
                         <option key={offer.id} value={offer.id}>
-                          {offer.name} · {offer.nightlyTotal} PKR · {offer.rooms} rooms
+                          {fill(t.offerOption, {
+                            name: offer.name,
+                            nightly: offer.nightlyTotal,
+                            rooms: offer.rooms,
+                          })}
                         </option>
                       ))}
                     </select>
                   </Field>
-                  <Field label="Rooms">
+                  <Field label={t.rooms}>
                     <input
                       type="number"
                       min={1}
@@ -319,8 +355,8 @@ export function RoomRequestsScreen() {
                   {error}
                 </p>
               ) : null}
-              <p>{nights ? `${nights} nights` : 'Choose a check-out after check-in.'}</p>
-              <p>{preview ? `About ${preview} PKR at today's charges.` : null}</p>
+              <p>{nights ? fill(t.nightsCount, { nights }) : t.chooseCheckOut}</p>
+              <p>{preview ? fill(t.preview, { total: preview }) : null}</p>
               <div className="kz-actions">
                 <button
                   type="button"
@@ -328,7 +364,7 @@ export function RoomRequestsScreen() {
                   disabled={busy || lines.length >= 12}
                   onClick={() => setLines((current) => [...current, emptyLine()])}
                 >
-                  Add a room type
+                  {t.addRoomType}
                 </button>
                 {lines.length > 1 ? (
                   <button
@@ -337,11 +373,11 @@ export function RoomRequestsScreen() {
                     disabled={busy}
                     onClick={() => setLines((current) => current.slice(0, -1))}
                   >
-                    Remove last
+                    {t.removeLast}
                   </button>
                 ) : null}
                 <button type="submit" className="kz-button" disabled={busy}>
-                  Save draft
+                  {t.saveDraft}
                 </button>
                 <button
                   type="button"
@@ -349,7 +385,7 @@ export function RoomRequestsScreen() {
                   disabled={busy}
                   onClick={() => void save(true)}
                 >
-                  Send request
+                  {t.sendRequest}
                 </button>
                 {editingId ? (
                   <button
@@ -358,7 +394,7 @@ export function RoomRequestsScreen() {
                     disabled={busy}
                     onClick={resetForm}
                   >
-                    Clear
+                    {t.clear}
                   </button>
                 ) : null}
               </div>
@@ -366,56 +402,295 @@ export function RoomRequestsScreen() {
           )}
         </FormDialog>
       ) : null}
-      {requests.length === 0 ? <p className="kz-empty">No room requests yet.</p> : null}
-      {requests.map((request) => (
-        <article key={request.id} className="kz-panel kz-stack">
-          <h2>
-            {request.number}{' '}
-            <span className="kz-status" data-tone={roomRequestStatusTone(request.status)}>
-              {ROOM_REQUEST_STATUS_LABELS[request.status]}
-            </span>
-          </h2>
-          <p>
-            {request.branchName} · {formatDisplayDate(request.checkIn)} to{' '}
-            {formatDisplayDate(request.checkOut)} · {request.nights} nights · {request.total} PKR
-            {request.lines.some((line) => line.quoted) ? '' : ' at current charges'}
-          </p>
-          {request.party ? <p>{request.party}</p> : null}
-          {request.decisionNote ? <p>{request.decisionNote}</p> : null}
-          <ul>
-            {request.lines.map((line) => (
-              <li key={line.roomTypeId}>
-                {line.rooms} {line.roomTypeName} · {line.nightly} PKR a night · {line.amount} PKR
-                {request.status === 'ACCEPTED'
-                  ? ` · ${line.checkedIn} of ${line.rooms} checked in`
-                  : ''}
-              </li>
-            ))}
-          </ul>
-          <div className="kz-actions">
-            {canWrite && isRoomRequestEditable(request.status) ? (
-              <button
-                type="button"
-                className="kz-button-quiet"
-                disabled={busy}
-                onClick={() => edit(request)}
-              >
-                Edit
-              </button>
+      <div className="kz-panel kz-table-wrap">
+        <h2>{t.yourRequests}</h2>
+        <RequestFilters
+          filters={filters}
+          copy={t}
+          statusLabel={(status) =>
+            label(ROOM_REQUEST_STATUS_LABELS[status as keyof typeof ROOM_REQUEST_STATUS_LABELS])
+          }
+          onChange={() => page.setPage(1)}
+          showAirline={false}
+        />
+        {requests.length > 0 && filters.shown.length === 0 ? (
+          <p className="kz-empty">{t.noMatches}</p>
+        ) : null}
+        {requests.length === 0 ? (
+          <p className="kz-empty">{t.empty}</p>
+        ) : (
+          <table className="kz-table">
+            <thead>
+              <tr>
+                <th>{t.number}</th>
+                <th>{t.checkIn}</th>
+                <th>{t.checkOut}</th>
+                <th>{t.nights}</th>
+                <th>{t.rooms}</th>
+                <th>{t.total}</th>
+                <th>{t.status}</th>
+                <th className="kz-actions-head">{t.actions}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {page.rows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="kz-row-clickable"
+                  aria-selected={row.id === selectedId}
+                  onClick={() => openDetail(row)}
+                >
+                  <td>
+                    {/* The number stays a link so the row can be reached and opened from the keyboard. */}
+                    <a
+                      href={`#${row.id}`}
+                      aria-current={row.id === selectedId ? 'true' : undefined}
+                      onClick={(event) => event.preventDefault()}
+                    >
+                      {row.number}
+                    </a>
+                  </td>
+                  <td>{formatDisplayDate(row.checkIn)}</td>
+                  <td>{formatDisplayDate(row.checkOut)}</td>
+                  <td>{row.nights}</td>
+                  <td>{row.lines.reduce((sum, line) => sum + line.rooms, 0)}</td>
+                  <td>{row.total} PKR</td>
+                  <td>
+                    <span className="kz-status" data-tone={roomRequestStatusTone(row.status)}>
+                      {label(ROOM_REQUEST_STATUS_LABELS[row.status])}
+                    </span>
+                  </td>
+                  <td className="kz-actions-cell">
+                    <div className="kz-row-actions">
+                      {canEdit(row) ? (
+                        <button
+                          type="button"
+                          className="kz-button-quiet"
+                          disabled={busy}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            edit(row);
+                          }}
+                        >
+                          {t.edit}
+                        </button>
+                      ) : null}
+                      {canCancel(row) ? (
+                        <button
+                          type="button"
+                          className="kz-button-quiet kz-button-danger"
+                          disabled={busy}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void act(row.id);
+                          }}
+                        >
+                          {t.cancel}
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <Pagination
+          page={page.page}
+          pageCount={page.pageCount}
+          total={page.total}
+          from={page.from}
+          to={page.to}
+          onPage={page.setPage}
+          labels={common}
+        />
+      </div>
+
+      <FormDialog
+        buttonLabel={selected?.number ?? ''}
+        title={selected?.number ?? ''}
+        showTrigger={false}
+        isOpen={detailOpen && selected !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailOpen(false);
+        }}
+      >
+        {() => (
+          <div className="kz-order">
+            {selected ? (
+              <>
+                <div className="kz-order-head">
+                  <span className="kz-status" data-tone={roomRequestStatusTone(selected.status)}>
+                    {label(ROOM_REQUEST_STATUS_LABELS[selected.status])}
+                  </span>
+                </div>
+
+                <dl className="kz-order-facts">
+                  <div>
+                    <dt>{t.factStay}</dt>
+                    <dd>
+                      {formatDisplayDate(selected.checkIn)} → {formatDisplayDate(selected.checkOut)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t.nights}</dt>
+                    <dd>{selected.nights}</dd>
+                  </div>
+                  <div>
+                    <dt>{t.rooms}</dt>
+                    <dd>{selected.lines.reduce((sum, line) => sum + line.rooms, 0)}</dd>
+                  </div>
+                  <div>
+                    <dt>{t.total}</dt>
+                    <dd>
+                      {selected.total} PKR
+                      {selected.lines.some((line) => line.quoted) ? '' : t.atCurrentCharges}
+                    </dd>
+                  </div>
+                  {selected.party ? (
+                    <div>
+                      <dt>{t.factGuests}</dt>
+                      <dd>{selected.party}</dd>
+                    </div>
+                  ) : null}
+                  {selected.branchName ? (
+                    <div>
+                      <dt>{t.branch}</dt>
+                      <dd>{selected.branchName}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+
+                <section className="kz-order-section">
+                  <h3>{t.roomsRequested}</h3>
+                  <div className="kz-table-wrap">
+                    <table className="kz-table">
+                      <thead>
+                        <tr>
+                          <th>{t.roomType}</th>
+                          <th>{t.rooms}</th>
+                          <th>{t.nightly}</th>
+                          <th>{t.amount}</th>
+                          {selected.status === 'ACCEPTED' ? <th>{t.checkedIn}</th> : null}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selected.lines.map((line) => (
+                          <tr key={line.roomTypeId}>
+                            <td>
+                              {line.roomTypeName}
+                              {line.quoted ? (
+                                <span className="kz-help"> · {t.fixedPrice}</span>
+                              ) : null}
+                            </td>
+                            <td>{line.rooms}</td>
+                            <td>{line.nightly} PKR</td>
+                            <td>{line.amount} PKR</td>
+                            {selected.status === 'ACCEPTED' ? (
+                              <td>
+                                {fill(t.checkedInCount, {
+                                  done: line.checkedIn,
+                                  rooms: line.rooms,
+                                })}
+                              </td>
+                            ) : null}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                {selected.note || selected.decisionNote ? (
+                  <section className="kz-order-section">
+                    <h3>{t.notesTitle}</h3>
+                    <ul className="kz-order-notes">
+                      {selected.note ? <li>{selected.note}</li> : null}
+                      {selected.decisionNote ? <li>{selected.decisionNote}</li> : null}
+                    </ul>
+                  </section>
+                ) : null}
+
+                {selected.stays.length > 0 ? (
+                  <section className="kz-order-section">
+                    <h3>{t.roomsInUse}</h3>
+                    <div className="kz-table-wrap">
+                      <table className="kz-table">
+                        <thead>
+                          <tr>
+                            <th>{t.room}</th>
+                            <th>{t.floor}</th>
+                            <th>{t.roomType}</th>
+                            <th>{t.checkedIn}</th>
+                            <th>{t.checkedOut}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selected.stays.map((stay) => (
+                            <tr key={stay.id}>
+                              <td>{stay.roomName}</td>
+                              <td>{stay.floorName}</td>
+                              <td>{stay.roomTypeName}</td>
+                              <td>{formatKarachiDateTime(new Date(stay.checkedInAt))}</td>
+                              <td>
+                                {stay.checkedOutAt
+                                  ? formatKarachiDateTime(new Date(stay.checkedOutAt))
+                                  : t.inRoom}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                ) : null}
+
+                {canEdit(selected) || canCancel(selected) ? (
+                  <section className="kz-order-section kz-order-decision">
+                    <div className="kz-order-actions">
+                      {canCancel(selected) ? (
+                        <button
+                          type="button"
+                          className="kz-button-quiet kz-button-danger"
+                          disabled={busy}
+                          onClick={() => void act(selected.id)}
+                        >
+                          {t.cancel}
+                        </button>
+                      ) : null}
+                      {canEdit(selected) ? (
+                        <button
+                          type="button"
+                          className="kz-button"
+                          disabled={busy}
+                          onClick={() => edit(selected)}
+                        >
+                          {t.edit}
+                        </button>
+                      ) : null}
+                    </div>
+                  </section>
+                ) : null}
+              </>
             ) : null}
-            {canWrite && nextRoomRequestStatus(request.status, 'cancel') ? (
-              <button
-                type="button"
-                className="kz-button-quiet"
-                disabled={busy}
-                onClick={() => void act(request.id)}
-              >
-                Cancel
-              </button>
+            {error ? (
+              <p className="kz-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            {saved ? (
+              <p className="kz-order-saved" role="status">
+                {saved}
+              </p>
             ) : null}
           </div>
-        </article>
-      ))}
+        )}
+      </FormDialog>
     </section>
   );
+}
+
+/** What the search box looks in. */
+function requestSearchText(row: RoomRequestRecord): string {
+  return [row.number, row.party ?? ''].join(' ');
 }

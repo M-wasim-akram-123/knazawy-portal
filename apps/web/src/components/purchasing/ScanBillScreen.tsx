@@ -1,13 +1,15 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { goodsInCopy } from '@knazawy/i18n';
 import { can, moneyMatches, supplierBillOwed, todayInKarachi } from '@knazawy/shared';
 import type { ItemRecord, LocationRecord, SupplierRecord } from '@knazawy/shared';
+import { KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCommon, useCopy } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
@@ -19,6 +21,8 @@ interface DraftLine {
 }
 
 export function ScanBillScreen() {
+  const t = useCopy(goodsInCopy);
+  const common = useCommon();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [suppliers, setSuppliers] = useState<SupplierRecord[]>([]);
   const [items, setItems] = useState<ItemRecord[]>([]);
@@ -68,11 +72,11 @@ export function ScanBillScreen() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  if (!ready) return <p>Loading the bill</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to scan a bill.
+        <Link href="/login">{common.signIn}</Link> {t.signInSuffix}
       </p>
     );
   }
@@ -92,23 +96,19 @@ export function ScanBillScreen() {
   return (
     <section className="kz-stack">
       <div className="kz-page-head">
-        <h1>{messages.en.common.scanBill}</h1>
+        <h1>{common.goodsIn}</h1>
         <p>
-          Photograph or upload the supplier bill, check the lines, then post. Stock updates and the
-          supplier is owed the bill total.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.scanBill}
+          {t.introBefore} <Link href="/purchases">{t.introLink}</Link> {t.introAfter}
         </p>
       </div>
-      {!canPost ? <p>You cannot post a supplier bill.</p> : null}
+      {!canPost ? <p>{t.cannotPost}</p> : null}
       {canPost ? (
         <div className="kz-workspace">
           <div className="kz-panel kz-stack">
-            <h2>Bill</h2>
+            <h2>{t.bill}</h2>
             <div className="kz-file-actions">
               <label className="kz-button">
-                Take a photo
+                {t.takePhoto}
                 <input
                   className="kz-file-input"
                   type="file"
@@ -118,7 +118,7 @@ export function ScanBillScreen() {
                 />
               </label>
               <label className="kz-button-quiet">
-                Upload a file
+                {t.uploadFile}
                 <input
                   className="kz-file-input"
                   type="file"
@@ -127,8 +127,10 @@ export function ScanBillScreen() {
                 />
               </label>
             </div>
-            {file ? <p>{file.name}</p> : <p className="kz-empty">No bill chosen yet.</p>}
-            {preview ? <img className="kz-bill-preview" src={preview} alt="Supplier bill" /> : null}
+            {file ? <p>{file.name}</p> : <p className="kz-empty">{t.noBillChosen}</p>}
+            {preview ? (
+              <img className="kz-bill-preview" src={preview} alt={t.billImageAlt} />
+            ) : null}
           </div>
           <form
             className="kz-panel kz-form"
@@ -158,7 +160,9 @@ export function ScanBillScreen() {
                   file.name,
                 )
                 .then((receipt) => {
-                  setPosted(`${receipt.number} is in stock. The supplier is owed ${receipt.billTotal} PKR.`);
+                  setPosted(
+                    fill(t.posted, { number: receipt.number, total: receipt.billTotal ?? '—' }),
+                  );
                   setBillNumber('');
                   setBillTotal('');
                   setTax('0');
@@ -170,9 +174,13 @@ export function ScanBillScreen() {
                 .finally(() => setSaving(false));
             }}
           >
-            <h2>Check and post</h2>
-            <Field label="Supplier">
-              <select value={supplierId} onChange={(event) => setSupplierId(event.target.value)} required>
+            <h2>{t.checkAndPost}</h2>
+            <Field label={t.supplier}>
+              <select
+                value={supplierId}
+                onChange={(event) => setSupplierId(event.target.value)}
+                required
+              >
                 {suppliers.map((supplier) => (
                   <option key={supplier.id} value={supplier.id}>
                     {supplier.name}
@@ -180,14 +188,27 @@ export function ScanBillScreen() {
                 ))}
               </select>
             </Field>
-            <Field label="Bill number">
-              <input value={billNumber} onChange={(event) => setBillNumber(event.target.value)} required />
+            <Field label={t.billNumber}>
+              <input
+                value={billNumber}
+                onChange={(event) => setBillNumber(event.target.value)}
+                required
+              />
             </Field>
-            <Field label="Bill date" hint="Shown as DD/MM/YYYY.">
-              <input type="date" value={billedOn} onChange={(event) => setBilledOn(event.target.value)} required />
+            <Field label={t.billDate} hint={t.dateHint}>
+              <input
+                type="date"
+                value={billedOn}
+                onChange={(event) => setBilledOn(event.target.value)}
+                required
+              />
             </Field>
-            <Field label="Receiving location">
-              <select value={locationId} onChange={(event) => setLocationId(event.target.value)} required>
+            <Field label={t.receivingLocation}>
+              <select
+                value={locationId}
+                onChange={(event) => setLocationId(event.target.value)}
+                required
+              >
                 {locations.map((location) => (
                   <option key={location.id} value={location.id}>
                     {location.name}
@@ -199,9 +220,9 @@ export function ScanBillScreen() {
               <table className="kz-table">
                 <thead>
                   <tr>
-                    <th>Item</th>
-                    <th>Quantity</th>
-                    <th>Price</th>
+                    <th>{t.item}</th>
+                    <th>{t.quantity}</th>
+                    <th>{t.price}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -225,7 +246,9 @@ export function ScanBillScreen() {
                         <input
                           inputMode="decimal"
                           value={line.quantity}
-                          onChange={(event) => updateLine(line.key, { quantity: event.target.value })}
+                          onChange={(event) =>
+                            updateLine(line.key, { quantity: event.target.value })
+                          }
                           required
                         />
                       </td>
@@ -233,7 +256,9 @@ export function ScanBillScreen() {
                         <input
                           inputMode="decimal"
                           value={line.unitPrice}
-                          onChange={(event) => updateLine(line.key, { unitPrice: event.target.value })}
+                          onChange={(event) =>
+                            updateLine(line.key, { unitPrice: event.target.value })
+                          }
                           required
                         />
                       </td>
@@ -242,9 +267,13 @@ export function ScanBillScreen() {
                           <button
                             type="button"
                             className="kz-button-quiet"
-                            onClick={() => setLines((current) => current.filter((entry) => entry.key !== line.key))}
+                            onClick={() =>
+                              setLines((current) =>
+                                current.filter((entry) => entry.key !== line.key),
+                              )
+                            }
                           >
-                            Remove
+                            {t.remove}
                           </button>
                         ) : null}
                       </td>
@@ -258,15 +287,23 @@ export function ScanBillScreen() {
               className="kz-button-quiet"
               onClick={() => setLines((current) => [...current, blankLine(items[0]?.id ?? '')])}
             >
-              Add a line
+              {t.addLine}
             </button>
-            <Field label="Tax" hint="PKR. Added to what you owe. Not added to the item cost.">
-              <input inputMode="decimal" value={tax} onChange={(event) => setTax(event.target.value)} />
+            <Field label={t.tax} hint={t.taxHint}>
+              <input
+                inputMode="decimal"
+                value={tax}
+                onChange={(event) => setTax(event.target.value)}
+              />
             </Field>
-            <Field label="Discount" hint="PKR taken off the bill.">
-              <input inputMode="decimal" value={discount} onChange={(event) => setDiscount(event.target.value)} />
+            <Field label={t.discount} hint={t.discountHint}>
+              <input
+                inputMode="decimal"
+                value={discount}
+                onChange={(event) => setDiscount(event.target.value)}
+              />
             </Field>
-            <Field label="Bill total" hint="PKR, after tax and discount.">
+            <Field label={t.billTotal} hint={t.billTotalHint}>
               <input
                 inputMode="decimal"
                 value={billTotal}
@@ -275,13 +312,16 @@ export function ScanBillScreen() {
               />
             </Field>
             <p>
-              Lines {owed.ok ? owed.lines : '—'} PKR. Amount owed {owed.ok ? owed.owed : '—'} PKR.
+              {fill(t.totals, {
+                lines: owed.ok ? owed.lines : '—',
+                owed: owed.ok ? owed.owed : '—',
+              })}
             </p>
             {owed.ok && billTotal.trim() !== '' && !totalsMatch ? (
-              <p className="kz-error">The lines do not add up to the bill total.</p>
+              <p className="kz-error">{t.totalsMismatch}</p>
             ) : null}
             {owed.ok === false && owed.reason === 'discount' ? (
-              <p className="kz-error">The discount is larger than the bill.</p>
+              <p className="kz-error">{t.discountTooLarge}</p>
             ) : null}
             {error ? (
               <p className="kz-error" role="alert">
@@ -290,7 +330,7 @@ export function ScanBillScreen() {
             ) : null}
             {posted ? <p>{posted}</p> : null}
             <button className="kz-button" type="submit" disabled={saving || !file || !totalsMatch}>
-              {saving ? 'Posting' : 'Post to stock'}
+              {saving ? t.posting : t.postToStock}
             </button>
           </form>
         </div>

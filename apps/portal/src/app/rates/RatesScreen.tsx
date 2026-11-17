@@ -1,6 +1,6 @@
 'use client';
 
-import { messages } from '@knazawy/i18n';
+import { portalRatesCopy } from '@knazawy/i18n';
 import {
   RECIPE_KIND_LABELS,
   formatDisplayDate,
@@ -8,11 +8,17 @@ import {
   todayInKarachi,
   type RateCardRecord,
 } from '@knazawy/shared';
+import { KaramLoader } from '@knazawy/ui-shell';
 import { useEffect, useState } from 'react';
 
+import { fill, useChrome, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { ApiError, api, clearSession } from '../../lib/session';
 
 export function RatesScreen() {
+  const t = useCopy(portalRatesCopy);
+  const common = useCommon();
+  const chrome = useChrome();
+  const label = useLabel();
   const [cards, setCards] = useState<RateCardRecord[] | null>(null);
   const [error, setError] = useState('');
 
@@ -26,7 +32,7 @@ export function RatesScreen() {
           window.location.assign('/login');
           return;
         }
-        setError(caught instanceof Error ? caught.message : 'Rates could not load.');
+        setError(caught instanceof Error ? caught.message : t.loadFailed);
       });
   }, []);
 
@@ -35,24 +41,16 @@ export function RatesScreen() {
   return (
     <section className="kz-stack">
       <div className="kz-page-head">
-        <h1>{messages.en.common.rateCards}</h1>
-        <p>
-          The prices Karam has agreed with your airline. A request is charged on the card that
-          covers its service date, for at least the minimum portions.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.rateCards}
-        </p>
+        <h1>{common.rateCards}</h1>
+        <p>{t.intro}</p>
       </div>
       {error ? (
         <p className="kz-error" role="alert">
           {error}
         </p>
       ) : null}
-      {cards === null && !error ? <p>Loading</p> : null}
-      {cards !== null && cards.length === 0 ? (
-        <p className="kz-empty">Karam has not agreed a rate card with your airline yet.</p>
-      ) : null}
+      {cards === null && !error ? <KaramLoader label={chrome.loading} fullPage /> : null}
+      {cards !== null && cards.length === 0 ? <p className="kz-empty">{t.empty}</p> : null}
       {cards?.map((card) => (
         <article key={card.id} className="kz-panel kz-stack">
           <h2>
@@ -60,30 +58,33 @@ export function RatesScreen() {
             {rateCardCovers(card, today) ? (
               <span className="kz-status" data-tone="done">
                 {' '}
-                · Applies today
+                · {t.appliesToday}
               </span>
             ) : null}
           </h2>
           <p className="kz-help">
             {card.validTo
-              ? `${formatDisplayDate(card.validFrom)} to ${formatDisplayDate(card.validTo)}`
-              : `From ${formatDisplayDate(card.validFrom)}, no end date`}
+              ? fill(t.validRange, {
+                  from: formatDisplayDate(card.validFrom),
+                  to: formatDisplayDate(card.validTo),
+                })
+              : fill(t.validOpen, { from: formatDisplayDate(card.validFrom) })}
           </p>
           <div className="kz-table-wrap">
             <table className="kz-table">
               <thead>
                 <tr>
-                  <th>Item</th>
-                  <th>Type</th>
-                  <th>Price</th>
-                  <th>Minimum portions</th>
+                  <th>{t.item}</th>
+                  <th>{t.type}</th>
+                  <th>{t.price}</th>
+                  <th>{t.minimumPortions}</th>
                 </tr>
               </thead>
               <tbody>
                 {card.lines.map((line) => (
                   <tr key={line.recipeId}>
                     <td>{line.recipeName}</td>
-                    <td>{RECIPE_KIND_LABELS[line.kind]}</td>
+                    <td>{label(RECIPE_KIND_LABELS[line.kind])}</td>
                     <td>{line.unitPrice} PKR</td>
                     <td>{line.minimumQuantity}</td>
                   </tr>

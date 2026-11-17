@@ -1,12 +1,15 @@
 'use client';
 
-import { messages } from '@knazawy/i18n';
+import { portalNotificationsCopy } from '@knazawy/i18n';
 import { formatKarachiDateTime, type NotificationRecord } from '@knazawy/shared';
 import { useEffect, useState } from 'react';
 
+import { useCommon, useCopy } from '../../lib/i18n';
 import { ApiError, api, clearSession } from '../../lib/session';
 
 export function NotificationsScreen() {
+  const t = useCopy(portalNotificationsCopy);
+  const common = useCommon();
   const [rows, setRows] = useState<NotificationRecord[] | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState('');
@@ -25,7 +28,7 @@ export function NotificationsScreen() {
           window.location.assign('/login');
           return;
         }
-        setError(caught instanceof Error ? caught.message : 'Notifications could not load.');
+        setError(caught instanceof Error ? caught.message : common.notificationsError);
       });
   }, []);
 
@@ -38,7 +41,7 @@ export function NotificationsScreen() {
       setUnreadCount((current) => Math.max(0, current - 1));
       window.dispatchEvent(new Event('karam-notifications-updated'));
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'That message could not be updated.');
+      setError(caught instanceof Error ? caught.message : t.oneFailed);
     } finally {
       setMarkingId(null);
     }
@@ -61,7 +64,7 @@ export function NotificationsScreen() {
         window.location.assign('/login');
         return;
       }
-      setError(caught instanceof Error ? caught.message : 'Messages could not be updated.');
+      setError(caught instanceof Error ? caught.message : t.allFailed);
     } finally {
       setMarkingAll(false);
     }
@@ -70,15 +73,12 @@ export function NotificationsScreen() {
   return (
     <section className="kz-stack">
       <div className="kz-page-head">
-        <h1>{messages.en.common.notifications}</h1>
-        <p>Messages about your airline&apos;s requests, deliveries, invoices, and disputes.</p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.notifications}
-        </p>
+        <h1>{common.notifications}</h1>
+        <p>{t.intro}</p>
         {unreadCount > 0 ? (
           <div className="kz-notification-page-actions">
             <span>
-              {unreadCount} {messages.en.common.unread}
+              {unreadCount} {common.unread}
             </span>
             <button
               type="button"
@@ -86,7 +86,7 @@ export function NotificationsScreen() {
               onClick={() => void markAllRead()}
               disabled={markingAll || markingId !== null}
             >
-              {messages.en.common.markAllAsRead}
+              {common.markAllAsRead}
             </button>
           </div>
         ) : null}
@@ -96,9 +96,9 @@ export function NotificationsScreen() {
           {error}
         </p>
       ) : null}
-      {rows === null && !error ? <p>{messages.en.common.notificationsLoading}</p> : null}
+      {rows === null && !error ? <p>{common.notificationsLoading}</p> : null}
       {rows !== null && rows.length === 0 ? (
-        <p className="kz-empty">{messages.en.common.noNotifications}</p>
+        <p className="kz-empty">{common.noNotifications}</p>
       ) : null}
       {rows?.map((row) => (
         <article key={row.id} className="kz-panel kz-stack">
@@ -106,7 +106,7 @@ export function NotificationsScreen() {
             {row.title}{' '}
             {row.readAt ? null : (
               <span className="kz-status" data-tone="progress">
-                {messages.en.common.newNotification}
+                {common.newNotification}
               </span>
             )}
           </h2>
@@ -119,7 +119,7 @@ export function NotificationsScreen() {
               onClick={() => void markRead(row.id)}
               disabled={markingAll || markingId === row.id}
             >
-              {messages.en.common.markAsRead}
+              {common.markAsRead}
             </button>
           )}
         </article>

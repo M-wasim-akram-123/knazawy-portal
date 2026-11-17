@@ -1,13 +1,18 @@
 'use client';
 
-import { messages } from '@knazawy/i18n';
+import { portalSignInCopy } from '@knazawy/i18n';
+import { PasswordInput } from '@knazawy/ui-shell';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { api, tokens, writeSessionUser } from '../../lib/session';
+import { useChrome, useCommon, useCopy } from '../../lib/i18n';
+import { api, writeSessionUser } from '../../lib/session';
 
 export default function LoginPage() {
+  const t = useCopy(portalSignInCopy);
+  const common = useCommon();
+  const chrome = useChrome();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,13 +29,12 @@ export default function LoginPage() {
         void api
           .login(email, password)
           .then((result) => {
-            tokens.setAccessToken(result.accessToken);
             writeSessionUser(result.user);
             router.push('/');
             router.refresh();
           })
           .catch((caught: unknown) => {
-            setError(caught instanceof Error ? caught.message : 'Email or password is wrong.');
+            setError(caught instanceof Error ? caught.message : t.wrongLogin);
           })
           .finally(() => setPending(false));
       }}
@@ -40,12 +44,12 @@ export default function LoginPage() {
           <Image
             className="kz-auth-logo"
             src="/karam-dome-mark.png"
-            alt="Karam Restaurant"
+            alt={t.logoAlt}
             width={64}
             height={64}
             priority
           />
-          <span className="kz-auth-chip">KARAM / PARTNERS</span>
+          <span className="kz-auth-chip">{t.chip}</span>
         </div>
         <div className="kz-auth-visual" aria-hidden="true">
           <svg viewBox="0 0 480 360" role="img">
@@ -100,24 +104,21 @@ export default function LoginPage() {
           </svg>
         </div>
         <div className="kz-auth-copy">
-          <h2>Make every request count.</h2>
-          <p>Follow service from the first request through delivery and billing.</p>
+          <h2>{t.headline}</h2>
+          <p>{t.tagline}</p>
         </div>
         <div className="kz-auth-foot">
-          REQUEST <span /> DELIVERY <span /> INVOICE
+          {t.footRequest} <span /> {t.footDelivery} <span /> {t.footInvoice}
         </div>
       </div>
       <div className="kz-auth-form">
         <div className="kz-page-head">
-          <p className="kz-auth-kicker">Partner portal</p>
-          <h1>{messages.en.common.signIn}</h1>
-          <p>Use the email your administrator set up for your airline.</p>
-          <p className="kz-auth-urdu" lang="ur" dir="rtl">
-            {messages.ur.common.signIn}
-          </p>
+          <p className="kz-auth-kicker">{t.kicker}</p>
+          <h1>{common.signIn}</h1>
+          <p>{t.lead}</p>
         </div>
         <label className="kz-field">
-          <span>Email</span>
+          <span>{t.email}</span>
           <input
             type="email"
             autoComplete="username"
@@ -127,10 +128,11 @@ export default function LoginPage() {
           />
         </label>
         <label className="kz-field">
-          <span>Password</span>
-          <input
-            type="password"
+          <span>{t.password}</span>
+          <PasswordInput
             autoComplete="current-password"
+            showLabel={chrome.showPassword}
+            hideLabel={chrome.hidePassword}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             required
@@ -142,9 +144,9 @@ export default function LoginPage() {
           </p>
         ) : null}
         <button className="kz-button kz-button-block" type="submit" disabled={pending}>
-          {messages.en.common.signIn}
+          {common.signIn}
         </button>
-        <p className="kz-auth-note">You only see your organisation&apos;s information.</p>
+        <p className="kz-auth-note">{t.privacyNote}</p>
       </div>
     </form>
   );
