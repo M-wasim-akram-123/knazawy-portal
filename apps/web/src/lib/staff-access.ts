@@ -1,4 +1,4 @@
-import { can, canRaiseRoomInvoice, isKaramRole, type Role } from '@knazawy/shared';
+import { can, canManageUsers, canRaiseRoomInvoice, isKaramRole, type Role } from '@knazawy/shared';
 
 const routePermissions: Array<{
   path: string;
@@ -20,6 +20,7 @@ const routePermissions: Array<{
   { path: '/deliveries', allowed: (role) => can(role, 'distribution', 'R') },
   { path: '/rates', allowed: (role) => can(role, 'service_rates', 'R') },
   { path: '/airlines', allowed: (role) => can(role, 'users', 'R') },
+  { path: '/users', allowed: canManageUsers },
   { path: '/invoices', allowed: (role) => can(role, 'invoices', 'R') },
   { path: '/room-requests', allowed: (role) => can(role, 'room_requests', 'R') },
   { path: '/room-bills', allowed: canRaiseRoomInvoice },

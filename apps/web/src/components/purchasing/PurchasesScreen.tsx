@@ -1,7 +1,7 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { purchasesCopy } from '@knazawy/i18n';
 import {
   PURCHASE_STATUS_LABELS,
   can,
@@ -10,16 +10,21 @@ import {
   todayInKarachi,
 } from '@knazawy/shared';
 import type { ItemRecord, PurchaseRecord, SupplierRecord } from '@knazawy/shared';
+import { KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
 export function PurchasesScreen() {
   const router = useRouter();
+  const t = useCopy(purchasesCopy);
+  const common = useCommon();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRecord[]>([]);
@@ -57,11 +62,11 @@ export function PurchasesScreen() {
     else if (!createOpen && dialog.open) dialog.close();
   }, [createOpen]);
 
-  if (!ready) return <p>Loading purchases</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see purchases.
+        <Link href="/login">{common.signIn}</Link> {t.signInSuffix}
       </p>
     );
   }
@@ -72,11 +77,8 @@ export function PurchasesScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-purchases-head">
         <div>
-          <h1>{messages.en.common.purchases}</h1>
-          <p>
-            Draft an order for this branch, send it, then receive the goods into one of its
-            locations.
-          </p>
+          <h1>{common.purchaseOrders}</h1>
+          <p>{t.intro}</p>
         </div>
         {canCreate ? (
           <button
@@ -87,7 +89,7 @@ export function PurchasesScreen() {
               setCreateOpen(true);
             }}
           >
-            New purchase
+            {t.newPurchase}
           </button>
         ) : null}
       </div>
@@ -98,18 +100,18 @@ export function PurchasesScreen() {
       ) : null}
       {purchases.length === 0 ? (
         <div className="kz-panel kz-purchase-empty-state">
-          <p className="kz-empty">No purchases yet.</p>
+          <p className="kz-empty">{t.noPurchases}</p>
         </div>
       ) : (
         <div className="kz-panel kz-table-wrap">
           <table className="kz-table">
             <thead>
               <tr>
-                <th>Number</th>
-                <th>Supplier</th>
-                <th>Status</th>
-                <th>Ordered</th>
-                <th>Lines</th>
+                <th>{t.number}</th>
+                <th>{t.supplier}</th>
+                <th>{t.status}</th>
+                <th>{t.ordered}</th>
+                <th>{t.lines}</th>
               </tr>
             </thead>
             <tbody>
@@ -121,7 +123,7 @@ export function PurchasesScreen() {
                   <td>{purchase.supplierName}</td>
                   <td>
                     <span className="kz-status" data-tone={purchaseStatusTone(purchase.status)}>
-                      {PURCHASE_STATUS_LABELS[purchase.status]}
+                      {label(PURCHASE_STATUS_LABELS[purchase.status])}
                     </span>
                   </td>
                   <td>{formatDisplayDate(purchase.orderedOn)}</td>
@@ -145,14 +147,14 @@ export function PurchasesScreen() {
           <div className="kz-purchase-dialog-content">
             <div className="kz-purchase-dialog-header">
               <div>
-                <p className="kz-eyebrow">Purchasing</p>
-                <h2 id="kz-new-purchase-title">New purchase</h2>
-                <p>Start an order with a supplier and add its first item.</p>
+                <p className="kz-eyebrow">{t.eyebrow}</p>
+                <h2 id="kz-new-purchase-title">{t.newPurchase}</h2>
+                <p>{t.dialogIntro}</p>
               </div>
               <button
                 className="kz-button-quiet kz-purchase-close"
                 type="button"
-                aria-label="Close new purchase"
+                aria-label={t.closeNewPurchase}
                 onClick={() => setCreateOpen(false)}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -176,7 +178,7 @@ export function PurchasesScreen() {
               }}
             >
               <div className="kz-purchase-form-grid">
-                <Field label="Supplier">
+                <Field label={t.supplier}>
                   <select
                     value={supplierId}
                     onChange={(event) => setSupplierId(event.target.value)}
@@ -189,10 +191,7 @@ export function PurchasesScreen() {
                     ))}
                   </select>
                 </Field>
-                <Field
-                  label="Order date"
-                  hint="Stored for the day in Pakistan. Shown as DD/MM/YYYY."
-                >
+                <Field label={t.orderDate} hint={t.orderDateHint}>
                   <input
                     type="date"
                     value={orderedOn}
@@ -200,7 +199,7 @@ export function PurchasesScreen() {
                     required
                   />
                 </Field>
-                <Field label="Item">
+                <Field label={t.item}>
                   <select
                     value={itemId}
                     onChange={(event) => setItemId(event.target.value)}
@@ -213,7 +212,7 @@ export function PurchasesScreen() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Quantity" hint="In the purchase unit, such as bags.">
+                <Field label={t.quantity} hint={t.quantityHint}>
                   <input
                     inputMode="decimal"
                     value={quantity}
@@ -221,7 +220,7 @@ export function PurchasesScreen() {
                     required
                   />
                 </Field>
-                <Field label="Price" hint="PKR for one purchase unit.">
+                <Field label={t.price} hint={t.priceHint}>
                   <input
                     inputMode="decimal"
                     value={unitPrice}
@@ -241,10 +240,10 @@ export function PurchasesScreen() {
                   type="button"
                   onClick={() => setCreateOpen(false)}
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button className="kz-button" type="submit">
-                  Save purchase
+                  {t.savePurchase}
                 </button>
               </div>
             </form>

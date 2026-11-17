@@ -1,7 +1,7 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { issuesCopy } from '@knazawy/i18n';
 import {
   BASE_UNIT_LABELS,
   STOCK_ISSUE_REASON_LABELS,
@@ -16,11 +16,12 @@ import type {
   StockIssueRecord,
   StockOnHandRecord,
 } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
@@ -33,6 +34,9 @@ interface DraftLine {
 const REASONS = Object.keys(STOCK_ISSUE_REASON_LABELS) as StockIssueReason[];
 
 export function IssuesScreen() {
+  const t = useCopy(issuesCopy);
+  const common = useCommon();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [items, setItems] = useState<ItemRecord[]>([]);
   const [locations, setLocations] = useState<LocationRecord[]>([]);
@@ -77,11 +81,11 @@ export function IssuesScreen() {
     return totals;
   }, [stock]);
 
-  if (!ready) return <p>Loading stock</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to issue stock.
+        <Link href="/login">{common.signIn}</Link> {t.signInSuffix}
       </p>
     );
   }
@@ -93,14 +97,8 @@ export function IssuesScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.issueStock}</h1>
-          <p>
-            Take goods out of a location. The oldest stock goes first, so each issue carries the
-            true cost.
-          </p>
-          <p lang="ur" dir="rtl">
-            {messages.ur.common.issueStock}
-          </p>
+          <h1>{common.issueStock}</h1>
+          <p>{t.intro}</p>
         </div>
         {canIssue ? (
           <button
@@ -112,11 +110,11 @@ export function IssuesScreen() {
               setDialogOpen(true);
             }}
           >
-            New issue
+            {t.newIssue}
           </button>
         ) : null}
       </div>
-      {!canIssue ? <p>You cannot issue stock.</p> : null}
+      {!canIssue ? <p>{t.cannotIssue}</p> : null}
       {canIssue ? (
         <>
           {error && !dialogOpen ? (
@@ -126,8 +124,8 @@ export function IssuesScreen() {
           ) : null}
           <div className="kz-workspace kz-workspace-single">
             <FormDialog
-              buttonLabel="New issue"
-              title="New issue"
+              buttonLabel={t.newIssue}
+              title={t.newIssue}
               showTrigger={false}
               isOpen={dialogOpen}
               onOpenChange={setDialogOpen}
@@ -153,7 +151,7 @@ export function IssuesScreen() {
                       })
                       .then((issue) => {
                         setIssues((current) => [issue, ...current]);
-                        setSaved(`${issue.number} is posted. Stock is down.`);
+                        setSaved(fill(t.posted, { number: issue.number }));
                         setLines([blankLine(items[0]?.id ?? '')]);
                         setNote('');
                         return api.listStock().then((nextStock) => {
@@ -165,7 +163,7 @@ export function IssuesScreen() {
                       .finally(() => setSaving(false));
                   }}
                 >
-                  <Field label="From location">
+                  <Field label={t.fromLocation}>
                     <select
                       value={locationId}
                       onChange={(event) => setLocationId(event.target.value)}
@@ -178,7 +176,7 @@ export function IssuesScreen() {
                       ))}
                     </select>
                   </Field>
-                  <Field label="Issue date" hint="Shown as DD/MM/YYYY.">
+                  <Field label={t.issueDate} hint={t.dateHint}>
                     <input
                       type="date"
                       value={issuedOn}
@@ -186,19 +184,19 @@ export function IssuesScreen() {
                       required
                     />
                   </Field>
-                  <Field label="Reason">
+                  <Field label={t.reason}>
                     <select
                       value={reason}
                       onChange={(event) => setReason(event.target.value as StockIssueReason)}
                     >
                       {REASONS.map((value) => (
                         <option key={value} value={value}>
-                          {STOCK_ISSUE_REASON_LABELS[value]}
+                          {label(STOCK_ISSUE_REASON_LABELS[value])}
                         </option>
                       ))}
                     </select>
                   </Field>
-                  <Field label="Note" hint="Optional. Who asked for it, or what happened.">
+                  <Field label={t.note} hint={t.noteHint}>
                     <input
                       value={note}
                       onChange={(event) => setNote(event.target.value)}
@@ -209,16 +207,16 @@ export function IssuesScreen() {
                     <table className="kz-table">
                       <thead>
                         <tr>
-                          <th>Item</th>
-                          <th>Quantity</th>
-                          <th>On hand</th>
+                          <th>{t.item}</th>
+                          <th>{t.quantity}</th>
+                          <th>{t.onHand}</th>
                           <th></th>
                         </tr>
                       </thead>
                       <tbody>
                         {lines.map((line) => {
                           const item = itemById.get(line.itemId);
-                          const unit = item ? BASE_UNIT_LABELS[item.baseUnit] : '';
+                          const unit = item ? label(BASE_UNIT_LABELS[item.baseUnit]) : '';
                           const available = item
                             ? (onHand.get(`${item.id}:${locationId}`) ?? 0)
                             : 0;
@@ -246,7 +244,7 @@ export function IssuesScreen() {
                                   onChange={(event) =>
                                     updateLine(line.key, { quantity: event.target.value })
                                   }
-                                  placeholder={unit ? `in ${unit}` : ''}
+                                  placeholder={unit ? fill(t.inUnit, { unit }) : ''}
                                   required
                                 />
                               </td>
@@ -262,7 +260,7 @@ export function IssuesScreen() {
                                       )
                                     }
                                   >
-                                    Remove
+                                    {t.remove}
                                   </button>
                                 ) : null}
                               </td>
@@ -279,7 +277,7 @@ export function IssuesScreen() {
                       setLines((current) => [...current, blankLine(items[0]?.id ?? '')])
                     }
                   >
-                    Add a line
+                    {t.addLine}
                   </button>
                   {error ? (
                     <p className="kz-error" role="alert">
@@ -291,25 +289,23 @@ export function IssuesScreen() {
                     type="submit"
                     disabled={saving || lines.length === 0 || !locationId}
                   >
-                    {saving ? 'Issuing' : 'Issue stock'}
+                    {saving ? t.issuing : t.issueStock}
                   </button>
                 </form>
               )}
             </FormDialog>
             {saved ? <p role="status">{saved}</p> : null}
             <div className="kz-panel kz-table-wrap">
-              <h2>Issues</h2>
-              {issues.length === 0 ? (
-                <p className="kz-empty">Nothing has been issued yet.</p>
-              ) : null}
+              <h2>{t.issues}</h2>
+              {issues.length === 0 ? <p className="kz-empty">{t.noIssues}</p> : null}
               <table className="kz-table">
                 <thead>
                   <tr>
-                    <th>Number</th>
-                    <th>Location</th>
-                    <th>Date</th>
-                    <th>Reason</th>
-                    <th>Lines</th>
+                    <th>{t.number}</th>
+                    <th>{t.location}</th>
+                    <th>{t.date}</th>
+                    <th>{t.reason}</th>
+                    <th>{t.lines}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -318,12 +314,16 @@ export function IssuesScreen() {
                       <td>{issue.number}</td>
                       <td>{issue.locationName}</td>
                       <td>{formatDisplayDate(issue.issuedOn)}</td>
-                      <td>{STOCK_ISSUE_REASON_LABELS[issue.reason]}</td>
+                      <td>{label(STOCK_ISSUE_REASON_LABELS[issue.reason])}</td>
                       <td>
                         {issue.lines
-                          .map(
-                            (line) =>
-                              `${line.itemName}: ${line.quantityBase} ${BASE_UNIT_LABELS[line.baseUnit]} (${line.cost} PKR)`,
+                          .map((line) =>
+                            fill(t.lineSummary, {
+                              item: line.itemName,
+                              quantity: line.quantityBase,
+                              unit: label(BASE_UNIT_LABELS[line.baseUnit]),
+                              cost: line.cost,
+                            }),
                           )
                           .join('; ')}
                       </td>

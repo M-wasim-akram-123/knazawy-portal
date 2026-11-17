@@ -4,6 +4,7 @@
     "module": "esnext",
     "moduleResolution": "node",
     "noEmit": true,
+    "lib": ["ES2022", "DOM"],
     "paths": {
       "@knazawy/shared": ["../shared/src/index.ts"],
       "@knazawy/shared/*": ["../shared/src/*"]

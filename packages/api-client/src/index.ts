@@ -1,15 +1,18 @@
-import type { TokenStore } from '@knazawy/auth-client';
+import { SESSION_CLIENT_HEADER, type SessionClient } from '@knazawy/shared';
 import type {
   AccountRecord,
   AirlineOption,
   DeliveryRecord,
   DisputeRecord,
   AirlineRecord,
+  AirlineTermsInput,
+  AirlineTermsRecord,
   AirlineRole,
   BillableRequestOption,
   DeliveryPoint,
   BranchRecord,
   ForecastRecord,
+  FulfilmentRecord,
   GoodsReceiptRecord,
   InvoiceRecord,
   JournalEntryRecord,
@@ -18,6 +21,7 @@ import type {
   LoginResult,
   MealCostRecord,
   MenuItemRecord,
+  NotificationPing,
   NotificationRecord,
   ProductionRecord,
   RateCardRecord,
@@ -29,16 +33,20 @@ import type {
   RoomBillableRecord,
   RoomInvoiceRecord,
   RoomRequestRecord,
+  RoomAvailabilityRecord,
   PurchaseRecord,
   RecipeKind,
   RecipeRecord,
   StockCountRecord,
   StockIssueReason,
   StockIssueRecord,
+  LowStockRecord,
   StockOnHandRecord,
   StockTransferRecord,
   ServiceRequestRecord,
   SupplierRecord,
+  UserAccountRecord,
+  Role,
 } from '@knazawy/shared';
 
 export class ApiError extends Error {
@@ -48,6 +56,16 @@ export class ApiError extends Error {
   ) {
     super(message);
   }
+}
+
+export interface UserInput {
+  name: string;
+  email: string;
+  role: Role;
+  /** Leave out for a Karam staff account. */
+  organisationId?: string;
+  branchId?: string;
+  password: string;
 }
 
 export interface AirlineInput {
@@ -226,22 +244,97 @@ export interface RateCardInput {
   lines: Array<{ recipeId: string; unitPrice: string; minimumQuantity: number }>;
 }
 
+/**
+ * Typed calls to the API. The browser holds the session in an httpOnly cookie, so this client
+ * never sees a token: it names its app on every request and sends cookies with it.
+ */
+/** A background call: it never shows the loader. */
+const QUIET = { quiet: true } as const;
+
 export class ApiClient {
   constructor(
     private readonly baseUrl: string,
-    private readonly tokens: TokenStore,
+    private readonly client: SessionClient,
   ) {}
 
+  private pending = 0;
+  private readonly activityListeners = new Set<(pending: number) => void>();
+
+  /**
+   * Reports how many requests are waiting on the API, so the app can show its loader.
+   * Background calls (the notification bell, the health check) are left out. A stable arrow
+   * function, so a React effect can depend on it.
+   */
+  readonly onActivity = (listener: (pending: number) => void): (() => void) => {
+    this.activityListeners.add(listener);
+    listener(this.pending);
+    return () => {
+      this.activityListeners.delete(listener);
+    };
+  };
+
+  private setPending(next: number): void {
+    this.pending = Math.max(0, next);
+    for (const listener of this.activityListeners) listener(this.pending);
+  }
+
+  /** Headers every request carries. The app name is what lets the API read the cookie. */
+  private headers(accept: string): Headers {
+    return new Headers({ Accept: accept, [SESSION_CLIENT_HEADER]: this.client });
+  }
+
   health(): Promise<{ status: 'ok'; service: string }> {
-    return this.request('GET', '/v1/health');
+    return this.request('GET', '/v1/health', undefined, QUIET);
   }
 
   login(email: string, password: string): Promise<LoginResult> {
     return this.request('POST', '/v1/auth/login', { email, password });
   }
 
+  /** Clears the session cookie. Safe to call when the session has already expired. */
+  async logout(): Promise<void> {
+    await fetch(`${this.baseUrl}/v1/auth/logout`, {
+      method: 'POST',
+      headers: this.headers('application/json'),
+      credentials: 'include',
+    });
+  }
+
   account(): Promise<AccountRecord> {
     return this.request('GET', '/v1/auth/me');
+  }
+
+  /** Every staff and airline account. Administrators only. */
+  listUsers(): Promise<UserAccountRecord[]> {
+    return this.request('GET', '/v1/users');
+  }
+
+  createUser(input: UserInput): Promise<UserAccountRecord> {
+    return this.request('POST', '/v1/users', input);
+  }
+
+  updateUser(
+    id: string,
+    input: Partial<Omit<UserInput, 'password' | 'organisationId'>>,
+  ): Promise<UserAccountRecord> {
+    return this.request('PATCH', `/v1/users/${encodeURIComponent(id)}`, input);
+  }
+
+  /** Sets a new password and signs the person out everywhere. */
+  setUserPassword(id: string, password: string): Promise<UserAccountRecord> {
+    return this.request('POST', `/v1/users/${encodeURIComponent(id)}/password`, { password });
+  }
+
+  revokeUser(id: string): Promise<UserAccountRecord> {
+    return this.request('POST', `/v1/users/${encodeURIComponent(id)}/revoke`);
+  }
+
+  restoreUser(id: string): Promise<UserAccountRecord> {
+    return this.request('POST', `/v1/users/${encodeURIComponent(id)}/restore`);
+  }
+
+  deleteUser(id: string): Promise<void> {
+    return this.request('DELETE', `/v1/users/${encodeURIComponent(id)}`);
   }
 
   listAirlines(): Promise<AirlineRecord[]> {
@@ -272,6 +365,25 @@ export class ApiClient {
     return this.request('GET', '/v1/requests');
   }
 
+  /** Payment days and discount. Karam staff see every airline; an airline sees its own. */
+  listAirlineTerms(): Promise<AirlineTermsRecord[]> {
+    return this.request('GET', '/v1/airlines/terms');
+  }
+
+  setAirlineTerms(airlineId: string, input: AirlineTermsInput): Promise<AirlineTermsRecord> {
+    return this.request('PATCH', `/v1/airlines/${encodeURIComponent(airlineId)}/terms`, input);
+  }
+
+  /** Karam staff only. Whether the rooms for a stay are free, by room type. */
+  roomRequestAvailability(id: string): Promise<RoomAvailabilityRecord> {
+    return this.request('GET', `/v1/room-requests/${encodeURIComponent(id)}/availability`);
+  }
+
+  /** Karam staff only. Whether stock covers a request, after other accepted requests. */
+  requestFulfilment(id: string): Promise<FulfilmentRecord> {
+    return this.request('GET', `/v1/requests/${encodeURIComponent(id)}/fulfilment`);
+  }
+
   listMenu(): Promise<MenuItemRecord[]> {
     return this.request('GET', '/v1/requests/menu');
   }
@@ -300,19 +412,19 @@ export class ApiClient {
   }
 
   listNotifications(): Promise<NotificationRecord[]> {
-    return this.request('GET', '/v1/notifications');
+    return this.request('GET', '/v1/notifications', undefined, QUIET);
   }
 
   markNotificationRead(id: string): Promise<NotificationRecord> {
-    return this.request('POST', `/v1/notifications/${id}/read`);
+    return this.request('POST', `/v1/notifications/${id}/read`, undefined, QUIET);
   }
 
   unreadNotificationCount(): Promise<number> {
-    return this.request('GET', '/v1/notifications/unread-count');
+    return this.request('GET', '/v1/notifications/unread-count', undefined, QUIET);
   }
 
   markAllNotificationsRead(): Promise<{ count: number; readAt: string }> {
-    return this.request('POST', '/v1/notifications/read-all');
+    return this.request('POST', '/v1/notifications/read-all', undefined, QUIET);
   }
 
   listDisputes(): Promise<DisputeRecord[]> {
@@ -522,9 +634,7 @@ export class ApiClient {
   }
 
   async billFile(receiptId: string): Promise<Blob> {
-    const headers = new Headers({ Accept: 'application/pdf,image/jpeg,image/png' });
-    const token = this.tokens.getAccessToken();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const headers = this.headers('application/pdf,image/jpeg,image/png');
     const response = await fetch(`${this.baseUrl}/v1/bills/${receiptId}/file`, {
       headers,
       credentials: 'include',
@@ -535,6 +645,10 @@ export class ApiClient {
 
   listStock(): Promise<StockOnHandRecord[]> {
     return this.request('GET', '/v1/stock');
+  }
+
+  listLowStock(): Promise<LowStockRecord[]> {
+    return this.request('GET', '/v1/stock/low');
   }
 
   listIssues(): Promise<StockIssueRecord[]> {
@@ -760,10 +874,58 @@ export class ApiClient {
     return this.request('POST', `/v1/stock/counts/${id}/send-back`);
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers = new Headers({ Accept: 'application/json' });
-    const token = this.tokens.getAccessToken();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
+  /**
+   * Reads the live notification stream until it ends or `signal` aborts. Uses fetch rather than
+   * EventSource so the app header goes with it.
+   */
+  async readNotificationStream(
+    onPing: (ping: NotificationPing) => void,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const headers = this.headers('text/event-stream');
+    const response = await fetch(`${this.baseUrl}/v1/notifications/stream`, {
+      headers,
+      credentials: 'include',
+      cache: 'no-store',
+      signal,
+    });
+    if (!response.ok || !response.body) {
+      throw new ApiError(response.status, `The live stream failed (${response.status}).`);
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) return;
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+      let end = buffer.indexOf('\n\n');
+      while (end !== -1) {
+        const ping = parseServerEvent(buffer.slice(0, end));
+        if (ping) onPing(ping);
+        buffer = buffer.slice(end + 2);
+        end = buffer.indexOf('\n\n');
+      }
+    }
+  }
+
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    options: { quiet?: boolean } = {},
+  ): Promise<T> {
+    if (options.quiet) return this.send<T>(method, path, body);
+    this.setPending(this.pending + 1);
+    try {
+      return await this.send<T>(method, path, body);
+    } finally {
+      this.setPending(this.pending - 1);
+    }
+  }
+
+  private async send<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const headers = this.headers('application/json');
     let payload: BodyInit | undefined;
     if (body instanceof FormData) {
       payload = body;
@@ -780,6 +942,7 @@ export class ApiClient {
     if (!response.ok) {
       throw new ApiError(response.status, await readError(response));
     }
+    if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   }
 }
@@ -793,4 +956,70 @@ async function readError(response: Response): Promise<string> {
     return `The request failed (${response.status}).`;
   }
   return `The request failed (${response.status}).`;
+}
+
+/** A `notification` event's data, or null for comments and other events. */
+export function parseServerEvent(block: string): NotificationPing | null {
+  let event = 'message';
+  const data: string[] = [];
+  for (const line of block.split('\n')) {
+    if (line.startsWith('event:')) event = line.slice(6).trim();
+    else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
+  }
+  if (event !== 'notification' || data.length === 0) return null;
+  try {
+    const parsed = JSON.parse(data.join('\n')) as Partial<NotificationPing>;
+    if (typeof parsed.title !== 'string' || typeof parsed.body !== 'string') return null;
+    return {
+      title: parsed.title,
+      body: parsed.body,
+      entity: typeof parsed.entity === 'string' ? parsed.entity : '',
+      entityId: typeof parsed.entityId === 'string' ? parsed.entityId : '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Keeps a live notification stream open, reconnecting with a growing pause after a drop.
+ * Stops for good on a 401, which means the session has ended. Returns the stop function.
+ */
+export function watchNotifications(
+  client: ApiClient,
+  handlers: { onPing: (ping: NotificationPing) => void; onSignedOut?: () => void },
+): () => void {
+  const controller = new AbortController();
+  let pause = 2_000;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const connect = () => {
+    void client
+      .readNotificationStream((ping) => {
+        pause = 2_000;
+        handlers.onPing(ping);
+      }, controller.signal)
+      .then(
+        () => schedule(),
+        (caught: unknown) => {
+          if (controller.signal.aborted) return;
+          if (caught instanceof ApiError && caught.status === 401) {
+            handlers.onSignedOut?.();
+            return;
+          }
+          schedule();
+        },
+      );
+  };
+  const schedule = () => {
+    if (controller.signal.aborted) return;
+    timer = setTimeout(connect, pause);
+    pause = Math.min(pause * 2, 30_000);
+  };
+
+  connect();
+  return () => {
+    controller.abort();
+    if (timer) clearTimeout(timer);
+  };
 }

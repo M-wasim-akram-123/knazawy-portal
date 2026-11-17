@@ -1,19 +1,25 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
-import { BASE_UNIT_LABELS, formatDisplayDate } from '@knazawy/shared';
-import type { GoodsReceiptRecord, StockOnHandRecord } from '@knazawy/shared';
+import { stockOnHandCopy } from '@knazawy/i18n';
+import { BASE_UNIT_LABELS, can, formatDisplayDate } from '@knazawy/shared';
+import type { GoodsReceiptRecord, LowStockRecord, StockOnHandRecord } from '@knazawy/shared';
+import { KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 
 export function StoreScreen() {
+  const t = useCopy(stockOnHandCopy);
+  const common = useCommon();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [stock, setStock] = useState<StockOnHandRecord[]>([]);
   const [receipts, setReceipts] = useState<GoodsReceiptRecord[]>([]);
+  const [low, setLow] = useState<LowStockRecord[]>([]);
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
 
@@ -22,43 +28,88 @@ export function StoreScreen() {
     setUser(session);
     setReady(true);
     if (!session) return;
-    void Promise.all([api.listStock(), api.listReceipts()])
-      .then(([nextStock, nextReceipts]) => {
+    void Promise.all([api.listStock(), api.listReceipts(), api.listLowStock()])
+      .then(([nextStock, nextReceipts, nextLow]) => {
         setStock(nextStock);
         setReceipts(nextReceipts);
+        setLow(nextLow);
       })
       .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
   }, []);
 
-  if (!ready) return <p>Loading stock</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see stock.
+        <Link href="/login">{common.signIn}</Link> {t.signInSuffix}
       </p>
     );
   }
 
   return (
     <section className="kz-stack">
-      <div className="kz-page-head">
-        <h1>{messages.en.common.receiveGoods}</h1>
-        <p>What is in each location, and the receipts that put it there.</p>
+      <div className="kz-page-head kz-page-action-head">
+        <div>
+          <h1>{common.stockOnHand}</h1>
+          <p>{t.intro}</p>
+        </div>
+        {can(user.role, 'stock', 'C') ? (
+          <div className="kz-dashboard-actions">
+            <Link className="kz-button" href="/bills">
+              {common.goodsIn}
+            </Link>
+            {can(user.role, 'purchases', 'R') ? (
+              <Link className="kz-button kz-button-outline" href="/purchases">
+                {common.purchaseOrders}
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       {error ? (
         <p className="kz-error" role="alert">
           {error}
         </p>
       ) : null}
+      {low.length > 0 ? (
+        <div className="kz-panel kz-table-wrap">
+          <h2>{common.lowStock}</h2>
+          <p className="kz-help">{t.lowStockHelp}</p>
+          <table className="kz-table">
+            <thead>
+              <tr>
+                <th>{t.item}</th>
+                <th>{t.inStock}</th>
+                <th>{t.reorderLevel}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {low.map((row) => (
+                <tr key={row.itemId}>
+                  <td>{row.itemName}</td>
+                  <td>
+                    <span className="kz-status" data-tone="problem">
+                      {row.onHand} {label(BASE_UNIT_LABELS[row.baseUnit])}
+                    </span>
+                  </td>
+                  <td>
+                    {row.reorderLevel} {label(BASE_UNIT_LABELS[row.baseUnit])}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
       <div className="kz-panel kz-table-wrap">
-        <h2>Stock on hand</h2>
-        {stock.length === 0 ? <p className="kz-empty">Nothing is in stock yet.</p> : null}
+        <h2>{common.stockOnHand}</h2>
+        {stock.length === 0 ? <p className="kz-empty">{t.nothingInStock}</p> : null}
         <table className="kz-table">
           <thead>
             <tr>
-              <th>Item</th>
-              <th>Location</th>
-              <th>Quantity</th>
+              <th>{t.item}</th>
+              <th>{t.location}</th>
+              <th>{t.quantity}</th>
             </tr>
           </thead>
           <tbody>
@@ -67,7 +118,7 @@ export function StoreScreen() {
                 <td>{row.itemName}</td>
                 <td>{row.locationName}</td>
                 <td>
-                  {row.quantityBase} {BASE_UNIT_LABELS[row.baseUnit]}
+                  {row.quantityBase} {label(BASE_UNIT_LABELS[row.baseUnit])}
                 </td>
               </tr>
             ))}
@@ -75,17 +126,17 @@ export function StoreScreen() {
         </table>
       </div>
       <div className="kz-panel kz-table-wrap">
-        <h2>Goods received</h2>
-        {receipts.length === 0 ? <p className="kz-empty">No goods received yet.</p> : null}
+        <h2>{t.goodsReceived}</h2>
+        {receipts.length === 0 ? <p className="kz-empty">{t.noGoodsReceived}</p> : null}
         <table className="kz-table">
           <thead>
             <tr>
-              <th>Number</th>
-              <th>Purchase</th>
-              <th>Bill</th>
-              <th>Location</th>
-              <th>Received</th>
-              <th>Lines</th>
+              <th>{t.number}</th>
+              <th>{t.purchase}</th>
+              <th>{t.bill}</th>
+              <th>{t.location}</th>
+              <th>{t.received}</th>
+              <th>{t.lines}</th>
             </tr>
           </thead>
           <tbody>
@@ -96,8 +147,12 @@ export function StoreScreen() {
                 <td>
                   {receipt.billNumber ?? '—'}
                   {receipt.hasBillFile ? (
-                    <button type="button" className="kz-button-quiet" onClick={() => openBill(receipt.id)}>
-                      View
+                    <button
+                      type="button"
+                      className="kz-button-quiet"
+                      onClick={() => openBill(receipt.id)}
+                    >
+                      {t.view}
                     </button>
                   ) : null}
                 </td>
@@ -105,9 +160,15 @@ export function StoreScreen() {
                 <td>{formatDisplayDate(receipt.receivedOn)}</td>
                 <td>
                   {receipt.lines
-                    .map(
-                      (line) =>
-                        `${line.itemName}: ${line.quantity} ${line.purchaseUnit} (${line.quantityBase} ${BASE_UNIT_LABELS[line.baseUnit]} at ${line.unitCost} PKR)`,
+                    .map((line) =>
+                      fill(t.receiptLine, {
+                        item: line.itemName,
+                        quantity: line.quantity,
+                        purchaseUnit: line.purchaseUnit,
+                        quantityBase: line.quantityBase,
+                        unit: label(BASE_UNIT_LABELS[line.baseUnit]),
+                        unitCost: line.unitCost,
+                      }),
                     )
                     .join('; ')}
                 </td>

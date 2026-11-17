@@ -1,6 +1,6 @@
 'use client';
 
-import { messages } from '@knazawy/i18n';
+import { portalDeliveriesCopy } from '@knazawy/i18n';
 import {
   DELIVERY_POINT_LABELS,
   REQUEST_STATUS_LABELS,
@@ -8,11 +8,17 @@ import {
   statusTone,
   type DeliveryRecord,
 } from '@knazawy/shared';
+import { KaramLoader } from '@knazawy/ui-shell';
 import { useEffect, useState } from 'react';
 
+import { fill, useChrome, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { ApiError, api, clearSession } from '../../lib/session';
 
 export function DeliveriesScreen() {
+  const t = useCopy(portalDeliveriesCopy);
+  const common = useCommon();
+  const chrome = useChrome();
+  const label = useLabel();
   const [deliveries, setDeliveries] = useState<DeliveryRecord[] | null>(null);
   const [error, setError] = useState('');
 
@@ -26,52 +32,50 @@ export function DeliveriesScreen() {
           window.location.assign('/login');
           return;
         }
-        setError(caught instanceof Error ? caught.message : 'Deliveries could not load.');
+        setError(caught instanceof Error ? caught.message : t.loadFailed);
       });
   }, []);
 
   return (
     <section className="kz-stack">
       <div className="kz-page-head">
-        <h1>{messages.en.common.deliveries}</h1>
-        <p>
-          What Karam has sent for your flights, and what was signed for on arrival. You only see
-          your own airline.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.deliveries}
-        </p>
+        <h1>{common.deliveries}</h1>
+        <p>{t.intro}</p>
       </div>
       {error ? (
         <p className="kz-error" role="alert">
           {error}
         </p>
       ) : null}
-      {deliveries === null && !error ? <p>Loading</p> : null}
+      {deliveries === null && !error ? <KaramLoader label={chrome.loading} fullPage /> : null}
       {deliveries !== null && deliveries.length === 0 ? (
-        <p className="kz-empty">Nothing has gone into production yet.</p>
+        <p className="kz-empty">{t.empty}</p>
       ) : null}
       {deliveries?.map((delivery) => (
         <article key={delivery.id} className="kz-panel kz-stack">
           <h2>
             {delivery.number}{' '}
             <span className="kz-status" data-tone={statusTone(delivery.status)}>
-              · {REQUEST_STATUS_LABELS[delivery.status]}
+              · {label(REQUEST_STATUS_LABELS[delivery.status])}
             </span>
           </h2>
           <p className="kz-help">
-            {delivery.requestNumber}, flight {delivery.flightNumber} {delivery.route},{' '}
-            {formatDisplayDate(delivery.serviceDate)},{' '}
-            {DELIVERY_POINT_LABELS[delivery.deliveryPoint]}
+            {fill(t.summary, {
+              request: delivery.requestNumber,
+              flight: delivery.flightNumber,
+              route: delivery.route,
+              date: formatDisplayDate(delivery.serviceDate),
+              point: label(DELIVERY_POINT_LABELS[delivery.deliveryPoint]),
+            })}
           </p>
           <div className="kz-table-wrap">
             <table className="kz-table">
               <thead>
                 <tr>
-                  <th>Item</th>
-                  <th>Ordered</th>
-                  <th>Sent</th>
-                  <th>Received</th>
+                  <th>{t.item}</th>
+                  <th>{t.ordered}</th>
+                  <th>{t.sent}</th>
+                  <th>{t.received}</th>
                 </tr>
               </thead>
               <tbody>

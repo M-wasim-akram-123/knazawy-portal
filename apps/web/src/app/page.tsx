@@ -1,103 +1,50 @@
 'use client';
 
-import { messages } from '@knazawy/i18n';
+import { staffHomeCopy } from '@knazawy/i18n';
 import type { Role } from '@knazawy/shared';
+import { KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { ApiStatus } from '../components/ApiStatus';
+import { fill, useChrome, useCommon, useCopy } from '../lib/i18n';
 import { readSessionUser } from '../lib/session';
-import { canAccessStaffPath } from '../lib/staff-access';
-
-const heroActions = [
-  { href: '/requests', label: 'Open service requests', className: 'kz-button' },
-  { href: '/bills', label: messages.en.common.scanBill, className: 'kz-button kz-button-outline' },
-] as const;
-
-const quickActions = [
-  {
-    href: '/bills',
-    number: '01',
-    category: 'Procurement',
-    title: messages.en.common.scanBill,
-    description: 'Record a supplier bill and prepare received goods for stock.',
-  },
-  {
-    href: '/store',
-    number: '02',
-    category: 'Inventory',
-    title: messages.en.common.receiveGoods,
-    description: 'Receive a purchase and add its goods to the stock ledger.',
-  },
-  {
-    href: '/requests',
-    number: '03',
-    category: 'Airline service',
-    title: messages.en.common.requests,
-    description: 'Review meal and snack requests from airline partners.',
-  },
-  {
-    href: '/deliveries',
-    number: '04',
-    category: 'Distribution',
-    title: messages.en.common.deliveries,
-    description: 'Prepare deliveries and follow handoff to the airline.',
-  },
-] as const;
-
-const workAreas = [
-  {
-    href: '/purchases',
-    title: 'Purchasing & suppliers',
-    description: 'Manage purchases, supplier bills, and goods received.',
-  },
-  {
-    href: '/items',
-    title: 'Stock & locations',
-    description: 'Keep item records, stock locations, and movements in order.',
-  },
-  {
-    href: '/recipes',
-    title: 'Kitchen & costing',
-    description: 'Maintain recipes, production batches, and meal costs.',
-  },
-  {
-    href: '/invoices',
-    title: 'Finance',
-    description: 'Review invoices, disputes, and posted ledger entries.',
-  },
-] as const;
+import { stepsFor, workspaceName } from '../lib/workspaces';
 
 export default function HomePage() {
   const [role, setRole] = useState<Role | null>(null);
+  const chrome = useChrome();
+  const common = useCommon();
+  const t = useCopy(staffHomeCopy);
 
   useEffect(() => {
     setRole(readSessionUser()?.role ?? null);
   }, []);
 
-  if (!role) return <p className="kz-booting">Loading</p>;
+  if (!role) return <KaramLoader label={chrome.loading} fullPage />;
+  const steps = stepsFor(role, chrome);
 
   return (
     <div className="kz-dashboard">
       <header className="kz-dashboard-hero">
         <div className="kz-dashboard-hero-copy">
-          <p className="kz-eyebrow">Karam / Operations</p>
+          <p className="kz-eyebrow">Karam / {workspaceName(role, chrome)}</p>
           <h1>
-            Kitchen to cabin,
+            {t.heroLine1}
             <br />
-            everything in sync.
+            {t.heroLine2}
           </h1>
-          <p className="kz-dashboard-intro">
-            Keep the store, kitchen, service, and finance teams moving together.
-          </p>
+          <p className="kz-dashboard-intro">{t.intro}</p>
           <div className="kz-dashboard-actions">
-            {heroActions
-              .filter((action) => canAccessStaffPath(role, action.href))
-              .map((action) => (
-                <Link className={action.className} href={action.href} key={action.href}>
-                  {action.label}
-                </Link>
-              ))}
+            {steps.slice(0, 2).map((step, index) => (
+              <Link
+                className={index === 0 ? 'kz-button' : 'kz-button kz-button-outline'}
+                href={step.href}
+                key={step.href}
+              >
+                {step.title}
+              </Link>
+            ))}
           </div>
         </div>
         <div className="kz-dashboard-visual">
@@ -120,59 +67,35 @@ export default function HomePage() {
           </svg>
           <div className="kz-dashboard-health">
             <div>
-              <span>Live connection</span>
+              <span>{t.liveConnection}</span>
               <ApiStatus />
             </div>
           </div>
-          <span className="kz-visual-caption">Fresh work. Clear handoffs.</span>
+          <span className="kz-visual-caption">{t.caption}</span>
         </div>
       </header>
 
-      <section className="kz-dashboard-section" aria-labelledby="quick-actions-title">
+      <section className="kz-dashboard-section" aria-labelledby="your-work-title">
         <div className="kz-section-heading">
           <div>
-            <h2 id="quick-actions-title">Quick actions</h2>
-            <p>Pick up a common task and keep operations moving.</p>
+            <h2 id="your-work-title">{common.yourWork}</h2>
+            <p>{t.stepsIntro}</p>
           </div>
         </div>
         <div className="kz-quick-grid">
-          {quickActions
-            .filter((action) => canAccessStaffPath(role, action.href))
-            .map((action) => (
-              <Link className="kz-quick-card" href={action.href} key={action.href}>
-                <span className="kz-quick-card-top">
-                  <span className="kz-quick-number">{action.number}</span>
-                  <span className="kz-quick-category">{action.category}</span>
-                </span>
-                <span className="kz-quick-title">{action.title}</span>
-                <span className="kz-quick-description">{action.description}</span>
-                <span className="kz-quick-arrow" aria-hidden="true">
-                  &gt;
-                </span>
-              </Link>
-            ))}
-        </div>
-      </section>
-
-      <section className="kz-dashboard-section" aria-labelledby="work-areas-title">
-        <div className="kz-section-heading">
-          <div>
-            <h2 id="work-areas-title">Work areas</h2>
-            <p>Go directly to the tools your team uses every day.</p>
-          </div>
-        </div>
-        <div className="kz-work-area-grid">
-          {workAreas
-            .filter((area) => canAccessStaffPath(role, area.href))
-            .map((area) => (
-              <Link className="kz-work-area-card" href={area.href} key={area.href}>
-                <span className="kz-work-area-arrow" aria-hidden="true">
-                  &gt;
-                </span>
-                <h3>{area.title}</h3>
-                <p>{area.description}</p>
-              </Link>
-            ))}
+          {steps.map((step, index) => (
+            <Link className="kz-quick-card" href={step.href} key={step.href}>
+              <span className="kz-quick-card-top">
+                <span className="kz-quick-number">{String(index + 1).padStart(2, '0')}</span>
+                <span className="kz-quick-category">{fill(t.step, { number: index + 1 })}</span>
+              </span>
+              <span className="kz-quick-title">{step.title}</span>
+              <span className="kz-quick-description">{step.description}</span>
+              <span className="kz-quick-arrow" aria-hidden="true">
+                &gt;
+              </span>
+            </Link>
+          ))}
         </div>
       </section>
     </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { countsCopy } from '@knazawy/i18n';
 import {
   BASE_UNIT_LABELS,
   COUNT_STATUS_LABELS,
@@ -16,15 +16,21 @@ import type {
   StockCountLineRecord,
   StockCountRecord,
 } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
+type CountsText = Record<keyof (typeof countsCopy)['en'], string>;
+
 export function CountsScreen() {
+  const t = useCopy(countsCopy);
+  const common = useCommon();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [items, setItems] = useState<ItemRecord[]>([]);
   const [locations, setLocations] = useState<LocationRecord[]>([]);
@@ -59,11 +65,11 @@ export function CountsScreen() {
       .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
   }, []);
 
-  if (!ready) return <p>Loading counts</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to count stock.
+        <Link href="/login">{common.signIn}</Link> {t.signInSuffix}
       </p>
     );
   }
@@ -71,7 +77,7 @@ export function CountsScreen() {
   const canCount = can(user.role, 'stock', 'C');
   const canApprove = can(user.role, 'stock', 'A');
   const sheet = counts.find((count) => count.id === sheetId) ?? null;
-  const rows = rowsOf(sheet, extras, items);
+  const rows = rowsOf(sheet, extras, items, t.item);
   const used = new Set(rows.map((row) => row.itemId));
   const spareItems = items.filter((item) => !used.has(item.id));
 
@@ -79,14 +85,8 @@ export function CountsScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.countStock}</h1>
-          <p>
-            Count one location. The difference waits for approval, then stock is corrected. A
-            shortage leaves at the oldest cost, and anything extra comes in at the latest cost.
-          </p>
-          <p lang="ur" dir="rtl">
-            {messages.ur.common.countStock}
-          </p>
+          <h1>{common.countStock}</h1>
+          <p>{t.intro}</p>
         </div>
         {canCount ? (
           <button
@@ -98,7 +98,7 @@ export function CountsScreen() {
               setDialogOpen(true);
             }}
           >
-            New count
+            {t.newCount}
           </button>
         ) : null}
       </div>
@@ -110,8 +110,8 @@ export function CountsScreen() {
       <div className={`kz-workspace${sheet ? '' : ' kz-workspace-single'}`}>
         {canCount ? (
           <FormDialog
-            buttonLabel="New count"
-            title="New count"
+            buttonLabel={t.newCount}
+            title={t.newCount}
             showTrigger={false}
             isOpen={dialogOpen}
             onOpenChange={setDialogOpen}
@@ -133,7 +133,12 @@ export function CountsScreen() {
                       ]);
                       setNote('');
                       show(count);
-                      setSaved(`${count.number} is ready to count at ${count.locationName}.`);
+                      setSaved(
+                        fill(t.readyToCount, {
+                          number: count.number,
+                          location: count.locationName,
+                        }),
+                      );
                       close();
                     })
                     .catch(async (caught: unknown) => {
@@ -143,7 +148,7 @@ export function CountsScreen() {
                     .finally(() => setSaving(false));
                 }}
               >
-                <Field label="Location">
+                <Field label={t.location}>
                   <select
                     value={locationId}
                     onChange={(event) => setLocationId(event.target.value)}
@@ -156,7 +161,7 @@ export function CountsScreen() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Counted on" hint="Shown as DD/MM/YYYY.">
+                <Field label={t.countedOn} hint={t.dateHint}>
                   <input
                     type="date"
                     value={countedOn}
@@ -164,12 +169,12 @@ export function CountsScreen() {
                     required
                   />
                 </Field>
-                <Field label="Note">
+                <Field label={t.note}>
                   <input
                     value={note}
                     maxLength={200}
                     onChange={(event) => setNote(event.target.value)}
-                    placeholder="Optional"
+                    placeholder={t.optional}
                   />
                 </Field>
                 {error && !sheet ? (
@@ -183,7 +188,7 @@ export function CountsScreen() {
                   type="submit"
                   disabled={saving || locations.length === 0}
                 >
-                  {saving ? 'Starting' : 'Start count'}
+                  {saving ? t.starting : t.startCount}
                 </button>
               </form>
             )}
@@ -201,7 +206,7 @@ export function CountsScreen() {
               }));
               const missing = rows.find((row) => (counted[row.itemId] ?? '').trim() === '');
               if (missing) {
-                setError(`Enter the counted quantity for ${missing.itemName}.`);
+                setError(fill(t.enterCounted, { item: missing.itemName }));
                 return;
               }
               setError('');
@@ -211,7 +216,7 @@ export function CountsScreen() {
                 .submitCount(sheet.id, lines)
                 .then((next) => {
                   remember(next);
-                  setSaved(`${next.number} is waiting for approval.`);
+                  setSaved(fill(t.waitingApproval, { number: next.number }));
                 })
                 .catch(async (caught: unknown) => {
                   setError(explainApiError(caught, setUser));
@@ -225,28 +230,26 @@ export function CountsScreen() {
             </h2>
             <p>
               <span className="kz-status" data-tone={countStatusTone(sheet.status)}>
-                {COUNT_STATUS_LABELS[sheet.status]}
+                {label(COUNT_STATUS_LABELS[sheet.status])}
               </span>{' '}
               {formatDisplayDate(sheet.countedOn)}
             </p>
             {sheet.note ? <p>{sheet.note}</p> : null}
-            {rows.length === 0 ? (
-              <p>Nothing is on the book here. Add an item if you found some.</p>
-            ) : null}
+            {rows.length === 0 ? <p>{t.nothingOnBook}</p> : null}
             {rows.length > 0 ? (
               <div className="kz-table-wrap">
                 <table className="kz-table">
                   <thead>
                     <tr>
-                      <th>Item</th>
-                      <th>Book</th>
-                      <th>Counted</th>
-                      <th>Difference</th>
+                      <th>{t.item}</th>
+                      <th>{t.book}</th>
+                      <th>{t.counted}</th>
+                      <th>{t.difference}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) => {
-                      const unit = BASE_UNIT_LABELS[row.baseUnit];
+                      const unit = label(BASE_UNIT_LABELS[row.baseUnit]);
                       const entered = counted[row.itemId] ?? '';
                       return (
                         <tr key={row.itemId}>
@@ -259,7 +262,7 @@ export function CountsScreen() {
                               <input
                                 inputMode="decimal"
                                 value={entered}
-                                placeholder={`in ${unit}`}
+                                placeholder={fill(t.inUnit, { unit })}
                                 onChange={(event) =>
                                   setCounted((current) => ({
                                     ...current,
@@ -273,7 +276,12 @@ export function CountsScreen() {
                             )}
                           </td>
                           <td>
-                            {differenceText(entered || row.countedQuantity, row.bookQuantity, unit)}
+                            {differenceText(
+                              entered || row.countedQuantity,
+                              row.bookQuantity,
+                              unit,
+                              t,
+                            )}
                           </td>
                         </tr>
                       );
@@ -283,7 +291,7 @@ export function CountsScreen() {
               </div>
             ) : null}
             {sheet.status === 'COUNTING' && canCount && spareItems.length > 0 ? (
-              <Field label="Add an item">
+              <Field label={t.addItem}>
                 <select
                   value=""
                   onChange={(event) => {
@@ -293,7 +301,7 @@ export function CountsScreen() {
                     setCounted((current) => ({ ...current, [itemId]: current[itemId] ?? '' }));
                   }}
                 >
-                  <option value="">Choose an item</option>
+                  <option value="">{t.chooseItem}</option>
                   {spareItems.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}
@@ -310,7 +318,7 @@ export function CountsScreen() {
             {saved ? <p>{saved}</p> : null}
             {sheet.status === 'COUNTING' && canCount ? (
               <button className="kz-button" type="submit" disabled={saving}>
-                {saving ? 'Submitting' : 'Submit for approval'}
+                {saving ? t.submitting : t.submitForApproval}
               </button>
             ) : null}
             {sheet.status === 'WAITING' && canApprove ? (
@@ -326,14 +334,14 @@ export function CountsScreen() {
                       .then((next) => {
                         remember(next);
                         setSaved(
-                          `${next.number} is posted. Stock at ${next.locationName} matches the count.`,
+                          fill(t.posted, { number: next.number, location: next.locationName }),
                         );
                       })
                       .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
                       .finally(() => setSaving(false));
                   }}
                 >
-                  Approve and post
+                  {t.approveAndPost}
                 </button>{' '}
                 <button
                   className="kz-button-quiet"
@@ -345,29 +353,29 @@ export function CountsScreen() {
                       .sendCountBack(sheet.id)
                       .then((next) => {
                         remember(next);
-                        setSaved(`${next.number} is back with the counter.`);
+                        setSaved(fill(t.backWithCounter, { number: next.number }));
                       })
                       .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
                       .finally(() => setSaving(false));
                   }}
                 >
-                  Send back
+                  {t.sendBack}
                 </button>
               </p>
             ) : null}
           </form>
         ) : null}
         <div className="kz-panel kz-table-wrap">
-          <h2>Counts</h2>
-          {counts.length === 0 ? <p className="kz-empty">No counts yet.</p> : null}
+          <h2>{t.counts}</h2>
+          {counts.length === 0 ? <p className="kz-empty">{t.noCounts}</p> : null}
           <table className="kz-table">
             <thead>
               <tr>
-                <th>Number</th>
-                <th>Location</th>
-                <th>Status</th>
-                <th>Counted</th>
-                <th>Lines</th>
+                <th>{t.number}</th>
+                <th>{t.location}</th>
+                <th>{t.status}</th>
+                <th>{t.counted}</th>
+                <th>{t.lines}</th>
                 <th></th>
               </tr>
             </thead>
@@ -378,14 +386,16 @@ export function CountsScreen() {
                   <td>{count.locationName}</td>
                   <td>
                     <span className="kz-status" data-tone={countStatusTone(count.status)}>
-                      {COUNT_STATUS_LABELS[count.status]}
+                      {label(COUNT_STATUS_LABELS[count.status])}
                     </span>
                   </td>
                   <td>{formatDisplayDate(count.countedOn)}</td>
-                  <td>{count.lines.map((line) => describeLine(line)).join('; ') || '—'}</td>
+                  <td>
+                    {count.lines.map((line) => describeLine(line, t, label)).join('; ') || '—'}
+                  </td>
                   <td>
                     <button type="button" className="kz-button-quiet" onClick={() => show(count)}>
-                      Open
+                      {t.open}
                     </button>
                   </td>
                 </tr>
@@ -424,13 +434,18 @@ interface SheetRow {
   countedQuantity: string | null;
 }
 
-function rowsOf(sheet: StockCountRecord | null, extras: string[], items: ItemRecord[]): SheetRow[] {
+function rowsOf(
+  sheet: StockCountRecord | null,
+  extras: string[],
+  items: ItemRecord[],
+  fallbackName: string,
+): SheetRow[] {
   if (!sheet) return [];
   const extraRows = extras.map((itemId) => {
     const item = items.find((entry) => entry.id === itemId);
     return {
       itemId,
-      itemName: item?.name ?? 'Item',
+      itemName: item?.name ?? fallbackName,
       baseUnit: item?.baseUnit ?? 'KG',
       bookQuantity: '0',
       countedQuantity: null,
@@ -439,27 +454,33 @@ function rowsOf(sheet: StockCountRecord | null, extras: string[], items: ItemRec
   return [...sheet.lines, ...extraRows];
 }
 
-function describeLine(line: StockCountLineRecord): string {
-  const unit = BASE_UNIT_LABELS[line.baseUnit];
-  if (line.countedQuantity === null) return `${line.itemName}: book ${line.bookQuantity} ${unit}`;
+function describeLine(
+  line: StockCountLineRecord,
+  t: CountsText,
+  label: (english: string) => string,
+): string {
+  const unit = label(BASE_UNIT_LABELS[line.baseUnit]);
+  const item = line.itemName;
+  if (line.countedQuantity === null) {
+    return fill(t.lineBook, { item, quantity: line.bookQuantity, unit });
+  }
   const diff = fromScaled(toScaled(line.countedQuantity) - toScaled(line.bookQuantity));
-  if (diff === '0') return `${line.itemName}: no difference`;
+  if (diff === '0') return fill(t.lineNoDifference, { item });
   const amount = diff.startsWith('-') ? diff.slice(1) : diff;
-  const way = diff.startsWith('-') ? 'short' : 'over';
   const cost =
     line.varianceCost && !/^[-+]?0+(?:\.0+)?$/.test(line.varianceCost)
-      ? ` (${money(line.varianceCost)} PKR)`
+      ? fill(t.lineCost, { amount: money(line.varianceCost) })
       : '';
-  return `${line.itemName}: ${amount} ${unit} ${way}${cost}`;
+  return fill(diff.startsWith('-') ? t.lineShort : t.lineOver, { item, amount, unit, cost });
 }
 
-function differenceText(counted: string | null, book: string, unit: string): string {
+function differenceText(counted: string | null, book: string, unit: string, t: CountsText): string {
   if (!counted || counted.trim() === '') return '—';
   const diff = fromScaled(toScaled(counted) - toScaled(book));
   if (!Number.isFinite(toScaled(counted))) return '—';
-  if (diff === '0') return 'No difference';
+  if (diff === '0') return t.noDifference;
   const amount = diff.startsWith('-') ? diff.slice(1) : diff;
-  return diff.startsWith('-') ? `${amount} ${unit} short` : `${amount} ${unit} over`;
+  return fill(diff.startsWith('-') ? t.short : t.over, { amount, unit });
 }
 
 function money(value: string): string {

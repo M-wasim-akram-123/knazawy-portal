@@ -3261,13 +3261,16 @@ a {
   background: #b87955;
 }
 
-.kz-app .kz-button-quiet {
+/* Light-on-dark quiet buttons belong to the dark header and sidebar only. */
+.kz-app .kz-topbar .kz-button-quiet,
+.kz-app .kz-side .kz-button-quiet {
   border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.06);
   color: #f6f3e9;
 }
 
-.kz-app .kz-button-quiet:hover {
+.kz-app .kz-topbar .kz-button-quiet:hover,
+.kz-app .kz-side .kz-button-quiet:hover {
   border-color: rgba(196, 164, 95, 0.6);
   background: rgba(196, 164, 95, 0.12);
   color: #fffdf6;
@@ -3503,4 +3506,221 @@ a {
   .kz-page-action-head {
     gap: 10px;
   }
+}
+
+/* Pop-up close button: white on the green header band, filled white on hover. */
+.kz-app .kz-form-dialog-close,
+.kz-form-dialog .kz-form-dialog-close {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  flex: 0 0 38px;
+  padding: 0;
+  line-height: 0;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.kz-app .kz-form-dialog-close:hover,
+.kz-form-dialog .kz-form-dialog-close:hover {
+  transform: none;
+  border-color: #fff;
+  background: #fff;
+  color: var(--kz-deep);
+}
+
+.kz-form-dialog .kz-form-dialog-close svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  stroke-width: 2.2;
+}
+
+/* ---- Notification panel under the bell: a clean card with dark, readable text. It sits inside
+   the dark header, so every colour is set here rather than inherited from the header. ---- */
+.kz-app .kz-notification-menu .kz-notification-popover {
+  width: min(400px, calc(100vw - 24px));
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--kz-line);
+  border-radius: 16px;
+  background: var(--kz-card);
+  color: var(--kz-ink);
+  text-align: start;
+  box-shadow: 0 22px 60px rgba(20, 48, 43, 0.28);
+}
+
+.kz-app .kz-notification-menu .kz-notification-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--kz-line);
+  background: var(--kz-paper);
+}
+
+.kz-app .kz-notification-menu .kz-notification-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kz-app .kz-notification-menu .kz-notification-heading strong {
+  color: var(--kz-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.kz-app .kz-notification-menu .kz-notification-heading span {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(194, 138, 101, 0.16);
+  color: var(--kz-brand-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.kz-app .kz-notification-menu .kz-notification-mark-all,
+.kz-app .kz-notification-menu .kz-notification-read {
+  min-height: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--kz-deep);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.kz-app .kz-notification-menu .kz-notification-mark-all:hover:not(:disabled),
+.kz-app .kz-notification-menu .kz-notification-read:hover:not(:disabled) {
+  background: rgba(23, 63, 57, 0.08);
+  color: var(--kz-deep);
+  transform: none;
+}
+
+.kz-app .kz-notification-menu .kz-notification-mark-all:disabled,
+.kz-app .kz-notification-menu .kz-notification-read:disabled {
+  color: var(--kz-ink-soft);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.kz-app .kz-notification-menu .kz-notification-item {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--kz-line);
+  background: rgba(194, 138, 101, 0.07);
+  text-align: start;
+}
+
+.kz-app .kz-notification-menu .kz-notification-item.is-read {
+  background: var(--kz-card);
+}
+
+.kz-app .kz-notification-menu .kz-notification-item > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.kz-app .kz-notification-menu .kz-notification-item > div > strong {
+  color: var(--kz-ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.kz-app .kz-notification-menu .kz-notification-item.is-read > div > strong {
+  color: var(--kz-ink-soft);
+  font-weight: 600;
+}
+
+.kz-app .kz-notification-menu .kz-notification-item p {
+  margin: 0;
+  color: var(--kz-ink-soft);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.kz-app .kz-notification-menu .kz-notification-item time {
+  margin-top: 2px;
+  color: var(--kz-ink-soft);
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.kz-app .kz-notification-menu .kz-notification-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--kz-brand);
+  box-shadow: 0 0 0 3px rgba(194, 138, 101, 0.2);
+}
+
+.kz-app .kz-notification-menu .kz-notification-item.is-read .kz-notification-dot {
+  background: transparent;
+  box-shadow: none;
+}
+
+.kz-app .kz-notification-menu .kz-notification-empty {
+  margin: 0;
+  padding: 28px 16px;
+  color: var(--kz-ink-soft);
+  text-align: center;
+}
+
+.kz-app .kz-notification-menu .kz-notification-popover > .kz-error {
+  margin: 0;
+  padding: 12px 16px;
+}
+
+.kz-app .kz-notification-menu .kz-notification-footer {
+  display: block;
+  padding: 12px 16px;
+  background: var(--kz-paper);
+  color: var(--kz-deep);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+
+.kz-app .kz-notification-menu .kz-notification-footer:hover {
+  background: rgba(23, 63, 57, 0.06);
+  color: var(--kz-deep);
+}
+
+/* The header colours its spans light; inside the panel they must stay dark. */
+.kz-app .kz-top-user .kz-notification-popover span:not(.kz-notification-dot) {
+  color: inherit;
+}
+
+.kz-app .kz-top-user .kz-notification-heading span {
+  color: var(--kz-brand-strong);
+}
+
+.kz-app .kz-top-user .kz-notification-popover strong {
+  color: var(--kz-ink);
+}
+
+.kz-app .kz-top-user .kz-notification-item.is-read strong {
+  color: var(--kz-ink-soft);
 }

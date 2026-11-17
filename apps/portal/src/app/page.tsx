@@ -1,13 +1,18 @@
 'use client';
 
-import { messages } from '@knazawy/i18n';
+import { portalHomeCopy } from '@knazawy/i18n';
 import { can, isAirlineRole, type AccountRecord } from '@knazawy/shared';
+import { KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { useChrome, useCommon, useCopy } from '../lib/i18n';
 import { ApiError, api, clearSession } from '../lib/session';
 
 export default function HomePage() {
+  const t = useCopy(portalHomeCopy);
+  const common = useCommon();
+  const chrome = useChrome();
   const [account, setAccount] = useState<AccountRecord | null>(null);
   const [error, setError] = useState('');
 
@@ -21,7 +26,7 @@ export default function HomePage() {
           window.location.assign('/login');
           return;
         }
-        setError(caught instanceof Error ? caught.message : 'The portal could not load.');
+        setError(caught instanceof Error ? caught.message : t.loadFailed);
       });
   }, []);
 
@@ -32,14 +37,14 @@ export default function HomePage() {
       </p>
     );
   }
-  if (!account) return <p>Loading</p>;
+  if (!account) return <KaramLoader label={chrome.loading} fullPage />;
 
   if (!isAirlineRole(account.role)) {
     return (
       <section className="kz-stack">
         <div className="kz-page-head">
           <h1>{account.organisationName}</h1>
-          <p>This portal is for airline staff. Karam staff use the staff app.</p>
+          <p>{t.notAirline}</p>
         </div>
       </section>
     );
@@ -51,81 +56,72 @@ export default function HomePage() {
     <section className="kz-stack">
       <header className="kz-partner-hero">
         <div className="kz-partner-hero-copy">
-          <p className="kz-eyebrow">
-            {financeUser ? 'Karam / Airline finance' : 'Karam / Service workspace'}
-          </p>
+          <p className="kz-eyebrow">{financeUser ? t.eyebrowFinance : t.eyebrowService}</p>
           <h1>{account.organisationName}</h1>
-          <p>
-            {financeUser
-              ? 'Review invoices, resolve bill questions, and follow your airline ledger.'
-              : 'Create flight and room requests, then follow delivery and agreed rates.'}
-          </p>
-          <p className="kz-partner-urdu" lang="ur" dir="rtl">
-            {messages.ur.common.portalSurface}
-          </p>
+          <p>{financeUser ? t.leadFinance : t.leadService}</p>
           {can(account.role, 'service_requests', 'C') ? (
             <Link className="kz-button" href="/requests">
-              Create a service request
+              {t.createRequest}
             </Link>
           ) : can(account.role, 'invoices', 'R') ? (
             <Link className="kz-button" href="/invoices">
-              Review invoices
+              {t.reviewInvoices}
             </Link>
           ) : null}
         </div>
         <div className="kz-partner-stamp">
-          <span>YOUR ORGANISATION</span>
+          <span>{t.yourOrganisation}</span>
           <strong>{account.organisationCode}</strong>
-          <small>Private partner access</small>
+          <small>{t.privateAccess}</small>
         </div>
       </header>
       <div className="kz-home-grid">
         {can(account.role, 'service_requests', 'R') ? (
           <Link className="kz-panel kz-home-card" href="/requests">
-            <h2>{messages.en.common.requests}</h2>
-            <p>Ask for meals and snacks for a flight and follow each request.</p>
+            <h2>{common.requests}</h2>
+            <p>{t.requestsText}</p>
           </Link>
         ) : null}
         {can(account.role, 'room_requests', 'R') ? (
           <Link className="kz-panel kz-home-card" href="/room-requests">
-            <h2>{messages.en.common.roomRequests}</h2>
-            <p>Request rooms for your flight crew and follow each request.</p>
+            <h2>{common.roomRequests}</h2>
+            <p>{t.roomRequestsText}</p>
           </Link>
         ) : null}
         {can(account.role, 'distribution', 'R') ? (
           <Link className="kz-panel kz-home-card" href="/deliveries">
-            <h2>{messages.en.common.deliveries}</h2>
-            <p>See what has left the kitchen and what arrived for your flights.</p>
+            <h2>{common.deliveries}</h2>
+            <p>{t.deliveriesText}</p>
           </Link>
         ) : null}
         {can(account.role, 'ledger', 'R') ? (
           <Link className="kz-panel kz-home-card" href="/ledger">
-            <h2>{messages.en.common.ledger}</h2>
-            <p>See what has been posted for your airline.</p>
+            <h2>{common.ledger}</h2>
+            <p>{t.ledgerText}</p>
           </Link>
         ) : null}
         {isAirlineRole(account.role) ? (
           <Link className="kz-panel kz-home-card" href="/notifications">
-            <h2>{messages.en.common.notifications}</h2>
-            <p>See messages about your requests, deliveries, and bills.</p>
+            <h2>{common.notifications}</h2>
+            <p>{t.notificationsText}</p>
           </Link>
         ) : null}
         {can(account.role, 'disputes', 'R') ? (
           <Link className="kz-panel kz-home-card" href="/disputes">
-            <h2>{messages.en.common.disputes}</h2>
-            <p>Question a bill Karam has issued. The bill itself is not changed.</p>
+            <h2>{common.disputes}</h2>
+            <p>{t.disputesText}</p>
           </Link>
         ) : null}
         {can(account.role, 'invoices', 'R') ? (
           <Link className="kz-panel kz-home-card" href="/invoices">
-            <h2>{messages.en.common.invoices}</h2>
-            <p>See the bills Karam has issued and any credit notes.</p>
+            <h2>{common.invoices}</h2>
+            <p>{t.invoicesText}</p>
           </Link>
         ) : null}
         {can(account.role, 'service_rates', 'R') ? (
           <Link className="kz-panel kz-home-card" href="/rates">
-            <h2>{messages.en.common.rateCards}</h2>
-            <p>See the prices agreed with Karam and the dates they apply.</p>
+            <h2>{common.rateCards}</h2>
+            <p>{t.ratesText}</p>
           </Link>
         ) : null}
       </div>

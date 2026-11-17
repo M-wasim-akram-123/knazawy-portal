@@ -1,7 +1,7 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { transfersCopy } from '@knazawy/i18n';
 import {
   BASE_UNIT_LABELS,
   TRANSFER_STATUS_LABELS,
@@ -16,11 +16,12 @@ import type {
   StockOnHandRecord,
   StockTransferRecord,
 } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
@@ -31,6 +32,9 @@ interface DraftLine {
 }
 
 export function TransfersScreen() {
+  const t = useCopy(transfersCopy);
+  const common = useCommon();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [items, setItems] = useState<ItemRecord[]>([]);
   const [locations, setLocations] = useState<LocationRecord[]>([]);
@@ -74,11 +78,11 @@ export function TransfersScreen() {
     return totals;
   }, [stock]);
 
-  if (!ready) return <p>Loading transfers</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to transfer stock.
+        <Link href="/login">{common.signIn}</Link> {t.signInSuffix}
       </p>
     );
   }
@@ -92,14 +96,8 @@ export function TransfersScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.transferStock}</h1>
-          <p>
-            Send goods from one location to another. They leave straight away and arrive, at the
-            same cost, when the receiving location confirms.
-          </p>
-          <p lang="ur" dir="rtl">
-            {messages.ur.common.transferStock}
-          </p>
+          <h1>{common.transferStock}</h1>
+          <p>{t.intro}</p>
         </div>
         {canSend ? (
           <button
@@ -111,7 +109,7 @@ export function TransfersScreen() {
               setDialogOpen(true);
             }}
           >
-            New transfer
+            {t.newTransfer}
           </button>
         ) : null}
       </div>
@@ -123,8 +121,8 @@ export function TransfersScreen() {
       <div className="kz-workspace kz-workspace-single">
         {canSend ? (
           <FormDialog
-            buttonLabel="New transfer"
-            title="New transfer"
+            buttonLabel={t.newTransfer}
+            title={t.newTransfer}
             showTrigger={false}
             isOpen={dialogOpen}
             onOpenChange={setDialogOpen}
@@ -149,7 +147,12 @@ export function TransfersScreen() {
                     })
                     .then(async (transfer) => {
                       setTransfers((current) => [transfer, ...current]);
-                      setSaved(`${transfer.number} is on the way to ${transfer.toLocationName}.`);
+                      setSaved(
+                        fill(t.onTheWay, {
+                          number: transfer.number,
+                          location: transfer.toLocationName,
+                        }),
+                      );
                       setLines([blankLine(items[0]?.id ?? '')]);
                       setStock(await api.listStock());
                       close();
@@ -158,7 +161,7 @@ export function TransfersScreen() {
                     .finally(() => setSaving(false));
                 }}
               >
-                <Field label="From">
+                <Field label={t.from}>
                   <select
                     value={fromLocationId}
                     onChange={(event) => setFromLocationId(event.target.value)}
@@ -171,7 +174,7 @@ export function TransfersScreen() {
                     ))}
                   </select>
                 </Field>
-                <Field label="To">
+                <Field label={t.to}>
                   <select
                     value={toLocationId}
                     onChange={(event) => setToLocationId(event.target.value)}
@@ -184,7 +187,7 @@ export function TransfersScreen() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Sent on" hint="Shown as DD/MM/YYYY.">
+                <Field label={t.sentOn} hint={t.dateHint}>
                   <input
                     type="date"
                     value={sentOn}
@@ -196,16 +199,16 @@ export function TransfersScreen() {
                   <table className="kz-table">
                     <thead>
                       <tr>
-                        <th>Item</th>
-                        <th>Quantity</th>
-                        <th>On hand</th>
+                        <th>{t.item}</th>
+                        <th>{t.quantity}</th>
+                        <th>{t.onHand}</th>
                         <th></th>
                       </tr>
                     </thead>
                     <tbody>
                       {lines.map((line) => {
                         const item = itemById.get(line.itemId);
-                        const unit = item ? BASE_UNIT_LABELS[item.baseUnit] : '';
+                        const unit = item ? label(BASE_UNIT_LABELS[item.baseUnit]) : '';
                         const available = item
                           ? (onHand.get(`${item.id}:${fromLocationId}`) ?? 0)
                           : 0;
@@ -233,7 +236,7 @@ export function TransfersScreen() {
                                 onChange={(event) =>
                                   updateLine(line.key, { quantity: event.target.value })
                                 }
-                                placeholder={unit ? `in ${unit}` : ''}
+                                placeholder={unit ? fill(t.inUnit, { unit }) : ''}
                                 required
                               />
                             </td>
@@ -249,7 +252,7 @@ export function TransfersScreen() {
                                     )
                                   }
                                 >
-                                  Remove
+                                  {t.remove}
                                 </button>
                               ) : null}
                             </td>
@@ -264,10 +267,10 @@ export function TransfersScreen() {
                   className="kz-button-quiet"
                   onClick={() => setLines((current) => [...current, blankLine(items[0]?.id ?? '')])}
                 >
-                  Add a line
+                  {t.addLine}
                 </button>
-                {samePlace ? <p className="kz-error">Choose two different locations.</p> : null}
-                {locations.length < 2 ? <p>Add another location before you transfer.</p> : null}
+                {samePlace ? <p className="kz-error">{t.chooseTwo}</p> : null}
+                {locations.length < 2 ? <p>{t.addAnotherLocation}</p> : null}
                 {error ? (
                   <p className="kz-error" role="alert">
                     {error}
@@ -278,7 +281,7 @@ export function TransfersScreen() {
                   type="submit"
                   disabled={saving || samePlace || locations.length < 2}
                 >
-                  {saving ? 'Sending' : 'Send transfer'}
+                  {saving ? t.sending : t.sendTransfer}
                 </button>
               </form>
             )}
@@ -286,17 +289,17 @@ export function TransfersScreen() {
         ) : null}
         {saved ? <p role="status">{saved}</p> : null}
         <div className="kz-panel kz-table-wrap">
-          <h2>Transfers</h2>
-          {transfers.length === 0 ? <p className="kz-empty">No transfers yet.</p> : null}
+          <h2>{t.transfers}</h2>
+          {transfers.length === 0 ? <p className="kz-empty">{t.noTransfers}</p> : null}
           <table className="kz-table">
             <thead>
               <tr>
-                <th>Number</th>
-                <th>From</th>
-                <th>To</th>
-                <th>Status</th>
-                <th>Sent</th>
-                <th>Lines</th>
+                <th>{t.number}</th>
+                <th>{t.from}</th>
+                <th>{t.to}</th>
+                <th>{t.status}</th>
+                <th>{t.sent}</th>
+                <th>{t.lines}</th>
                 <th></th>
               </tr>
             </thead>
@@ -308,15 +311,19 @@ export function TransfersScreen() {
                   <td>{transfer.toLocationName}</td>
                   <td>
                     <span className="kz-status" data-tone={transferStatusTone(transfer.status)}>
-                      {TRANSFER_STATUS_LABELS[transfer.status]}
+                      {label(TRANSFER_STATUS_LABELS[transfer.status])}
                     </span>
                   </td>
                   <td>{formatDisplayDate(transfer.sentOn)}</td>
                   <td>
                     {transfer.lines
-                      .map(
-                        (line) =>
-                          `${line.itemName}: ${line.quantityBase} ${BASE_UNIT_LABELS[line.baseUnit]} (${line.cost} PKR)`,
+                      .map((line) =>
+                        fill(t.lineSummary, {
+                          item: line.itemName,
+                          quantity: line.quantityBase,
+                          unit: label(BASE_UNIT_LABELS[line.baseUnit]),
+                          cost: line.cost,
+                        }),
                       )
                       .join('; ')}
                   </td>
@@ -333,13 +340,18 @@ export function TransfersScreen() {
                               setTransfers((current) =>
                                 current.map((row) => (row.id === next.id ? next : row)),
                               );
-                              setSaved(`${next.number} is in ${next.toLocationName}.`);
+                              setSaved(
+                                fill(t.arrived, {
+                                  number: next.number,
+                                  location: next.toLocationName,
+                                }),
+                              );
                               setStock(await api.listStock());
                             })
                             .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
                         }}
                       >
-                        Receive
+                        {t.receive}
                       </button>
                     ) : null}
                   </td>

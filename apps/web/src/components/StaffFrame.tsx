@@ -1,68 +1,20 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { ROLE_LABELS } from '@knazawy/shared';
+import { KaramLoader, LanguageSwitcher, LoadingOverlay, useLanguage } from '@knazawy/ui-shell';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 
-import { clearSession, readSessionUser } from '../lib/session';
+import { fill, useChrome, useCommon, useLabel } from '../lib/i18n';
+import { api, clearSession, readSessionUser } from '../lib/session';
 import { canAccessStaffPath } from '../lib/staff-access';
+import { navigationFor, workspaceName } from '../lib/workspaces';
 
 import { NotificationBell } from './notifications/NotificationBell';
-
-const navigationGroups: Array<{
-  label: string;
-  links: Array<{ href: string; label: string }>;
-}> = [
-  {
-    label: 'Workspace',
-    links: [
-      { href: '/', label: messages.en.common.today },
-      { href: '/branches', label: messages.en.common.branches },
-    ],
-  },
-  {
-    label: 'Supply & stock',
-    links: [
-      { href: '/purchases', label: messages.en.common.purchases },
-      { href: '/bills', label: messages.en.common.scanBill },
-      { href: '/store', label: messages.en.common.receiveGoods },
-      { href: '/issues', label: messages.en.common.issueStock },
-      { href: '/transfers', label: messages.en.common.transferStock },
-      { href: '/counts', label: messages.en.common.countStock },
-      { href: '/items', label: messages.en.common.items },
-      { href: '/suppliers', label: messages.en.common.suppliers },
-      { href: '/locations', label: messages.en.common.locations },
-    ],
-  },
-  {
-    label: 'Kitchen',
-    links: [
-      { href: '/recipes', label: messages.en.common.recipes },
-      { href: '/production', label: messages.en.common.production },
-      { href: '/meal-cost', label: messages.en.common.mealCost },
-      { href: '/forecast', label: messages.en.common.forecast },
-    ],
-  },
-  {
-    label: 'Service & finance',
-    links: [
-      { href: '/requests', label: messages.en.common.requests },
-      { href: '/deliveries', label: messages.en.common.deliveries },
-      { href: '/rates', label: messages.en.common.rateCards },
-      { href: '/airlines', label: messages.en.common.airlines },
-      { href: '/invoices', label: messages.en.common.invoices },
-      { href: '/room-requests', label: messages.en.common.roomRequests },
-      { href: '/room-bills', label: messages.en.common.roomBills },
-      { href: '/rooms', label: messages.en.common.rooms },
-      { href: '/disputes', label: messages.en.common.disputes },
-      { href: '/ledger', label: messages.en.common.ledger },
-    ],
-  },
-];
 
 export function StaffFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -70,6 +22,10 @@ export function StaffFrame({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
   const signingIn = pathname === '/login';
+  const common = useCommon();
+  const chrome = useChrome();
+  const label = useLabel();
+  const { dir } = useLanguage();
 
   useEffect(() => {
     const session = readSessionUser();
@@ -84,22 +40,24 @@ export function StaffFrame({ children }: { children: ReactNode }) {
     return (
       <div className="kz-signin">
         <header className="kz-topbar">
-          <Brand />
+          <Brand caption={chrome.brandStaff} productName={common.productName} />
+          <LanguageSwitcher label={chrome.language} />
         </header>
-        <main className="kz-signin-main">{children}</main>
+        <main className="kz-signin-main" dir={dir}>
+          {children}
+        </main>
+        <LoadingOverlay subscribe={api.onActivity} label={chrome.loading} />
       </div>
     );
   }
 
-  if (!ready || !user) return <p className="kz-booting">Loading</p>;
-  if (!canAccessStaffPath(user.role, pathname)) return <p className="kz-booting">Loading</p>;
+  if (!ready || !user) return <KaramLoader label={chrome.loading} fullPage />;
+  if (!canAccessStaffPath(user.role, pathname)) {
+    return <KaramLoader label={chrome.loading} fullPage />;
+  }
 
-  const visibleGroups = navigationGroups
-    .map((group) => ({
-      ...group,
-      links: group.links.filter((link) => canAccessStaffPath(user.role, link.href)),
-    }))
-    .filter((group) => group.links.length > 0);
+  const visibleGroups = navigationFor(user.role, common);
+  const workspace = workspaceName(user.role, chrome);
   const activeLink = visibleGroups
     .flatMap((group) => group.links)
     .find((link) => isCurrent(pathname, link.href));
@@ -107,12 +65,15 @@ export function StaffFrame({ children }: { children: ReactNode }) {
   return (
     <div className="kz-app">
       <header className="kz-topbar">
-        <Brand />
+        <Brand caption={chrome.brandStaff} productName={common.productName} />
         <div className="kz-header-context">
-          <span>STAFF / OPERATIONS</span>
-          <strong>{activeLink?.label ?? messages.en.common.today}</strong>
+          <span>
+            {chrome.staffContext} / {workspace.toUpperCase()}
+          </span>
+          <strong>{activeLink?.label ?? common.today}</strong>
         </div>
         <div className="kz-top-user">
+          <LanguageSwitcher label={chrome.language} />
           <NotificationBell />
           <span className="kz-user-avatar" aria-hidden="true">
             {user.name
@@ -124,7 +85,7 @@ export function StaffFrame({ children }: { children: ReactNode }) {
           </span>
           <p>
             <strong>{user.name}</strong>
-            <span>{roleLabel(user.role)}</span>
+            <span>{label(ROLE_LABELS[user.role])}</span>
           </p>
           <button
             type="button"
@@ -136,14 +97,14 @@ export function StaffFrame({ children }: { children: ReactNode }) {
               router.refresh();
             }}
           >
-            {messages.en.common.signOut}
+            {common.signOut}
           </button>
         </div>
       </header>
       <div className="kz-body">
-        <nav className="kz-side" aria-label="Staff">
+        <nav className="kz-side" dir={dir} aria-label={chrome.staffNav}>
           {visibleGroups.map((group) => (
-            <div className="kz-nav-group" key={group.label}>
+            <div className="kz-nav-group" key={group.key}>
               <span className="kz-nav-label">{group.label}</span>
               {group.links.map((link) => (
                 <Link
@@ -158,25 +119,26 @@ export function StaffFrame({ children }: { children: ReactNode }) {
           ))}
           <div className="kz-side-footer">
             <span className="kz-footer-dot" aria-hidden="true" />
-            Staff workspace
+            {fill(chrome.workspaceFooter, { name: workspace })}
           </div>
         </nav>
-        <main className="kz-content">{children}</main>
+        <main className="kz-content" dir={dir}>
+          {children}
+        </main>
+        <LoadingOverlay subscribe={api.onActivity} label={chrome.loading} />
       </div>
     </div>
   );
 }
 
-function Brand() {
+function Brand({ caption, productName }: { caption: string; productName: string }) {
   return (
     <div className="kz-brand">
       <Image className="kz-brand-logo" src="/karam-dome-mark.png" alt="" width={48} height={48} />
       <span className="kz-brand-copy">
         <strong>KARAM</strong>
-        <span className="kz-brand-caption">RESTAURANT OPERATIONS</span>
-        <span lang="ur" dir="rtl">
-          {messages.ur.common.productName}
-        </span>
+        <span className="kz-brand-caption">{caption}</span>
+        <span>{productName}</span>
       </span>
     </div>
   );
@@ -185,9 +147,4 @@ function Brand() {
 function isCurrent(pathname: string, href: string): boolean {
   if (href === '/') return pathname === '/';
   return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function roleLabel(role: string): string {
-  const words = role.toLowerCase().split('_');
-  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }

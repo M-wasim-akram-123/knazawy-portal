@@ -2,7 +2,7 @@
 
 import { ApiError } from '@knazawy/api-client';
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { itemsCopy } from '@knazawy/i18n';
 import {
   BASE_UNIT_LABELS,
   BASE_UNITS,
@@ -11,10 +11,11 @@ import {
   can,
 } from '@knazawy/shared';
 import type { ItemRecord, SupplierRecord } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { api, clearSession, readSessionUser } from '../../lib/session';
 
 import { Field } from './Field';
@@ -44,6 +45,9 @@ const empty: {
 };
 
 export function ItemsScreen() {
+  const t = useCopy(itemsCopy);
+  const common = useCommon();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [items, setItems] = useState<ItemRecord[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRecord[]>([]);
@@ -66,14 +70,17 @@ export function ItemsScreen() {
     setUser(session);
     setReady(true);
     if (!session) return;
-    void reload().catch((caught: unknown) => setError(explain(caught, setUser)));
+    void reload().catch((caught: unknown) => setError(explain(caught, setUser, t)));
   }, []);
 
-  if (!ready) return <p>Loading items</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
+    const [beforeLink, afterLink] = t.signInToSee.split('{signIn}');
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see items.
+        {beforeLink}
+        <Link href="/login">{common.signIn}</Link>
+        {afterLink}
       </p>
     );
   }
@@ -85,13 +92,13 @@ export function ItemsScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.items}</h1>
-          <p>Codes, units, and where each item is kept.</p>
+          <h1>{common.items}</h1>
+          <p>{t.intro}</p>
         </div>
         {canCreate ? (
           <FormDialog
-            buttonLabel="New item"
-            title="New item"
+            buttonLabel={t.newItem}
+            title={t.newItem}
             onOpenChange={setDialogOpen}
             onOpen={() => setError('')}
           >
@@ -111,31 +118,31 @@ export function ItemsScreen() {
                       setForm(empty);
                       close();
                     })
-                    .catch((caught: unknown) => setError(explain(caught, setUser)));
+                    .catch((caught: unknown) => setError(explain(caught, setUser, t)));
                 }}
               >
-                <Field label="Code">
+                <Field label={t.code}>
                   <input
                     value={form.code}
                     onChange={(event) => setForm({ ...form, code: event.target.value })}
                     required
                   />
                 </Field>
-                <Field label="Name">
+                <Field label={t.name}>
                   <input
                     value={form.name}
                     onChange={(event) => setForm({ ...form, name: event.target.value })}
                     required
                   />
                 </Field>
-                <Field label="Category">
+                <Field label={t.category}>
                   <input
                     value={form.category}
                     onChange={(event) => setForm({ ...form, category: event.target.value })}
                     required
                   />
                 </Field>
-                <Field label="Base unit">
+                <Field label={t.baseUnit}>
                   <select
                     value={form.baseUnit}
                     onChange={(event) =>
@@ -147,22 +154,19 @@ export function ItemsScreen() {
                   >
                     {BASE_UNITS.map((unit) => (
                       <option key={unit} value={unit}>
-                        {BASE_UNIT_LABELS[unit]}
+                        {label(BASE_UNIT_LABELS[unit])}
                       </option>
                     ))}
                   </select>
                 </Field>
-                <Field label="Purchase unit" hint="For example bag, bori, or crate.">
+                <Field label={t.purchaseUnit} hint={t.purchaseUnitHint}>
                   <input
                     value={form.purchaseUnit}
                     onChange={(event) => setForm({ ...form, purchaseUnit: event.target.value })}
                     required
                   />
                 </Field>
-                <Field
-                  label="Base units in one purchase unit"
-                  hint="A 25 kg bag is 25 when the base unit is kg."
-                >
+                <Field label={t.conversion} hint={t.conversionHint}>
                   <input
                     inputMode="decimal"
                     value={form.conversionToBase}
@@ -170,7 +174,7 @@ export function ItemsScreen() {
                     required
                   />
                 </Field>
-                <Field label="Reorder level" hint="In the base unit.">
+                <Field label={t.reorderLevel} hint={t.reorderLevelHint}>
                   <input
                     inputMode="decimal"
                     value={form.reorderLevel}
@@ -178,7 +182,7 @@ export function ItemsScreen() {
                     required
                   />
                 </Field>
-                <Field label="Shelf life (days)">
+                <Field label={t.shelfLife}>
                   <input
                     inputMode="numeric"
                     value={form.shelfLifeDays}
@@ -186,7 +190,7 @@ export function ItemsScreen() {
                     required
                   />
                 </Field>
-                <Field label="Storage">
+                <Field label={t.storage}>
                   <select
                     value={form.storageType}
                     onChange={(event) =>
@@ -198,14 +202,14 @@ export function ItemsScreen() {
                   >
                     {STORAGE_TYPES.map((storage) => (
                       <option key={storage} value={storage}>
-                        {STORAGE_TYPE_LABELS[storage]}
+                        {label(STORAGE_TYPE_LABELS[storage])}
                       </option>
                     ))}
                   </select>
                 </Field>
                 {suppliers.length > 0 ? (
-                  <fieldset className="kz-field kz-span-2">
-                    <legend>Suppliers</legend>
+                  <fieldset className="kz-field kz-span-2 kz-check-grid">
+                    <legend>{t.suppliers}</legend>
                     {suppliers.map((supplier) => (
                       <label key={supplier.id} className="kz-check">
                         <input
@@ -229,7 +233,7 @@ export function ItemsScreen() {
                   </p>
                 ) : null}
                 <button className="kz-button kz-span-2" type="submit">
-                  Save item
+                  {t.saveItem}
                 </button>
               </form>
             )}
@@ -243,16 +247,16 @@ export function ItemsScreen() {
       ) : null}
       <div className="kz-workspace kz-workspace-single">
         <div className="kz-panel kz-table-wrap">
-          {items.length === 0 ? <p className="kz-empty">No items yet.</p> : null}
+          {items.length === 0 ? <p className="kz-empty">{t.noItems}</p> : null}
           <table className="kz-table">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Category</th>
-                <th>Unit</th>
-                <th>Storage</th>
-                <th>Reorder</th>
+                <th>{t.code}</th>
+                <th>{t.name}</th>
+                <th>{t.category}</th>
+                <th>{t.unit}</th>
+                <th>{t.storage}</th>
+                <th>{t.reorder}</th>
                 <th></th>
               </tr>
             </thead>
@@ -263,11 +267,12 @@ export function ItemsScreen() {
                   <td>{item.name}</td>
                   <td>{item.category}</td>
                   <td>
-                    {item.conversionToBase} {BASE_UNIT_LABELS[item.baseUnit]} / {item.purchaseUnit}
+                    {item.conversionToBase} {label(BASE_UNIT_LABELS[item.baseUnit])} /{' '}
+                    {item.purchaseUnit}
                   </td>
-                  <td>{STORAGE_TYPE_LABELS[item.storageType]}</td>
+                  <td>{label(STORAGE_TYPE_LABELS[item.storageType])}</td>
                   <td>
-                    {item.reorderLevel} {BASE_UNIT_LABELS[item.baseUnit]}
+                    {item.reorderLevel} {label(BASE_UNIT_LABELS[item.baseUnit])}
                   </td>
                   <td>
                     {canArchive ? (
@@ -279,10 +284,10 @@ export function ItemsScreen() {
                           void api
                             .archiveItem(item.id)
                             .then(() => reload())
-                            .catch((caught: unknown) => setError(explain(caught, setUser)));
+                            .catch((caught: unknown) => setError(explain(caught, setUser, t)));
                         }}
                       >
-                        {messages.en.common.archive}
+                        {common.archive}
                       </button>
                     ) : null}
                   </td>
@@ -296,11 +301,15 @@ export function ItemsScreen() {
   );
 }
 
-function explain(error: unknown, setUser: (user: SessionUser | null) => void): string {
+function explain(
+  error: unknown,
+  setUser: (user: SessionUser | null) => void,
+  t: { signInToContinue: string; somethingWentWrong: string },
+): string {
   if (error instanceof ApiError && error.status === 401) {
     clearSession();
     setUser(null);
-    return 'Sign in to continue.';
+    return t.signInToContinue;
   }
-  return error instanceof Error ? error.message : 'Something went wrong.';
+  return error instanceof Error ? error.message : t.somethingWentWrong;
 }

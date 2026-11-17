@@ -1,7 +1,7 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { productionCopy } from '@knazawy/i18n';
 import {
   BASE_UNIT_LABELS,
   can,
@@ -16,11 +16,12 @@ import type {
   RecipeRecord,
   StockOnHandRecord,
 } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useCopy, useCommon, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
@@ -41,6 +42,9 @@ export function ProductionScreen() {
   const [saving, setSaving] = useState(false);
   const [ready, setReady] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const t = useCopy(productionCopy);
+  const common = useCommon();
+  const label = useLabel();
 
   useEffect(() => {
     const session = readSessionUser();
@@ -74,11 +78,11 @@ export function ProductionScreen() {
     return totals;
   }, [stock]);
 
-  if (!ready) return <p>Loading production</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to record production.
+        <Link href="/login">{common.signIn}</Link> {t.signInSuffix}
       </p>
     );
   }
@@ -104,7 +108,7 @@ export function ProductionScreen() {
             portions: actualPortions.trim(),
             wastagePercent: recipe.wastagePercent,
           });
-          const unit = BASE_UNIT_LABELS[line.baseUnit];
+          const unit = label(BASE_UNIT_LABELS[line.baseUnit]);
           const available = onHand.get(`${line.itemId}:${locationId}`) ?? '0';
           const short = batch.ok ? Number(available) < Number(batch.batch) : false;
           return {
@@ -122,14 +126,8 @@ export function ProductionScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.production}</h1>
-          <p>
-            Record a batch when it is cooked. Its ingredients leave stock straight away, oldest cost
-            first, and the batch shows what each portion cost.
-          </p>
-          <p lang="ur" dir="rtl">
-            {messages.ur.common.production}
-          </p>
+          <h1>{common.production}</h1>
+          <p>{t.intro}</p>
         </div>
         {canRecord ? (
           <button
@@ -141,7 +139,7 @@ export function ProductionScreen() {
               setDialogOpen(true);
             }}
           >
-            New batch
+            {t.newBatch}
           </button>
         ) : null}
       </div>
@@ -154,8 +152,8 @@ export function ProductionScreen() {
       <div className="kz-workspace kz-workspace-single">
         {canRecord ? (
           <FormDialog
-            buttonLabel="New batch"
-            title="New batch"
+            buttonLabel={t.newBatch}
+            title={t.newBatch}
             showTrigger={false}
             isOpen={dialogOpen}
             onOpenChange={setDialogOpen}
@@ -180,7 +178,11 @@ export function ProductionScreen() {
                     .then(async (batch) => {
                       setBatches((current) => [batch, ...current]);
                       setSaved(
-                        `${batch.number} is recorded: ${batch.actualPortions} portions at ${batch.costPerPortion} PKR each.`,
+                        fill(t.recorded, {
+                          number: batch.number,
+                          portions: batch.actualPortions,
+                          cost: batch.costPerPortion,
+                        }),
                       );
                       setPlannedPortions('');
                       setActualPortions('');
@@ -192,7 +194,7 @@ export function ProductionScreen() {
                     .finally(() => setSaving(false));
                 }}
               >
-                <Field label="Recipe">
+                <Field label={t.recipe}>
                   <select
                     value={recipeId}
                     onChange={(event) => setRecipeId(event.target.value)}
@@ -205,7 +207,7 @@ export function ProductionScreen() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Cooked at">
+                <Field label={t.cookedAt}>
                   <select
                     value={locationId}
                     onChange={(event) => setLocationId(event.target.value)}
@@ -218,7 +220,7 @@ export function ProductionScreen() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Cooked on" hint="Shown as DD/MM/YYYY.">
+                <Field label={t.cookedOn} hint={t.dateHint}>
                   <input
                     type="date"
                     value={producedOn}
@@ -228,13 +230,13 @@ export function ProductionScreen() {
                 </Field>
                 {stockYield?.ok ? (
                   <p role="status">
-                    Current stock at this location can make up to {stockYield.portions} portions.
-                    {stockYield.portions === '0'
-                      ? ` Not enough ${stockYield.limitingIngredients.join(', ')} for one portion.`
-                      : ` Limited by ${stockYield.limitingIngredients.join(', ')}.`}
+                    {fill(t.canMake, { portions: stockYield.portions })}
+                    {fill(stockYield.portions === '0' ? t.notEnoughForOne : t.limitedBy, {
+                      items: stockYield.limitingIngredients.join(t.listSeparator),
+                    })}
                   </p>
                 ) : null}
-                <Field label="Planned portions">
+                <Field label={t.plannedPortions}>
                   <input
                     inputMode="numeric"
                     value={plannedPortions}
@@ -242,7 +244,7 @@ export function ProductionScreen() {
                     required
                   />
                 </Field>
-                <Field label="Portions made" hint="Ingredients are taken for these portions.">
+                <Field label={t.portionsMade} hint={t.portionsMadeHint}>
                   <input
                     inputMode="numeric"
                     value={actualPortions}
@@ -250,12 +252,12 @@ export function ProductionScreen() {
                     required
                   />
                 </Field>
-                <Field label="Note">
+                <Field label={t.note}>
                   <input
                     value={note}
                     maxLength={200}
                     onChange={(event) => setNote(event.target.value)}
-                    placeholder="Optional"
+                    placeholder={t.optional}
                   />
                 </Field>
                 {preview.length > 0 ? (
@@ -263,9 +265,9 @@ export function ProductionScreen() {
                     <table className="kz-table">
                       <thead>
                         <tr>
-                          <th>Ingredient</th>
-                          <th>Needed</th>
-                          <th>In this location</th>
+                          <th>{t.ingredient}</th>
+                          <th>{t.needed}</th>
+                          <th>{t.inThisLocation}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -275,7 +277,7 @@ export function ProductionScreen() {
                             <td>{row.needed}</td>
                             <td>
                               {row.available}
-                              {row.short ? ' · not enough' : ''}
+                              {row.short ? t.notEnoughSuffix : ''}
                             </td>
                           </tr>
                         ))}
@@ -293,26 +295,26 @@ export function ProductionScreen() {
                   type="submit"
                   disabled={saving || recipes.length === 0 || locations.length === 0}
                 >
-                  {saving ? 'Recording' : 'Record batch'}
+                  {saving ? t.recording : t.recordBatch}
                 </button>
-                {recipes.length === 0 ? <p>Approve a recipe before you cook it.</p> : null}
+                {recipes.length === 0 ? <p>{t.approveFirst}</p> : null}
               </form>
             )}
           </FormDialog>
         ) : null}
         <div className="kz-panel kz-table-wrap">
-          <h2>Batches</h2>
-          {batches.length === 0 ? <p className="kz-empty">No batches yet.</p> : null}
+          <h2>{t.batches}</h2>
+          {batches.length === 0 ? <p className="kz-empty">{t.noBatches}</p> : null}
           <table className="kz-table">
             <thead>
               <tr>
-                <th>Number</th>
-                <th>Recipe</th>
-                <th>Location</th>
-                <th>Cooked</th>
-                <th>Portions</th>
-                <th>Ingredient cost</th>
-                <th>Cost per portion</th>
+                <th>{t.number}</th>
+                <th>{t.recipe}</th>
+                <th>{t.location}</th>
+                <th>{t.cooked}</th>
+                <th>{t.portions}</th>
+                <th>{t.ingredientCost}</th>
+                <th>{t.costPerPortion}</th>
               </tr>
             </thead>
             <tbody>
@@ -325,7 +327,7 @@ export function ProductionScreen() {
                   <td>
                     {batch.actualPortions}
                     {batch.actualPortions !== batch.plannedPortions
-                      ? ` (planned ${batch.plannedPortions})`
+                      ? fill(t.plannedSuffix, { count: batch.plannedPortions })
                       : ''}
                   </td>
                   <td>{batch.totalCost} PKR</td>

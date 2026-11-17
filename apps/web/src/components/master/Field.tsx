@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { useCommon } from '../../lib/i18n';
+
 export function Field({
   label,
   hint,
@@ -10,6 +12,7 @@ export function Field({
   hint?: string;
   children: ReactNode;
 }) {
+  const common = useCommon();
   const [hintOpen, setHintOpen] = useState(false);
 
   return (
@@ -21,7 +24,7 @@ export function Field({
             className="kz-field-info"
             role="button"
             tabIndex={0}
-            aria-label={`Information: ${hint}`}
+            aria-label={`${common.information}: ${hint}`}
             aria-expanded={hintOpen}
             title={hint}
             data-hint={hint}
