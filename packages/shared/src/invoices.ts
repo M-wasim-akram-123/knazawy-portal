@@ -137,6 +137,16 @@ export interface InvoiceRecord {
   note: string | null;
   reason: string | null;
   issuedAt: string | null;
+  /** Lines added up, before the airline discount. */
+  subtotal: string;
+  /** Percent copied from the airline's terms, such as "5". */
+  discountPercent: string;
+  discount: string;
+  /** Days to pay, copied when issued. Null on a draft or a credit note. */
+  paymentTermsDays: number | null;
+  /** YYYY-MM-DD the invoice must be paid by. Null until issued. */
+  dueOn: string | null;
+  /** What the airline owes for this document: subtotal less discount. */
   total: string;
   amountDue: string;
   lines: InvoiceLineRecord[];

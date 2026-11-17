@@ -1,11 +1,20 @@
 import {
+  airlineTermsError,
+  canSetAirlineTerms,
   isAirlineRole,
+  isKaramRole,
   type Actor,
   type AirlineRecord,
+  type AirlineTermsRecord,
   type AirlineRole,
   type Role,
 } from '@knazawy/shared';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -15,6 +24,7 @@ import { rethrowUnique } from '../common/prisma-error';
 import { PrismaService } from '../prisma/prisma.service';
 
 import type {
+  AirlineTermsDto,
   CreateAirlineDto,
   CreateAirlineUserDto,
   UpdateAirlineDto,
@@ -27,6 +37,31 @@ const airlineInclude = {
 
 type AirlineRow = Prisma.OrganisationGetPayload<{ include: typeof airlineInclude }>;
 type AirlineUserRow = AirlineRow['users'][number];
+
+const termsSelect = {
+  id: true,
+  code: true,
+  name: true,
+  paymentTermsDays: true,
+  discountPercent: true,
+} satisfies Prisma.OrganisationSelect;
+
+type TermsRow = Prisma.OrganisationGetPayload<{ select: typeof termsSelect }>;
+
+function toTerms(row: TermsRow): AirlineTermsRecord {
+  return {
+    airlineId: row.id,
+    airlineCode: row.code,
+    airlineName: row.name,
+    paymentTermsDays: row.paymentTermsDays,
+    discountPercent: trimPercent(row.discountPercent.toFixed(2)),
+  };
+}
+
+/** "5.00" reads as "5", "2.50" as "2.5". */
+function trimPercent(value: string): string {
+  return value.replace(/\.?0+$/, '') || '0';
+}
 
 const CODE = /^[A-Z0-9][A-Z0-9-]{1,11}$/;
 
@@ -45,6 +80,49 @@ export class AirlinesService {
       orderBy: { name: 'asc' },
     });
     return rows.map(toAirline);
+  }
+
+  async terms(actor: Actor): Promise<AirlineTermsRecord[]> {
+    assertCan(actor, 'service_rates', 'R', 'view airline terms');
+    const rows = await this.prisma.organisation.findMany({
+      where: isKaramRole(actor.role)
+        ? { type: 'AIRLINE' }
+        : { type: 'AIRLINE', id: actor.organisationId },
+      select: termsSelect,
+      orderBy: { name: 'asc' },
+    });
+    return rows.map(toTerms);
+  }
+
+  async setTerms(actor: Actor, id: string, input: AirlineTermsDto): Promise<AirlineTermsRecord> {
+    if (!canSetAirlineTerms(actor.role)) {
+      throw new ForbiddenException('You cannot change airline terms.');
+    }
+    const discountPercent = input.discountPercent.trim();
+    const error = airlineTermsError({ paymentTermsDays: input.paymentTermsDays, discountPercent });
+    if (error) throw new BadRequestException(error);
+    const existing = await this.prisma.organisation.findFirst({
+      where: { id, type: 'AIRLINE' },
+      select: termsSelect,
+    });
+    if (!existing) throw new NotFoundException('That airline was not found.');
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.organisation.update({
+        where: { id },
+        data: { paymentTermsDays: input.paymentTermsDays, discountPercent },
+        select: termsSelect,
+      });
+      await this.audit.record(tx, {
+        userId: actor.id,
+        entity: 'Organisation',
+        entityId: id,
+        action: 'terms',
+        before: toTerms(existing),
+        after: toTerms(row),
+      });
+      return row;
+    });
+    return toTerms(updated);
   }
 
   async create(actor: Actor, input: CreateAirlineDto): Promise<AirlineRecord> {

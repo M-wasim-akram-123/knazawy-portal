@@ -39,6 +39,10 @@ model Organisation {
   type              OrganisationType
   name              String
   taxNumber         String?            @map("tax_number")
+  /// Airlines only. Days an invoice has to be paid, counted from the day it is issued.
+  paymentTermsDays  Int                @default(30) @map("payment_terms_days")
+  /// Airlines only. Percent taken off every invoice.
+  discountPercent   Decimal            @default(0) @map("discount_percent") @db.Decimal(5, 2)
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
   users             User[]
@@ -75,14 +79,14 @@ model Organisation {
 
 /// A Karam branch. Airlines are not split into branches, so only a KARAM organisation has these.
 model Branch {
-  id             String       @id @default(cuid())
-  organisationId String       @map("organisation_id")
-  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  id             String          @id @default(cuid())
+  organisationId String          @map("organisation_id")
+  organisation   Organisation    @relation(fields: [organisationId], references: [id])
   code           String
   name           String
-  active         Boolean      @default(true)
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
   users          User[]
   locations      StockLocation[]
   purchases      Purchase[]
@@ -95,39 +99,41 @@ model Branch {
 }
 
 model User {
-  id                   String           @id @default(cuid())
-  organisationId       String           @map("organisation_id")
-  organisation         Organisation     @relation(fields: [organisationId], references: [id])
+  id                   String             @id @default(cuid())
+  organisationId       String             @map("organisation_id")
+  organisation         Organisation       @relation(fields: [organisationId], references: [id])
   // The branch a Karam user is working in. An airline user has none.
-  branchId             String?          @map("branch_id")
-  branch               Branch?          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branchId             String?            @map("branch_id")
+  branch               Branch?            @relation(fields: [branchId], references: [id], onDelete: Restrict)
   name                 String
-  email                String           @unique
+  email                String             @unique
   role                 UserRole
-  requestsCreated      ServiceRequest[] @relation("RequestCreatedBy")
-  requestsDecided      ServiceRequest[] @relation("RequestDecidedBy")
-  rateCardsCreated     RateCard[]       @relation("RateCardCreatedBy")
-  rateCardsApproved    RateCard[]       @relation("RateCardApprovedBy")
-  deliveriesCreated    Delivery[]       @relation("DeliveryCreatedBy")
-  deliveriesDispatched Delivery[]       @relation("DeliveryDispatchedBy")
-  deliveriesDelivered  Delivery[]       @relation("DeliveryDeliveredBy")
-  invoicesCreated      Invoice[]        @relation("InvoiceCreatedBy")
-  invoicesIssued       Invoice[]        @relation("InvoiceIssuedBy")
-  journalEntriesPosted JournalEntry[]   @relation("JournalPostedBy")
+  requestsCreated      ServiceRequest[]   @relation("RequestCreatedBy")
+  requestsDecided      ServiceRequest[]   @relation("RequestDecidedBy")
+  rateCardsCreated     RateCard[]         @relation("RateCardCreatedBy")
+  rateCardsApproved    RateCard[]         @relation("RateCardApprovedBy")
+  deliveriesCreated    Delivery[]         @relation("DeliveryCreatedBy")
+  deliveriesDispatched Delivery[]         @relation("DeliveryDispatchedBy")
+  deliveriesDelivered  Delivery[]         @relation("DeliveryDeliveredBy")
+  invoicesCreated      Invoice[]          @relation("InvoiceCreatedBy")
+  invoicesIssued       Invoice[]          @relation("InvoiceIssuedBy")
+  journalEntriesPosted JournalEntry[]     @relation("JournalPostedBy")
   amendmentsCreated    RequestAmendment[] @relation("AmendmentCreatedBy")
   notifications        Notification[]
-  disputesOpened       Dispute[]        @relation("DisputeOpenedBy")
-  disputesDecided      Dispute[]        @relation("DisputeDecidedBy")
-  roomRequestsCreated  RoomRequest[]    @relation("RoomRequestCreatedBy")
-  roomRequestsDecided  RoomRequest[]    @relation("RoomRequestDecidedBy")
-  roomStaysCheckedIn   RoomStay[]       @relation("RoomStayCheckedInBy")
-  roomStaysCheckedOut  RoomStay[]       @relation("RoomStayCheckedOutBy")
-  roomInvoicesCreated  RoomInvoice[]    @relation("RoomInvoiceCreatedBy")
-  status               UserStatus       @default(INVITED)
-  passwordHash         String           @map("password_hash")
-  lastLoginAt          DateTime?        @map("last_login_at")
-  createdAt            DateTime         @default(now()) @map("created_at")
-  updatedAt            DateTime         @updatedAt @map("updated_at")
+  disputesOpened       Dispute[]          @relation("DisputeOpenedBy")
+  disputesDecided      Dispute[]          @relation("DisputeDecidedBy")
+  roomRequestsCreated  RoomRequest[]      @relation("RoomRequestCreatedBy")
+  roomRequestsDecided  RoomRequest[]      @relation("RoomRequestDecidedBy")
+  roomStaysCheckedIn   RoomStay[]         @relation("RoomStayCheckedInBy")
+  roomStaysCheckedOut  RoomStay[]         @relation("RoomStayCheckedOutBy")
+  roomInvoicesCreated  RoomInvoice[]      @relation("RoomInvoiceCreatedBy")
+  status               UserStatus         @default(INVITED)
+  passwordHash         String             @map("password_hash")
+  lastLoginAt          DateTime?          @map("last_login_at")
+  /// Tokens issued before this are refused, so a new password signs the person out everywhere.
+  passwordChangedAt    DateTime?          @map("password_changed_at")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
 
   @@index([organisationId])
   @@index([branchId])
@@ -797,30 +803,34 @@ enum InvoiceStatus {
 
 /// What an airline is charged for a delivered request or a one-off sale.
 model Invoice {
-  id              String         @id @default(cuid())
-  organisationId  String         @map("organisation_id")
-  organisation    Organisation   @relation(fields: [organisationId], references: [id])
-  number          String         @unique
-  kind            InvoiceKind    @default(INVOICE)
-  status          InvoiceStatus  @default(DRAFT)
-  requestId       String?        @map("request_id")
-  request         ServiceRequest? @relation(fields: [requestId], references: [id], onDelete: Restrict)
-  rateCardId      String?        @map("rate_card_id")
-  rateCard        RateCard?      @relation(fields: [rateCardId], references: [id], onDelete: Restrict)
-  sourceInvoiceId String?        @map("source_invoice_id")
-  sourceInvoice   Invoice?       @relation("InvoiceCredits", fields: [sourceInvoiceId], references: [id], onDelete: Restrict)
-  creditNotes     Invoice[]      @relation("InvoiceCredits")
-  note            String?
-  reason          String?
-  createdById     String         @map("created_by_id")
-  createdBy       User           @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  issuedAt        DateTime?      @map("issued_at")
-  issuedById      String?        @map("issued_by_id")
-  issuedBy        User?          @relation("InvoiceIssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
-  lines           InvoiceLine[]
-  dispute         Dispute?
+  id               String          @id @default(cuid())
+  organisationId   String          @map("organisation_id")
+  organisation     Organisation    @relation(fields: [organisationId], references: [id])
+  number           String          @unique
+  kind             InvoiceKind     @default(INVOICE)
+  status           InvoiceStatus   @default(DRAFT)
+  requestId        String?         @map("request_id")
+  request          ServiceRequest? @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  rateCardId       String?         @map("rate_card_id")
+  rateCard         RateCard?       @relation(fields: [rateCardId], references: [id], onDelete: Restrict)
+  sourceInvoiceId  String?         @map("source_invoice_id")
+  sourceInvoice    Invoice?        @relation("InvoiceCredits", fields: [sourceInvoiceId], references: [id], onDelete: Restrict)
+  creditNotes      Invoice[]       @relation("InvoiceCredits")
+  note             String?
+  reason           String?
+  /// Copied from the airline when issued. A credit note copies its invoice.
+  discountPercent  Decimal         @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  paymentTermsDays Int?            @map("payment_terms_days")
+  dueOn            DateTime?       @map("due_on") @db.Date
+  createdById      String          @map("created_by_id")
+  createdBy        User            @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  issuedAt         DateTime?       @map("issued_at")
+  issuedById       String?         @map("issued_by_id")
+  issuedBy         User?           @relation("InvoiceIssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  lines            InvoiceLine[]
+  dispute          Dispute?
 
   @@index([organisationId, status])
   @@index([requestId])
@@ -896,6 +906,8 @@ model Notification {
   createdAt DateTime  @default(now()) @map("created_at")
 
   @@index([userId, createdAt])
+  /// The bell's unread count runs on every page and every live ping.
+  @@index([userId, readAt])
   @@map("notifications")
 }
 
@@ -907,24 +919,24 @@ enum DisputeStatus {
 
 /// An airline's disagreement with an issued bill. Deciding it does not change the bill.
 model Dispute {
-  id             String         @id @default(cuid())
-  organisationId String         @map("organisation_id")
-  organisation   Organisation   @relation(fields: [organisationId], references: [id])
-  invoiceId      String?        @unique @map("invoice_id")
-  invoice        Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
-  roomInvoiceId  String?        @unique @map("room_invoice_id")
-  roomInvoice    RoomInvoice?   @relation(fields: [roomInvoiceId], references: [id], onDelete: Restrict)
-  number         String         @unique
-  status         DisputeStatus  @default(OPEN)
+  id             String        @id @default(cuid())
+  organisationId String        @map("organisation_id")
+  organisation   Organisation  @relation(fields: [organisationId], references: [id])
+  invoiceId      String?       @unique @map("invoice_id")
+  invoice        Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  roomInvoiceId  String?       @unique @map("room_invoice_id")
+  roomInvoice    RoomInvoice?  @relation(fields: [roomInvoiceId], references: [id], onDelete: Restrict)
+  number         String        @unique
+  status         DisputeStatus @default(OPEN)
   reason         String
   resolution     String?
-  openedById     String         @map("opened_by_id")
-  openedBy       User           @relation("DisputeOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
-  decidedById    String?        @map("decided_by_id")
-  decidedBy      User?          @relation("DisputeDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
-  decidedAt      DateTime?      @map("decided_at")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
+  openedById     String        @map("opened_by_id")
+  openedBy       User          @relation("DisputeOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+  decidedById    String?       @map("decided_by_id")
+  decidedBy      User?         @relation("DisputeDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  decidedAt      DateTime?     @map("decided_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
   @@index([organisationId])
   @@map("disputes")
@@ -1036,14 +1048,14 @@ model RoomFloor {
 
 /// A kind of room, such as a single or a suite. The names are the administrator's.
 model RoomType {
-  id             String       @id @default(cuid())
-  organisationId String       @map("organisation_id")
-  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  id             String            @id @default(cuid())
+  organisationId String            @map("organisation_id")
+  organisation   Organisation      @relation(fields: [organisationId], references: [id])
   name           String
   note           String?
-  active         Boolean      @default(true)
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  active         Boolean           @default(true)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
   charges        RoomCharge[]
   rooms          HotelRoom[]
   requestLines   RoomRequestLine[]
@@ -1056,15 +1068,15 @@ model RoomType {
 
 /// One named part of a night's price. The administrator adds every charge.
 model RoomCharge {
-  id              String   @id @default(cuid())
-  roomTypeId      String   @map("room_type_id")
-  roomType        RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
-  name            String
-  amountPerNight  Decimal  @map("amount_per_night") @db.Decimal(12, 2)
-  sortOrder       Int      @default(0) @map("sort_order")
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  roomTypeId     String   @map("room_type_id")
+  roomType       RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  name           String
+  amountPerNight Decimal  @map("amount_per_night") @db.Decimal(12, 2)
+  sortOrder      Int      @default(0) @map("sort_order")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@unique([roomTypeId, name])
   @@index([roomTypeId])
@@ -1085,7 +1097,7 @@ model HotelRoom {
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  stays          RoomStay[]
+  stays RoomStay[]
 
   @@unique([floorId, name])
   @@index([organisationId])
@@ -1133,14 +1145,14 @@ model RoomRequest {
 }
 
 model RoomRequestLine {
-  id             String      @id @default(cuid())
-  requestId      String      @map("request_id")
-  request        RoomRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
-  roomTypeId     String      @map("room_type_id")
-  roomType       RoomType    @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
-  quantity       Int
-  nightlyQuoted  Decimal?    @map("nightly_quoted") @db.Decimal(12, 2)
-  stays          RoomStay[]
+  id            String      @id @default(cuid())
+  requestId     String      @map("request_id")
+  request       RoomRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  roomTypeId    String      @map("room_type_id")
+  roomType      RoomType    @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  quantity      Int
+  nightlyQuoted Decimal?    @map("nightly_quoted") @db.Decimal(12, 2)
+  stays         RoomStay[]
 
   @@unique([requestId, roomTypeId])
   @@index([requestId])
@@ -1179,23 +1191,23 @@ enum RoomInvoiceKind {
 
 /// A bill for an accepted room stay, or the credit note that reverses it. Issued when it is raised; never changed.
 model RoomInvoice {
-  id              String          @id @default(cuid())
-  organisationId  String          @map("organisation_id")
-  organisation    Organisation    @relation(fields: [organisationId], references: [id])
-  number          String          @unique
+  id              String            @id @default(cuid())
+  organisationId  String            @map("organisation_id")
+  organisation    Organisation      @relation(fields: [organisationId], references: [id])
+  number          String            @unique
   kind            RoomInvoiceKind
-  roomRequestId   String          @map("room_request_id")
-  roomRequest     RoomRequest     @relation(fields: [roomRequestId], references: [id], onDelete: Restrict)
+  roomRequestId   String            @map("room_request_id")
+  roomRequest     RoomRequest       @relation(fields: [roomRequestId], references: [id], onDelete: Restrict)
   /// The room request id while this bill is the one in force. Cleared when the bill is credited, so the stay can be billed again.
-  openRequestId   String?         @unique @map("open_request_id")
-  sourceInvoiceId String?         @unique @map("source_invoice_id")
-  sourceInvoice   RoomInvoice?    @relation("RoomInvoiceCredits", fields: [sourceInvoiceId], references: [id], onDelete: Restrict)
-  creditNotes     RoomInvoice[]   @relation("RoomInvoiceCredits")
+  openRequestId   String?           @unique @map("open_request_id")
+  sourceInvoiceId String?           @unique @map("source_invoice_id")
+  sourceInvoice   RoomInvoice?      @relation("RoomInvoiceCredits", fields: [sourceInvoiceId], references: [id], onDelete: Restrict)
+  creditNotes     RoomInvoice[]     @relation("RoomInvoiceCredits")
   reason          String?
-  createdById     String          @map("created_by_id")
-  createdBy       User            @relation("RoomInvoiceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  issuedAt        DateTime        @map("issued_at")
-  createdAt       DateTime        @default(now()) @map("created_at")
+  createdById     String            @map("created_by_id")
+  createdBy       User              @relation("RoomInvoiceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  issuedAt        DateTime          @map("issued_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
   lines           RoomInvoiceLine[]
   dispute         Dispute?
 

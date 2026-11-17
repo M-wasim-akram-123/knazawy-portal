@@ -55,6 +55,8 @@ function deliveryRow(overrides: Record<string, unknown> = {}) {
 }
 
 function serviceFor(tx: Record<string, unknown>): DeliveriesService {
+  // Row locks (SELECT ... FOR UPDATE) are a database concern; the mock just records them.
+  tx.$executeRaw ??= jest.fn().mockResolvedValue(1);
   const prisma = {
     ...tx,
     $transaction: (run: (client: object) => Promise<unknown>) => run(tx),

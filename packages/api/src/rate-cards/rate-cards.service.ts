@@ -14,6 +14,7 @@ import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
 import { formatIsoDate, parseIsoDate } from '../common/date';
 import { nextDocumentNumber } from '../common/document-number';
+import { lockOrganisation } from '../common/row-lock';
 import { PrismaService } from '../prisma/prisma.service';
 
 import type { EndRateCardDto, RateCardDto } from './rate-cards.dto';
@@ -171,6 +172,12 @@ export class RateCardsService {
     const period = periodOf(existing);
 
     await this.prisma.$transaction(async (tx) => {
+      // Approvals for one airline run one at a time, so two overlapping cards cannot both pass.
+      await lockOrganisation(tx, existing.organisationId);
+      const current = await tx.rateCard.findUnique({ where: { id }, select: { status: true } });
+      if (current?.status !== 'DRAFT') {
+        throw new BadRequestException('This rate card is already approved.');
+      }
       const others = await tx.rateCard.findMany({
         where: { organisationId: existing.organisationId, status: 'APPROVED', id: { not: id } },
         select: { number: true, validFrom: true, validTo: true },

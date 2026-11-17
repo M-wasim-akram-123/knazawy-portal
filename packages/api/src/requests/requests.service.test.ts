@@ -72,6 +72,8 @@ function input(overrides: Partial<ServiceRequestDto> = {}): ServiceRequestDto {
 }
 
 function serviceFor(tx: Record<string, unknown>): RequestsService {
+  // Row locks (SELECT ... FOR UPDATE) are a database concern; the mock just records them.
+  tx.$executeRaw ??= jest.fn().mockResolvedValue(1);
   const prisma = {
     ...tx,
     $transaction: (run: (client: object) => Promise<unknown>) => run(tx),
@@ -418,6 +420,62 @@ describe('RequestsService', () => {
       expect.objectContaining({
         data: expect.objectContaining({ status: 'CANCELLED' }),
       }),
+    );
+  });
+});
+
+describe('stock check for a request', () => {
+  function stockTx() {
+    return {
+      organisation: { findFirst: jest.fn().mockResolvedValue({ id: 'org-karam' }) },
+      serviceRequest: {
+        findUnique: jest.fn().mockResolvedValue(requestRow({ status: 'SUBMITTED' })),
+      },
+      serviceRequestLine: {
+        findMany: jest.fn().mockResolvedValue([{ recipeId: 'recipe-1', quantity: 4 }]),
+      },
+      recipe: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'recipe-1',
+            name: 'Chicken biryani',
+            kind: 'MEAL',
+            wastagePercent: { toString: () => '0.00' },
+            lines: [
+              {
+                itemId: 'rice',
+                quantityPerPortion: { toString: () => '0.150' },
+                item: { name: 'Rice', baseUnit: 'KG' },
+              },
+            ],
+          },
+        ]),
+      },
+      stockLayer: {
+        groupBy: jest
+          .fn()
+          .mockResolvedValue([{ itemId: 'rice', _sum: { quantityBase: { toString: () => '2' } } }]),
+      },
+    };
+  }
+
+  it('holds back stock for other accepted requests, then says how short this one is', async () => {
+    const tx = stockTx();
+    const result = await serviceFor(tx).fulfilment(operations, 'rq-1');
+    expect(tx.serviceRequestLine.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { request: { status: 'ACCEPTED', id: { not: 'rq-1' } } },
+      }),
+    );
+    // 2 kg on hand, 0.6 kg promised, 1.5 kg needed for 10 portions.
+    expect(result.ingredients[0]).toMatchObject({ free: '1.4', short: '0.1' });
+    expect(result.lines[0]).toMatchObject({ quantity: 10, canMake: 9 });
+    expect(result.canFulfil).toBe(false);
+  });
+
+  it('never shows stock to an airline', async () => {
+    await expect(serviceFor(stockTx()).fulfilment(airline, 'rq-1')).rejects.toBeInstanceOf(
+      ForbiddenException,
     );
   });
 });

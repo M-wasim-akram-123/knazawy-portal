@@ -90,7 +90,13 @@ export function journalCsv(entries: JournalEntryRecord[]): string {
   return [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\n');
 }
 
-function csvCell(value: string): string {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
+/**
+ * A text cell that Excel or Sheets will not run as a formula. A cell starting with = + - @ or a
+ * tab gets a leading apostrophe; amounts are numbers and are left alone.
+ */
+export function csvCell(value: string): string {
+  const looksLikeNumber = /^-?\d+(?:\.\d+)?$/.test(value);
+  const safe = !looksLikeNumber && /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  if (/[",\n\r]/.test(safe)) return `"${safe.replace(/"/g, '""')}"`;
+  return safe;
 }

@@ -29,10 +29,7 @@ function buildCorsOrigins(): string[] {
     .filter((origin) => origin.length > 0);
 
   if (localNetworkOrigins.length > 0 && process.env.NODE_ENV === 'production') {
-    Logger.warn(
-      'LOCAL_NETWORK_BASE_URLS is set in production and will be ignored.',
-      'Bootstrap',
-    );
+    Logger.warn('LOCAL_NETWORK_BASE_URLS is set in production and will be ignored.', 'Bootstrap');
     return baseOrigins;
   }
 
@@ -76,8 +73,9 @@ async function bootstrap(): Promise<void> {
   });
 
   app.use(cookieParser());
-  app.use(json({ limit: '8mb' }));
-  app.use(urlencoded({ extended: true, limit: '8mb' }));
+  // JSON bodies are small forms. Bill photos are multipart and have their own 8 MB limit.
+  app.use(json({ limit: '1mb' }));
+  app.use(urlencoded({ extended: true, limit: '1mb' }));
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(
     new ValidationPipe({

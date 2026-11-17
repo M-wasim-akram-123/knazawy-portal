@@ -55,3 +55,30 @@ export interface StockOnHandRecord {
   baseUnit: BaseUnit;
   quantityBase: string;
 }
+
+/** An active item at or below its reorder level in this branch, including items with none left. */
+export interface LowStockRecord {
+  itemId: string;
+  itemName: string;
+  baseUnit: BaseUnit;
+  onHand: string;
+  reorderLevel: string;
+}
+
+/**
+ * True when an item should be bought again: it has a reorder level, and stock is at or below it.
+ * Both values are base-unit decimals, such as "12.5" or "12.5000".
+ */
+export function needsReorder(onHand: string, reorderLevel: string): boolean {
+  const level = scaledQuantity(reorderLevel);
+  const stock = scaledQuantity(onHand);
+  if (level === null || stock === null || level === 0n) return false;
+  return stock <= level;
+}
+
+function scaledQuantity(value: string): bigint | null {
+  const trimmed = value.trim();
+  if (!/^\d+(?:\.\d+)?$/.test(trimmed)) return null;
+  const [whole, fraction = ''] = trimmed.split('.');
+  return BigInt(whole + fraction.slice(0, 4).padEnd(4, '0'));
+}

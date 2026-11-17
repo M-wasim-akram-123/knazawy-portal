@@ -1,4 +1,4 @@
-import type { Actor, AirlineRecord } from '@knazawy/shared';
+import type { Actor, AirlineRecord, AirlineTermsRecord } from '@knazawy/shared';
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
@@ -6,6 +6,7 @@ import { CurrentUser } from '../auth/current-user';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 import {
+  AirlineTermsDto,
   CreateAirlineDto,
   CreateAirlineUserDto,
   UpdateAirlineDto,
@@ -23,6 +24,21 @@ export class AirlinesController {
   @Get()
   list(@CurrentUser() actor: Actor): Promise<AirlineRecord[]> {
     return this.airlines.list(actor);
+  }
+
+  /** Payment days and discount. Karam staff see every airline; an airline sees its own. */
+  @Get('terms')
+  terms(@CurrentUser() actor: Actor): Promise<AirlineTermsRecord[]> {
+    return this.airlines.terms(actor);
+  }
+
+  @Patch(':id/terms')
+  setTerms(
+    @CurrentUser() actor: Actor,
+    @Param('id') id: string,
+    @Body() body: AirlineTermsDto,
+  ): Promise<AirlineTermsRecord> {
+    return this.airlines.setTerms(actor, id, body);
   }
 
   @Post()

@@ -1,6 +1,7 @@
 import {
   amendmentError,
   cancellationChargeApplies,
+  checkFulfilment,
   cutOffInstant,
   invoicePosting,
   isKaramRole,
@@ -11,19 +12,27 @@ import {
   previewCharges,
   todayInKarachi,
   type Actor,
+  type FulfilmentRecipe,
+  type FulfilmentRecord,
   type InvoicePricedLine,
   type MenuItemRecord,
   type PassengerSplit,
   type RequestAction,
   type ServiceRequestRecord,
 } from '@knazawy/shared';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
 import { formatIsoDate, parseIsoDate } from '../common/date';
 import { nextDocumentNumber } from '../common/document-number';
+import { lockRequestStatus } from '../common/row-lock';
 import { LedgerService } from '../ledger/ledger.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -143,6 +152,7 @@ export class RequestsService {
     const lines = linesFrom(input.lines);
 
     await this.prisma.$transaction(async (tx) => {
+      await lockRequestStatus(tx, existing.id, existing.status);
       await checkMenu(tx, karamOrgId, lines);
       await tx.serviceRequest.update({ where: { id }, data: { serviceDate, ...fields } });
       await tx.serviceRequestLine.deleteMany({ where: { requestId: id } });
@@ -185,6 +195,7 @@ export class RequestsService {
     }));
 
     await this.prisma.$transaction(async (tx) => {
+      await lockRequestStatus(tx, existing.id, existing.status);
       await checkMenu(tx, karamOrgId, lines);
       await tx.serviceRequest.update({
         where: { id },
@@ -241,6 +252,7 @@ export class RequestsService {
     const karamOrgId = await this.karamOrganisationId();
 
     await this.prisma.$transaction(async (tx) => {
+      await lockRequestStatus(tx, existing.id, existing.status);
       await checkMenu(tx, karamOrgId, lines);
       await tx.serviceRequest.update({ where: { id }, data: { serviceDate, ...fields } });
       await tx.serviceRequestLine.deleteMany({ where: { requestId: id } });
@@ -300,13 +312,7 @@ export class RequestsService {
     }
     const karamOrgId = await this.karamOrganisationId();
     await this.prisma.$transaction(async (tx) => {
-      const current = await tx.serviceRequest.findUnique({
-        where: { id },
-        select: { status: true },
-      });
-      if (current?.status !== existing.status) {
-        throw new BadRequestException('This request can no longer be cancelled.');
-      }
+      await lockRequestStatus(tx, existing.id, existing.status);
       const number = await nextDocumentNumber(tx, karamOrgId, 'INVOICE');
       const invoice = await tx.invoice.create({
         data: {
@@ -379,6 +385,70 @@ export class RequestsService {
     return this.load(id);
   }
 
+  /**
+   * Whether Karam's stock covers this request. Stock held for other accepted requests that have
+   * not gone into production is set aside first. Karam staff only: an airline never sees stock.
+   */
+  async fulfilment(actor: Actor, id: string): Promise<FulfilmentRecord> {
+    assertCan(actor, 'service_requests', 'R', 'check stock for a request');
+    if (!isKaramRole(actor.role)) throw new ForbiddenException('You cannot see stock levels.');
+    const request = await this.findAny(id);
+    const karamOrgId = await this.karamOrganisationId();
+    const promised = await this.prisma.serviceRequestLine.findMany({
+      where: { request: { status: 'ACCEPTED', id: { not: request.id } } },
+      select: { recipeId: true, quantity: true },
+    });
+    const recipeIds = [...new Set([...request.lines, ...promised].map((line) => line.recipeId))];
+    const recipeRows = await this.prisma.recipe.findMany({
+      where: { id: { in: recipeIds } },
+      select: {
+        id: true,
+        name: true,
+        kind: true,
+        wastagePercent: true,
+        lines: {
+          select: {
+            itemId: true,
+            quantityPerPortion: true,
+            item: { select: { name: true, baseUnit: true } },
+          },
+        },
+      },
+    });
+    const recipes = new Map<string, FulfilmentRecipe>(
+      recipeRows.map((recipe) => [
+        recipe.id,
+        {
+          recipeId: recipe.id,
+          recipeName: recipe.name,
+          kind: recipe.kind,
+          wastagePercent: recipe.wastagePercent.toString(),
+          ingredients: recipe.lines.map((line) => ({
+            itemId: line.itemId,
+            itemName: line.item.name,
+            baseUnit: line.item.baseUnit,
+            quantityPerPortion: line.quantityPerPortion.toString(),
+          })),
+        },
+      ]),
+    );
+    const itemIds = [
+      ...new Set(recipeRows.flatMap((recipe) => recipe.lines.map((line) => line.itemId))),
+    ];
+    const stock = await this.prisma.stockLayer.groupBy({
+      by: ['itemId'],
+      where: { organisationId: karamOrgId, itemId: { in: itemIds }, quantityBase: { gt: 0 } },
+      _sum: { quantityBase: true },
+    });
+    return checkFulfilment({
+      requestId: request.id,
+      lines: request.lines.map((line) => ({ recipeId: line.recipeId, quantity: line.quantity })),
+      recipes,
+      onHand: new Map(stock.map((row) => [row.itemId, row._sum.quantityBase?.toString() ?? '0'])),
+      promisedLines: promised,
+    });
+  }
+
   async accept(actor: Actor, id: string): Promise<ServiceRequestRecord> {
     assertCan(actor, 'service_requests', 'A', 'accept a request');
     const existing = await this.findAny(id);
@@ -414,6 +484,7 @@ export class RequestsService {
   ): Promise<void> {
     const decided = action === 'accept' || action === 'reject';
     await this.prisma.$transaction(async (tx) => {
+      await lockRequestStatus(tx, existing.id, existing.status);
       await tx.serviceRequest.update({
         where: { id: existing.id },
         data: {

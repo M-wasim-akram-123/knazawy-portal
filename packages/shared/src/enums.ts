@@ -29,14 +29,6 @@ export const USER_STATUSES = {
 
 export type UserStatus = (typeof USER_STATUSES)[keyof typeof USER_STATUSES];
 
-export const SERVICE_TYPES = {
-  MEAL: 'MEAL',
-  SNACK: 'SNACK',
-  HOTEL_ROOM: 'HOTEL_ROOM',
-} as const;
-
-export type ServiceType = (typeof SERVICE_TYPES)[keyof typeof SERVICE_TYPES];
-
 /** Order matches the operational lifecycle. Rejected and cancelled are terminal. */
 export const REQUEST_STATUSES = [
   'DRAFT',

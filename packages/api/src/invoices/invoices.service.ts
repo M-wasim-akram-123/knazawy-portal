@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 
 import {
   amountDue,
+  applyDiscount,
+  formatDisplayDate,
+  invoiceDueOn,
+  todayInKarachi,
   canIssueInvoice,
   canRaiseInvoice,
   chargeFor,
@@ -28,9 +32,10 @@ import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
-import { formatIsoDate } from '../common/date';
+import { formatIsoDate, parseIsoDate } from '../common/date';
 import { parsePositiveDecimal } from '../common/decimal';
 import { nextDocumentNumber } from '../common/document-number';
+import { lockInvoice, lockRequest } from '../common/row-lock';
 import { LedgerService } from '../ledger/ledger.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -48,6 +53,7 @@ const invoiceInclude = {
       id: true,
       number: true,
       reason: true,
+      discountPercent: true,
       lines: { select: { recipeId: true, billedQuantity: true, amount: true } },
     },
   },
@@ -111,6 +117,8 @@ export class InvoicesService {
     const karamOrgId = await this.karamOrganisationId();
 
     const id = await this.prisma.$transaction(async (tx) => {
+      // One invoice per request: hold the request while checking for an existing one.
+      await lockRequest(tx, input.requestId);
       const request = await this.loadRequest(tx, input.requestId);
       if (!requestStatusAfterInvoice(request.status)) {
         throw new BadRequestException('Only a delivered request can be invoiced.');
@@ -122,6 +130,7 @@ export class InvoicesService {
       if (existing)
         throw new BadRequestException(`${existing.number} already covers this request.`);
       const charge = await this.price(tx, request);
+      const terms = await termsOf(tx, request.organisationId);
       const number = await nextDocumentNumber(tx, karamOrgId, 'INVOICE');
       const invoice = await tx.invoice.create({
         data: {
@@ -129,6 +138,8 @@ export class InvoicesService {
           number,
           requestId: request.id,
           rateCardId: charge.rateCardId,
+          discountPercent: terms.discountPercent,
+          paymentTermsDays: terms.paymentTermsDays,
           note: blankToNull(input.note),
           createdById: actor.id,
           lines: { create: charge.lines.map(lineData) },
@@ -197,11 +208,13 @@ export class InvoicesService {
     }
     const karamOrgId = await this.karamOrganisationId();
     await this.prisma.$transaction(async (tx) => {
+      // Hold the invoice so a double click cannot issue or credit it twice.
+      await lockInvoice(tx, id);
       const existing = await this.find(tx, id);
       if (existing.kind !== 'INVOICE' || existing.status !== 'DRAFT') {
         throw new BadRequestException('Only a draft invoice can be issued.');
       }
-      let total: string;
+      let subtotal: string;
       let rateCardId: string | undefined;
       if (existing.requestId) {
         const request = await this.loadRequest(tx, existing.requestId);
@@ -214,13 +227,18 @@ export class InvoicesService {
         });
         rateCardId = charge.rateCardId;
         await tx.serviceRequest.update({ where: { id: request.id }, data: { status: next } });
-        total = totalOf(charge.lines);
+        subtotal = totalOf(charge.lines);
       } else {
         if (existing.lines.length === 0) {
           throw new BadRequestException('Add at least one menu item before issuing this invoice.');
         }
-        total = totalOf(existing.lines.map((line) => ({ amount: line.amount.toFixed(2) })));
+        subtotal = totalOf(existing.lines.map((line) => ({ amount: line.amount.toFixed(2) })));
       }
+      // The airline's terms on the day of issue are copied onto the bill and never change after.
+      const terms = await termsOf(tx, existing.organisationId);
+      const priced = applyDiscount(subtotal, terms.discountPercent);
+      if (!priced) throw new BadRequestException('The airline discount cannot be applied.');
+      const total = priced.total;
       await tx.invoice.update({
         where: { id },
         data: {
@@ -228,6 +246,9 @@ export class InvoicesService {
           status: 'ISSUED',
           issuedAt: new Date(),
           issuedById: actor.id,
+          discountPercent: terms.discountPercent,
+          paymentTermsDays: terms.paymentTermsDays,
+          dueOn: parseIsoDate(invoiceDueOn(todayInKarachi(), terms.paymentTermsDays)),
         },
       });
       await this.audit.record(tx, {
@@ -236,7 +257,13 @@ export class InvoicesService {
         entityId: id,
         action: 'issue',
         before: { status: 'DRAFT' },
-        after: { status: 'ISSUED', total },
+        after: {
+          status: 'ISSUED',
+          subtotal,
+          discount: priced.discount,
+          total,
+          paymentTermsDays: terms.paymentTermsDays,
+        },
       });
       await this.ledger.post(tx, actor, {
         organisationId: existing.organisationId,
@@ -250,7 +277,9 @@ export class InvoicesService {
           organisationId: existing.organisationId,
           role: 'AIRLINE_FINANCE',
           title: `${existing.number} was issued`,
-          body: `The bill is ${total} PKR.`,
+          body: `The bill is ${total} PKR, due by ${formatDisplayDate(
+            invoiceDueOn(todayInKarachi(), terms.paymentTermsDays),
+          )}.`,
           entity: 'Invoice',
           entityId: id,
           exceptUserId: actor.id,
@@ -269,6 +298,8 @@ export class InvoicesService {
     const quantities = quantitiesFrom(input.lines);
 
     const creditId = await this.prisma.$transaction(async (tx) => {
+      // Hold the invoice so a double click cannot issue or credit it twice.
+      await lockInvoice(tx, id);
       const existing = await this.find(tx, id);
       if (existing.kind === 'CREDIT_NOTE' || existing.status !== 'ISSUED') {
         throw new BadRequestException('Credit an invoice that has been issued.');
@@ -307,6 +338,7 @@ export class InvoicesService {
           requestId: existing.requestId,
           rateCardId: existing.rateCardId,
           sourceInvoiceId: existing.id,
+          discountPercent: existing.discountPercent,
           reason,
           createdById: actor.id,
           issuedAt: new Date(),
@@ -314,7 +346,7 @@ export class InvoicesService {
           lines: { create: lines },
         },
       });
-      const total = totalOf(lines);
+      const total = discountedTotal(totalOf(lines), existing.discountPercent);
       await this.audit.record(tx, {
         userId: actor.id,
         entity: 'Invoice',
@@ -489,6 +521,25 @@ function totalOf(lines: Array<{ amount: string }>): string {
   return sumMoney(lines.map((line) => line.amount)) ?? '0.00';
 }
 
+/** A credit note takes the same discount as the invoice it corrects. */
+function discountedTotal(subtotal: string, discountPercent: Prisma.Decimal): string {
+  return applyDiscount(subtotal, discountPercent.toFixed(2))?.total ?? subtotal;
+}
+
+async function termsOf(
+  tx: Prisma.TransactionClient,
+  organisationId: string,
+): Promise<{ paymentTermsDays: number; discountPercent: string }> {
+  const organisation = await tx.organisation.findUnique({
+    where: { id: organisationId },
+    select: { paymentTermsDays: true, discountPercent: true },
+  });
+  return {
+    paymentTermsDays: organisation?.paymentTermsDays ?? 0,
+    discountPercent: organisation?.discountPercent.toFixed(2) ?? '0.00',
+  };
+}
+
 function quantitiesFrom(lines: CreditInvoiceDto['lines']): Map<string, number> {
   const quantities = new Map<string, number>();
   for (const line of lines) {
@@ -528,12 +579,16 @@ function toInvoice(row: InvoiceRow): InvoiceRecord {
       unitPrice: line.unitPrice.toFixed(2),
       amount: line.amount.toFixed(2),
     }));
-  const total = totalOf(lines);
+  const subtotal = totalOf(lines);
+  const priced = applyDiscount(subtotal, row.discountPercent.toFixed(2)) ?? {
+    discount: '0.00',
+    total: subtotal,
+  };
+  const total = priced.total;
   const creditTotals = row.creditNotes.map((credit) =>
-    totalOf(
-      credit.lines.map((line) => ({
-        amount: line.amount.toFixed(2),
-      })),
+    discountedTotal(
+      totalOf(credit.lines.map((line) => ({ amount: line.amount.toFixed(2) }))),
+      credit.discountPercent,
     ),
   );
   const due = row.kind === 'CREDIT_NOTE' ? total : (amountDue(total, creditTotals) ?? total);
@@ -554,14 +609,19 @@ function toInvoice(row: InvoiceRow): InvoiceRecord {
     note: row.note,
     reason: row.reason,
     issuedAt: row.issuedAt?.toISOString() ?? null,
+    subtotal,
+    discountPercent: row.discountPercent.toFixed(2).replace(/\.?0+$/, '') || '0',
+    discount: priced.discount,
+    paymentTermsDays: row.paymentTermsDays,
+    dueOn: row.dueOn ? formatIsoDate(row.dueOn) : null,
     total,
     amountDue: due,
     lines,
-    credits: row.creditNotes.map((credit) => ({
+    credits: row.creditNotes.map((credit, index) => ({
       id: credit.id,
       number: credit.number,
       reason: credit.reason,
-      total: totalOf(credit.lines.map((line) => ({ amount: line.amount.toFixed(2) }))),
+      total: creditTotals[index] ?? '0.00',
     })),
   };
 }

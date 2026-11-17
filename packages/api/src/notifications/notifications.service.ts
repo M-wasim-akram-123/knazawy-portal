@@ -1,8 +1,13 @@
-import type { Actor, NotificationRecord, Role } from '@knazawy/shared';
+import type { Actor, NotificationPing, NotificationRecord, Role } from '@knazawy/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+
+type PingListener = (ping: NotificationPing) => void;
+
+/** Open streams one user may hold, such as a phone and two browser tabs. */
+export const MAX_STREAMS_PER_USER = 3;
 
 export interface NotifyInput {
   organisationId: string;
@@ -16,7 +21,34 @@ export interface NotifyInput {
 
 @Injectable()
 export class NotificationsService {
+  /** Open live streams, by user. In-process: one API instance. Move to Redis pub/sub to scale out. */
+  private readonly listeners = new Map<string, Set<PingListener>>();
+
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Calls `listener` for each new notification for this user. Returns the unsubscribe, or null
+   * when the user already holds the most streams allowed.
+   */
+  subscribe(userId: string, listener: PingListener): (() => void) | null {
+    const set = this.listeners.get(userId) ?? new Set<PingListener>();
+    if (set.size >= MAX_STREAMS_PER_USER) return null;
+    set.add(listener);
+    this.listeners.set(userId, set);
+    return () => {
+      set.delete(listener);
+      if (set.size === 0) this.listeners.delete(userId);
+    };
+  }
+
+  /** True while the account may still receive notifications. */
+  async isActive(userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { status: true },
+    });
+    return user?.status === 'ACTIVE';
+  }
 
   /** Active users in one role, except the person who just did the thing. */
   async notify(tx: Prisma.TransactionClient, input: NotifyInput): Promise<void> {
@@ -39,6 +71,19 @@ export class NotificationsService {
         entityId: input.entityId,
       })),
     });
+    const ping: NotificationPing = {
+      title: input.title,
+      body: input.body,
+      entity: input.entity,
+      entityId: input.entityId,
+    };
+    for (const user of users) {
+      for (const listener of this.listeners.get(user.id) ?? []) {
+        // The write commits with the caller's transaction, so a client that refetches straight
+        // away may be early. The client refetches again shortly after; see watchNotifications.
+        listener(ping);
+      }
+    }
   }
 
   async list(actor: Actor): Promise<NotificationRecord[]> {

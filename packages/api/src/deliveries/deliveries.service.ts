@@ -13,6 +13,7 @@ import { AuditService } from '../audit/audit.service';
 import { assertCan } from '../auth/permissions';
 import { formatIsoDate } from '../common/date';
 import { nextDocumentNumber } from '../common/document-number';
+import { lockRequestStatus } from '../common/row-lock';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -71,6 +72,8 @@ export class DeliveriesService {
     const karamOrgId = await this.karamOrganisationId();
 
     const id = await this.prisma.$transaction(async (tx) => {
+      // The airline may be amending this request right now; wait for it, then re-check.
+      await lockRequestStatus(tx, request.id, request.status);
       const number = await nextDocumentNumber(tx, karamOrgId, 'DELIVERY');
       const delivery = await tx.delivery.create({
         data: {
