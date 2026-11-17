@@ -1,4 +1,6 @@
+import { LANGUAGE_OPTIONS } from '@knazawy/i18n';
 import { PRODUCT_NAME } from '@knazawy/shared';
+import { LanguageProvider } from '@knazawy/ui-shell';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
@@ -22,7 +24,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <StaffFrame>{children}</StaffFrame>
+        <LanguageProvider options={LANGUAGE_OPTIONS}>
+          <StaffFrame>{children}</StaffFrame>
+        </LanguageProvider>
       </body>
     </html>
   );

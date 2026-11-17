@@ -2,18 +2,22 @@
 
 import { ApiError } from '@knazawy/api-client';
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { locationsCopy } from '@knazawy/i18n';
 import { LOCATION_TYPE_LABELS, LOCATION_TYPES, can } from '@knazawy/shared';
 import type { LocationRecord } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { api, clearSession, readSessionUser } from '../../lib/session';
 
 import { Field } from './Field';
 
 export function LocationsScreen() {
+  const t = useCopy(locationsCopy);
+  const common = useCommon();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [locations, setLocations] = useState<LocationRecord[]>([]);
   const [name, setName] = useState('');
@@ -32,14 +36,17 @@ export function LocationsScreen() {
     setUser(session);
     setReady(true);
     if (!session) return;
-    void reload().catch((caught: unknown) => setError(explain(caught, setUser)));
+    void reload().catch((caught: unknown) => setError(explain(caught, setUser, t)));
   }, []);
 
-  if (!ready) return <p>Loading locations</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
+    const [beforeLink, afterLink] = t.signInToSee.split('{signIn}');
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see locations.
+        {beforeLink}
+        <Link href="/login">{common.signIn}</Link>
+        {afterLink}
       </p>
     );
   }
@@ -52,15 +59,13 @@ export function LocationsScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.locations}</h1>
-          <p>
-            Stores, rooms, and bins where this branch keeps stock. Switch branch to see another.
-          </p>
+          <h1>{common.locations}</h1>
+          <p>{t.intro}</p>
         </div>
         {canCreate ? (
           <FormDialog
-            buttonLabel="New location"
-            title="New location"
+            buttonLabel={t.newLocation}
+            title={t.newLocation}
             onOpenChange={setDialogOpen}
             onOpen={() => setError('')}
           >
@@ -82,13 +87,13 @@ export function LocationsScreen() {
                       setParentId('');
                       close();
                     })
-                    .catch((caught: unknown) => setError(explain(caught, setUser)));
+                    .catch((caught: unknown) => setError(explain(caught, setUser, t)));
                 }}
               >
-                <Field label="Name">
+                <Field label={t.name}>
                   <input value={name} onChange={(event) => setName(event.target.value)} required />
                 </Field>
-                <Field label="Type">
+                <Field label={t.type}>
                   <select
                     value={type}
                     onChange={(event) =>
@@ -97,17 +102,14 @@ export function LocationsScreen() {
                   >
                     {LOCATION_TYPES.map((locationType) => (
                       <option key={locationType} value={locationType}>
-                        {LOCATION_TYPE_LABELS[locationType]}
+                        {label(LOCATION_TYPE_LABELS[locationType])}
                       </option>
                     ))}
                   </select>
                 </Field>
-                <Field
-                  label="Inside"
-                  hint="Leave this empty for a top-level store, room, or vehicle."
-                >
+                <Field label={t.inside} hint={t.insideHint}>
                   <select value={parentId} onChange={(event) => setParentId(event.target.value)}>
-                    <option value="">None</option>
+                    <option value="">{t.none}</option>
                     {locations.map((location) => (
                       <option key={location.id} value={location.id}>
                         {location.name}
@@ -121,7 +123,7 @@ export function LocationsScreen() {
                   </p>
                 ) : null}
                 <button className="kz-button" type="submit">
-                  Save location
+                  {t.saveLocation}
                 </button>
               </form>
             )}
@@ -135,13 +137,13 @@ export function LocationsScreen() {
       ) : null}
       <div className="kz-workspace kz-workspace-single">
         <div className="kz-panel kz-table-wrap">
-          {locations.length === 0 ? <p className="kz-empty">No locations yet.</p> : null}
+          {locations.length === 0 ? <p className="kz-empty">{t.noLocations}</p> : null}
           <table className="kz-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Inside</th>
+                <th>{t.name}</th>
+                <th>{t.type}</th>
+                <th>{t.inside}</th>
                 <th></th>
               </tr>
             </thead>
@@ -149,8 +151,8 @@ export function LocationsScreen() {
               {locations.map((location) => (
                 <tr key={location.id}>
                   <td>{location.name}</td>
-                  <td>{LOCATION_TYPE_LABELS[location.type]}</td>
-                  <td>{location.parentId ? (names.get(location.parentId) ?? '') : 'Top level'}</td>
+                  <td>{label(LOCATION_TYPE_LABELS[location.type])}</td>
+                  <td>{location.parentId ? (names.get(location.parentId) ?? '') : t.topLevel}</td>
                   <td>
                     {canArchive ? (
                       <button
@@ -161,10 +163,10 @@ export function LocationsScreen() {
                           void api
                             .archiveLocation(location.id)
                             .then(() => reload())
-                            .catch((caught: unknown) => setError(explain(caught, setUser)));
+                            .catch((caught: unknown) => setError(explain(caught, setUser, t)));
                         }}
                       >
-                        {messages.en.common.archive}
+                        {common.archive}
                       </button>
                     ) : null}
                   </td>
@@ -178,11 +180,15 @@ export function LocationsScreen() {
   );
 }
 
-function explain(error: unknown, setUser: (user: SessionUser | null) => void): string {
+function explain(
+  error: unknown,
+  setUser: (user: SessionUser | null) => void,
+  t: { signInToContinue: string; somethingWentWrong: string },
+): string {
   if (error instanceof ApiError && error.status === 401) {
     clearSession();
     setUser(null);
-    return 'Sign in to continue.';
+    return t.signInToContinue;
   }
-  return error instanceof Error ? error.message : 'Something went wrong.';
+  return error instanceof Error ? error.message : t.somethingWentWrong;
 }

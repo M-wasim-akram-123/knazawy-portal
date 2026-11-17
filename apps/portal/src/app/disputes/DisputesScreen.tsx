@@ -1,7 +1,7 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { portalDisputesCopy } from '@knazawy/i18n';
 import {
   DISPUTE_STATUS_LABELS,
   canDisputeInvoice,
@@ -13,14 +13,19 @@ import {
   type InvoiceRecord,
   type RoomInvoiceRecord,
 } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { Field } from '../../components/Field';
+import { fill, useChrome, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { ApiError, api, clearSession, readSessionUser } from '../../lib/session';
 
 export function DisputesScreen() {
+  const t = useCopy(portalDisputesCopy);
+  const common = useCommon();
+  const chrome = useChrome();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [rows, setRows] = useState<DisputeRecord[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
@@ -50,15 +55,18 @@ export function DisputesScreen() {
           window.location.assign('/login');
           return;
         }
-        setError(caught instanceof Error ? caught.message : 'Disputes could not load.');
+        setError(caught instanceof Error ? caught.message : t.loadFailed);
       });
   }, []);
 
-  if (!ready) return <p>Loading</p>;
+  if (!ready) return <KaramLoader label={chrome.loading} fullPage />;
   if (!user) {
+    const [beforeLink, afterLink] = t.signInToSee.split('{link}');
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see disputes.
+        {beforeLink}
+        <Link href="/login">{common.signIn}</Link>
+        {afterLink}
       </p>
     );
   }
@@ -84,7 +92,11 @@ export function DisputesScreen() {
       )
       .map((bill) => ({
         key: `room:${bill.id}`,
-        label: `Room bill ${bill.number} · ${bill.total} PKR · ${formatDisplayDate(bill.checkIn)}`,
+        label: fill(t.roomBillOption, {
+          number: bill.number,
+          total: bill.total,
+          date: formatDisplayDate(bill.checkIn),
+        }),
       })),
   ];
 
@@ -101,10 +113,10 @@ export function DisputesScreen() {
       setRows((current) => [record, ...current]);
       setReason('');
       setBillKey('');
-      setSaved(`${record.number} is open. Karam will decide it. The bill is unchanged.`);
+      setSaved(fill(t.opened, { number: record.number }));
       setDialogOpen(false);
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'The dispute could not be opened.');
+      setError(caught instanceof Error ? caught.message : t.openFailed);
     } finally {
       setBusy(false);
     }
@@ -114,14 +126,8 @@ export function DisputesScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.disputes}</h1>
-          <p>
-            Dispute an issued bill for your airline. One dispute per bill. Karam&apos;s decision
-            does not change the bill.
-          </p>
-          <p lang="ur" dir="rtl">
-            {messages.ur.common.disputes}
-          </p>
+          <h1>{common.disputes}</h1>
+          <p>{t.intro}</p>
         </div>
         {canOpenDispute(user.role) ? (
           <button
@@ -134,7 +140,7 @@ export function DisputesScreen() {
               setDialogOpen(true);
             }}
           >
-            Open a dispute
+            {t.openADispute}
           </button>
         ) : null}
       </div>
@@ -146,8 +152,8 @@ export function DisputesScreen() {
       {saved ? <p role="status">{saved}</p> : null}
       {canOpenDispute(user.role) ? (
         <FormDialog
-          buttonLabel="Open a dispute"
-          title="Open a dispute"
+          buttonLabel={t.openADispute}
+          title={t.openADispute}
           showTrigger={false}
           isOpen={dialogOpen}
           onOpenChange={setDialogOpen}
@@ -160,13 +166,13 @@ export function DisputesScreen() {
                 void openDispute();
               }}
             >
-              <Field label="Bill">
+              <Field label={t.bill}>
                 <select
                   value={billKey}
                   onChange={(event) => setBillKey(event.target.value)}
                   required
                 >
-                  <option value="">Choose a bill</option>
+                  <option value="">{t.chooseBill}</option>
                   {openable.map((bill) => (
                     <option key={bill.key} value={bill.key}>
                       {bill.label}
@@ -174,7 +180,7 @@ export function DisputesScreen() {
                   ))}
                 </select>
               </Field>
-              <Field label="Reason">
+              <Field label={t.reason}>
                 <input
                   value={reason}
                   maxLength={300}
@@ -192,27 +198,29 @@ export function DisputesScreen() {
                 className="kz-button"
                 disabled={busy || reason.trim().length < 3}
               >
-                Open dispute
+                {t.openDispute}
               </button>
             </form>
           )}
         </FormDialog>
       ) : null}
-      {rows.length === 0 ? <p className="kz-empty">No disputes yet.</p> : null}
+      {rows.length === 0 ? <p className="kz-empty">{t.empty}</p> : null}
       {rows.map((row) => (
         <article key={row.id} className="kz-panel kz-stack">
           <h2>
             {row.number}{' '}
             <span className="kz-status" data-tone={disputeStatusTone(row.status)}>
-              {DISPUTE_STATUS_LABELS[row.status]}
+              {label(DISPUTE_STATUS_LABELS[row.status])}
             </span>
           </h2>
           <p>
-            {row.source === 'ROOM_INVOICE' ? `Room bill ${row.invoiceNumber}` : row.invoiceNumber} ·{' '}
-            {row.invoiceTotal} PKR · {formatDisplayDate(row.createdAt.slice(0, 10))}
+            {row.source === 'ROOM_INVOICE'
+              ? fill(t.roomBill, { number: row.invoiceNumber })
+              : row.invoiceNumber}{' '}
+            · {row.invoiceTotal} PKR · {formatDisplayDate(row.createdAt.slice(0, 10))}
           </p>
           <p>{row.reason}</p>
-          {row.resolution ? <p>Decision: {row.resolution}</p> : null}
+          {row.resolution ? <p>{fill(t.decision, { resolution: row.resolution })}</p> : null}
         </article>
       ))}
     </section>

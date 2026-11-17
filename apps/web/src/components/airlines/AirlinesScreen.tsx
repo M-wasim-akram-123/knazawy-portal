@@ -1,18 +1,23 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { airlinesCopy } from '@knazawy/i18n';
 import { AIRLINE_ROLE_LABELS, AIRLINE_ROLES, USER_STATUS_LABELS, can } from '@knazawy/shared';
 import type { AirlineRecord, AirlineRole } from '@knazawy/shared';
-import { FormDialog } from '@knazawy/ui-shell';
+import { FormDialog, KaramLoader, PasswordInput } from '@knazawy/ui-shell';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { fill, useChrome, useCommon, useCopy, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
 export function AirlinesScreen() {
+  const t = useCopy(airlinesCopy);
+  const common = useCommon();
+  const chrome = useChrome();
+  const label = useLabel();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [airlines, setAirlines] = useState<AirlineRecord[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -43,16 +48,19 @@ export function AirlinesScreen() {
       .catch((caught: unknown) => setError(explainApiError(caught, setUser)));
   }, []);
 
-  if (!ready) return <p>Loading airlines</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
+    const [beforeLink, afterLink] = t.signInToSee.split('{signIn}');
     return (
       <p>
-        <Link href="/login">{messages.en.common.signIn}</Link> to see airlines.
+        {beforeLink}
+        <Link href="/login">{common.signIn}</Link>
+        {afterLink}
       </p>
     );
   }
   if (!can(user.role, 'users', 'R')) {
-    return <p>An administrator keeps airline accounts.</p>;
+    return <p>{t.notAllowed}</p>;
   }
 
   const selected = airlines.find((airline) => airline.id === selectedId) ?? null;
@@ -62,19 +70,13 @@ export function AirlinesScreen() {
     <section className="kz-stack">
       <div className="kz-page-head kz-page-action-head">
         <div>
-          <h1>{messages.en.common.airlines}</h1>
-          <p>
-            Each airline has its own account. Its users sign in on the portal and see only that
-            airline. A requester places requests. Finance will see rates and invoices.
-          </p>
-          <p lang="ur" dir="rtl">
-            {messages.ur.common.airlines}
-          </p>
+          <h1>{common.airlines}</h1>
+          <p>{t.intro}</p>
         </div>
         {canWrite ? (
           <FormDialog
-            buttonLabel="New airline"
-            title="New airline"
+            buttonLabel={t.newAirline}
+            title={t.newAirline}
             onOpenChange={setDialogOpen}
             onOpen={() => setError('')}
           >
@@ -102,24 +104,24 @@ export function AirlinesScreen() {
                       setCode('');
                       setName('');
                       setTaxNumber('');
-                      setSaved(`${airline.name} is open.`);
+                      setSaved(fill(t.opened, { name: airline.name }));
                       close();
                     })
                     .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
                     .finally(() => setSaving(false));
                 }}
               >
-                <Field label="Code" hint="A short code, such as PIA.">
+                <Field label={t.code} hint={t.codeHint}>
                   <input value={code} onChange={(event) => setCode(event.target.value)} required />
                 </Field>
-                <Field label="Name">
+                <Field label={t.name}>
                   <input value={name} onChange={(event) => setName(event.target.value)} required />
                 </Field>
-                <Field label="Tax number">
+                <Field label={t.taxNumber}>
                   <input
                     value={taxNumber}
                     onChange={(event) => setTaxNumber(event.target.value)}
-                    placeholder="Optional"
+                    placeholder={t.optional}
                   />
                 </Field>
                 {error ? (
@@ -128,7 +130,7 @@ export function AirlinesScreen() {
                   </p>
                 ) : null}
                 <button className="kz-button" type="submit" disabled={saving}>
-                  {saving ? 'Saving' : 'Open airline'}
+                  {saving ? t.saving : t.openAirline}
                 </button>
               </form>
             )}
@@ -143,15 +145,15 @@ export function AirlinesScreen() {
       {saved ? <p role="status">{saved}</p> : null}
       <div className="kz-workspace kz-workspace-single">
         <div className="kz-panel kz-stack">
-          <h2>Accounts</h2>
-          {airlines.length === 0 ? <p className="kz-empty">No airlines yet.</p> : null}
+          <h2>{t.accounts}</h2>
+          {airlines.length === 0 ? <p className="kz-empty">{t.noAirlines}</p> : null}
           <div className="kz-table-wrap">
             <table className="kz-table">
               <thead>
                 <tr>
-                  <th>Code</th>
-                  <th>Name</th>
-                  <th>Users</th>
+                  <th>{t.code}</th>
+                  <th>{t.name}</th>
+                  <th>{t.users}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -167,7 +169,7 @@ export function AirlinesScreen() {
                         className="kz-button-quiet"
                         onClick={() => setSelectedId(airline.id)}
                       >
-                        Open
+                        {t.open}
                       </button>
                     </td>
                   </tr>
@@ -195,22 +197,24 @@ export function AirlinesScreen() {
                     setUserName('');
                     setEmail('');
                     setPassword('');
-                    setSaved(`${airline.name} has a new user.`);
+                    setSaved(fill(t.newUserAdded, { name: airline.name }));
                   })
                   .catch((caught: unknown) => setError(explainApiError(caught, setUser)))
                   .finally(() => setSaving(false));
               }}
             >
               <h2>{selected.name}</h2>
-              {selected.taxNumber ? <p>Tax number {selected.taxNumber}</p> : null}
+              {selected.taxNumber ? (
+                <p>{fill(t.taxNumberValue, { number: selected.taxNumber })}</p>
+              ) : null}
               <div className="kz-table-wrap">
                 <table className="kz-table">
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Status</th>
+                      <th>{t.name}</th>
+                      <th>{t.email}</th>
+                      <th>{t.role}</th>
+                      <th>{t.status}</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -219,8 +223,8 @@ export function AirlinesScreen() {
                       <tr key={member.id}>
                         <td>{member.name}</td>
                         <td>{member.email}</td>
-                        <td>{AIRLINE_ROLE_LABELS[member.role]}</td>
-                        <td>{USER_STATUS_LABELS[member.status]}</td>
+                        <td>{label(AIRLINE_ROLE_LABELS[member.role])}</td>
+                        <td>{label(USER_STATUS_LABELS[member.status])}</td>
                         <td>
                           {can(user.role, 'users', 'U') && member.status !== 'INVITED' ? (
                             <button
@@ -235,8 +239,8 @@ export function AirlinesScreen() {
                                     replaceAirline(airline);
                                     setSaved(
                                       status === 'ACTIVE'
-                                        ? `${member.name} can sign in again.`
-                                        : `${member.name} cannot sign in.`,
+                                        ? fill(t.canSignInAgain, { name: member.name })
+                                        : fill(t.cannotSignIn, { name: member.name }),
                                     );
                                   })
                                   .catch((caught: unknown) =>
@@ -244,7 +248,7 @@ export function AirlinesScreen() {
                                   );
                               }}
                             >
-                              {member.status === 'ACTIVE' ? 'Disable' : 'Enable'}
+                              {member.status === 'ACTIVE' ? t.disable : t.enable}
                             </button>
                           ) : null}
                         </td>
@@ -255,15 +259,15 @@ export function AirlinesScreen() {
               </div>
               {canWrite ? (
                 <>
-                  <h2>New user</h2>
-                  <Field label="Name">
+                  <h2>{t.newUser}</h2>
+                  <Field label={t.name}>
                     <input
                       value={userName}
                       onChange={(event) => setUserName(event.target.value)}
                       required
                     />
                   </Field>
-                  <Field label="Email">
+                  <Field label={t.email}>
                     <input
                       type="email"
                       value={email}
@@ -271,30 +275,31 @@ export function AirlinesScreen() {
                       required
                     />
                   </Field>
-                  <Field label="Role">
+                  <Field label={t.role}>
                     <select
                       value={role}
                       onChange={(event) => setRole(event.target.value as AirlineRole)}
                     >
                       {AIRLINE_ROLES.map((option) => (
                         <option key={option} value={option}>
-                          {AIRLINE_ROLE_LABELS[option]}
+                          {label(AIRLINE_ROLE_LABELS[option])}
                         </option>
                       ))}
                     </select>
                   </Field>
-                  <Field label="Password" hint="At least 4 characters. Share it with the user.">
-                    <input
-                      type="password"
+                  <Field label={t.password} hint={t.passwordHint}>
+                    <PasswordInput
                       autoComplete="new-password"
                       value={password}
-                      minLength={4}
+                      minLength={10}
                       onChange={(event) => setPassword(event.target.value)}
                       required
+                      showLabel={chrome.showPassword}
+                      hideLabel={chrome.hidePassword}
                     />
                   </Field>
                   <button className="kz-button" type="submit" disabled={saving}>
-                    {saving ? 'Saving' : 'Add user'}
+                    {saving ? t.saving : t.addUser}
                   </button>
                 </>
               ) : null}

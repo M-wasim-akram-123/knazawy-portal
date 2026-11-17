@@ -1,14 +1,18 @@
 'use client';
 
 import type { SessionUser } from '@knazawy/auth-client';
-import { messages } from '@knazawy/i18n';
+import { branchesCopy } from '@knazawy/i18n';
 import { can, isKaramRole, type BranchRecord } from '@knazawy/shared';
+import { KaramLoader } from '@knazawy/ui-shell';
 import { useEffect, useState } from 'react';
 
 import { explainApiError } from '../../lib/explain';
+import { useCommon, useCopy } from '../../lib/i18n';
 import { api, readSessionUser, writeSessionUser } from '../../lib/session';
 
 export function BranchesScreen() {
+  const t = useCopy(branchesCopy);
+  const common = useCommon();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [branches, setBranches] = useState<BranchRecord[]>([]);
   const [code, setCode] = useState('');
@@ -36,16 +40,19 @@ export function BranchesScreen() {
     }
   }
 
-  if (!ready) return <p>Loading branches</p>;
+  if (!ready) return <KaramLoader label={t.loading} fullPage />;
   if (!user) {
+    const [beforeLink, afterLink] = t.signInToSee.split('{signIn}');
     return (
       <p>
-        <a href="/login">{messages.en.common.signIn}</a> to see branches.
+        {beforeLink}
+        <a href="/login">{common.signIn}</a>
+        {afterLink}
       </p>
     );
   }
   if (!isKaramRole(user.role)) {
-    return <p>Branches are for Karam staff. An airline is not split into branches.</p>;
+    return <p>{t.staffOnly}</p>;
   }
 
   const manages = can(user.role, 'branches', 'C');
@@ -54,14 +61,8 @@ export function BranchesScreen() {
   return (
     <section className="kz-stack">
       <div className="kz-page-head">
-        <h1>{messages.en.common.branches}</h1>
-        <p>
-          Karam works in branches. Stock and rooms will belong to the branch you are working in. An
-          airline stays one account and is not split.
-        </p>
-        <p lang="ur" dir="rtl">
-          {messages.ur.common.branches}
-        </p>
+        <h1>{common.branches}</h1>
+        <p>{t.intro}</p>
       </div>
       {error ? (
         <p className="kz-error" role="alert">
@@ -69,14 +70,14 @@ export function BranchesScreen() {
         </p>
       ) : null}
       <div className="kz-panel">
-        <h2>Branches</h2>
-        {branches.length === 0 ? <p className="kz-empty">No branches yet.</p> : null}
+        <h2>{common.branches}</h2>
+        {branches.length === 0 ? <p className="kz-empty">{t.noBranches}</p> : null}
         <ul>
           {branches.map((branch) => (
             <li key={branch.id}>
               <strong>{branch.name}</strong> · {branch.code}
-              {branch.id === user.branchId ? ' · working here' : ''}
-              {branch.active ? '' : ' · closed'}
+              {branch.id === user.branchId ? t.workingHere : ''}
+              {branch.active ? '' : t.closed}
               {branch.active && branch.id !== user.branchId ? (
                 <button
                   type="button"
@@ -84,7 +85,7 @@ export function BranchesScreen() {
                   disabled={busy}
                   onClick={() => void workIn(branch)}
                 >
-                  Work here
+                  {t.workHere}
                 </button>
               ) : null}
               {manages && branch.active && openCount > 1 ? (
@@ -94,7 +95,7 @@ export function BranchesScreen() {
                   disabled={busy}
                   onClick={() => void close(branch)}
                 >
-                  Close
+                  {t.close}
                 </button>
               ) : null}
             </li>
@@ -109,17 +110,17 @@ export function BranchesScreen() {
             void add();
           }}
         >
-          <h2>New branch</h2>
+          <h2>{t.newBranch}</h2>
           <label>
-            Code
+            {t.code}
             <input value={code} onChange={(event) => setCode(event.target.value)} required />
           </label>
           <label>
-            Name
+            {t.name}
             <input value={name} onChange={(event) => setName(event.target.value)} required />
           </label>
           <button type="submit" className="kz-button" disabled={busy}>
-            Add branch
+            {t.addBranch}
           </button>
         </form>
       ) : null}
