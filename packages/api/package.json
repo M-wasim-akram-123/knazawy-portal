@@ -12,7 +12,9 @@
     "test": "jest --runInBand",
     "seed:local": "ts-node src/scripts/seed.ts",
     "seed:demo": "pnpm seed:local && ts-node src/scripts/seed-demo.ts",
-    "postinstall": "node scripts/prisma-generate.cjs"
+    "postinstall": "node scripts/prisma-generate.cjs",
+    "test:e2e": "node --test --test-reporter=spec e2e/system.e2e.mjs",
+    "seed:scenarios": "node scripts/seed-scenarios.mjs"
   },
   "dependencies": {
     "@knazawy/shared": "workspace:*",

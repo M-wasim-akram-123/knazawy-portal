@@ -1,4 +1,9 @@
-import type { Actor, MenuItemRecord, ServiceRequestRecord } from '@knazawy/shared';
+import type {
+  Actor,
+  FulfilmentRecord,
+  MenuItemRecord,
+  ServiceRequestRecord,
+} from '@knazawy/shared';
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
@@ -28,6 +33,11 @@ export class RequestsController {
   @Get('menu')
   menu(@CurrentUser() actor: Actor): Promise<MenuItemRecord[]> {
     return this.requests.menu(actor);
+  }
+
+  @Get(':id/fulfilment')
+  fulfilment(@CurrentUser() actor: Actor, @Param('id') id: string): Promise<FulfilmentRecord> {
+    return this.requests.fulfilment(actor, id);
   }
 
   @Post()

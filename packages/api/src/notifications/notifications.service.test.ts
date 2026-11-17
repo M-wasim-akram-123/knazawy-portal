@@ -25,3 +25,74 @@ describe('NotificationsService', () => {
     });
   });
 });
+
+describe('live notification stream', () => {
+  function tx(userIds: string[]) {
+    return {
+      user: { findMany: jest.fn().mockResolvedValue(userIds.map((id) => ({ id }))) },
+      notification: { createMany: jest.fn().mockResolvedValue({ count: userIds.length }) },
+    };
+  }
+  const input = {
+    organisationId: 'air-1',
+    role: 'AIRLINE_REQUESTER' as const,
+    title: 'RQ-00001 is accepted',
+    body: 'PK301, KHI-DXB.',
+    entity: 'ServiceRequest',
+    entityId: 'rq-1',
+  };
+
+  it('pings only the users the notification was written for', async () => {
+    const service = new NotificationsService({} as never);
+    const mine = jest.fn();
+    const someoneElse = jest.fn();
+    service.subscribe('user-2', mine);
+    service.subscribe('user-9', someoneElse);
+
+    await service.notify(tx(['user-2']) as never, input);
+
+    expect(mine).toHaveBeenCalledWith({
+      title: 'RQ-00001 is accepted',
+      body: 'PK301, KHI-DXB.',
+      entity: 'ServiceRequest',
+      entityId: 'rq-1',
+    });
+    expect(someoneElse).not.toHaveBeenCalled();
+  });
+
+  it('stops pinging a closed stream', async () => {
+    const service = new NotificationsService({} as never);
+    const listener = jest.fn();
+    const unsubscribe = service.subscribe('user-2', listener);
+    unsubscribe?.();
+
+    await service.notify(tx(['user-2']) as never, input);
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+describe('stream limits', () => {
+  it('refuses a fourth stream for one user, and frees a place when one closes', () => {
+    const service = new NotificationsService({} as never);
+    const first = service.subscribe('user-1', jest.fn());
+    service.subscribe('user-1', jest.fn());
+    service.subscribe('user-1', jest.fn());
+    expect(service.subscribe('user-1', jest.fn())).toBeNull();
+    expect(service.subscribe('user-2', jest.fn())).not.toBeNull();
+    first?.();
+    expect(service.subscribe('user-1', jest.fn())).not.toBeNull();
+  });
+
+  it('treats a disabled or missing account as inactive', async () => {
+    const findUnique = jest
+      .fn()
+      .mockResolvedValueOnce({ status: 'DISABLED' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ status: 'ACTIVE' });
+    const service = new NotificationsService({ user: { findUnique } } as never);
+    expect(await service.isActive('a')).toBe(false);
+    expect(await service.isActive('b')).toBe(false);
+    expect(await service.isActive('c')).toBe(true);
+  });
+});

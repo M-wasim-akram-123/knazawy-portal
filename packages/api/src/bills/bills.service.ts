@@ -26,6 +26,20 @@ const BILL_TYPES: Record<string, string> = {
   'application/pdf': '.pdf',
 };
 
+/** The first bytes of each allowed file type. The browser's claimed type is not trusted alone. */
+const BILL_SIGNATURES: Record<string, number[]> = {
+  'image/jpeg': [0xff, 0xd8, 0xff],
+  'image/png': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  'application/pdf': [0x25, 0x50, 0x44, 0x46, 0x2d],
+};
+
+/** True when the file's own bytes match the type it claims. */
+export function matchesSignature(contentType: string, bytes: Buffer): boolean {
+  const signature = BILL_SIGNATURES[contentType];
+  if (!signature || bytes.length < signature.length) return false;
+  return signature.every((byte, index) => bytes[index] === byte);
+}
+
 const MAX_BILL_BYTES = 8 * 1024 * 1024;
 
 export interface IncomingBill {
@@ -219,7 +233,9 @@ function requireBill(file: IncomingBill | undefined): {
   if (!file || file.size <= 0) throw new BadRequestException('Choose a bill photo or PDF.');
   if (file.size > MAX_BILL_BYTES) throw new BadRequestException('Choose a bill under 8 MB.');
   const extension = BILL_TYPES[file.mimetype];
-  if (!extension) throw new BadRequestException('Upload a JPG, PNG, or PDF.');
+  if (!extension || !matchesSignature(file.mimetype, file.buffer)) {
+    throw new BadRequestException('Upload a JPG, PNG, or PDF.');
+  }
   return {
     buffer: file.buffer,
     extension,

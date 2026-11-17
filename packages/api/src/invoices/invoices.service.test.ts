@@ -1,3 +1,4 @@
+import { addIsoDays, todayInKarachi } from '@knazawy/shared';
 import { ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
@@ -53,6 +54,9 @@ function invoiceRow(overrides: Record<string, unknown> = {}) {
     note: null,
     reason: null,
     issuedAt: null,
+    discountPercent: new Prisma.Decimal('0'),
+    paymentTermsDays: null,
+    dueOn: null,
     organisation: { name: 'Sample Air', taxNumber: null },
     request: {
       number: 'RQ-00001',
@@ -81,7 +85,12 @@ function invoiceRow(overrides: Record<string, unknown> = {}) {
 
 function priced() {
   return {
-    organisation: { findFirst: jest.fn().mockResolvedValue({ id: 'org-karam' }) },
+    organisation: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'org-karam' }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ paymentTermsDays: 30, discountPercent: new Prisma.Decimal('0') }),
+    },
     serviceRequest: { findUnique: jest.fn().mockResolvedValue(requestRow()), update: jest.fn() },
     invoice: { findFirst: jest.fn().mockResolvedValue(null) },
     rateCard: {
@@ -99,6 +108,8 @@ function priced() {
 }
 
 function serviceFor(tx: Record<string, unknown>): InvoicesService {
+  // Row locks (SELECT ... FOR UPDATE) are a database concern; the mock just records them.
+  tx.$executeRaw ??= jest.fn().mockResolvedValue(1);
   const prisma = {
     ...tx,
     $transaction: (run: (client: object) => Promise<unknown>) => run(tx),
@@ -195,6 +206,9 @@ describe('InvoicesService', () => {
       organisation: {
         findFirst: jest.fn().mockResolvedValue({ id: 'org-karam' }),
         create: jest.fn().mockResolvedValue({ id: 'one-off-1' }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ paymentTermsDays: 30, discountPercent: new Prisma.Decimal('0') }),
       },
       recipe: {
         findMany: jest
@@ -268,6 +282,71 @@ describe('InvoicesService', () => {
     expect(mocks.serviceRequest.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: 'INVOICED' } }),
     );
+  });
+
+  it("copies the airline's terms when issued: discount off the total, due date from today", async () => {
+    const base = priced();
+    const mocks = {
+      ...base,
+      organisation: {
+        ...base.organisation,
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ paymentTermsDays: 30, discountPercent: new Prisma.Decimal('5') }),
+      },
+      invoice: {
+        findUnique: jest.fn().mockResolvedValue(invoiceRow()),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      invoiceLine: { deleteMany: jest.fn().mockResolvedValue({}), createMany: jest.fn() },
+      journalEntry: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'je-1' }),
+      },
+    };
+    await serviceFor(mocks).issue(finance, 'in-1');
+
+    const update = mocks.invoice.update.mock.calls[0][0] as {
+      data: { discountPercent: string; paymentTermsDays: number; dueOn: Date };
+    };
+    expect(update.data.discountPercent).toBe('5.00');
+    expect(update.data.paymentTermsDays).toBe(30);
+    expect(update.data.dueOn.toISOString().slice(0, 10)).toBe(addIsoDays(todayInKarachi(), 30));
+    // 20 billed at 650 is 13000; 5% off leaves 12350 owed.
+    const posted = JSON.stringify(mocks.journalEntry.create.mock.calls[0]);
+    expect(posted).toContain('12350');
+    expect(posted).not.toContain('13000');
+  });
+
+  it('shows the discount on an issued invoice and takes it off the credit too', async () => {
+    const issued = invoiceRow({
+      status: 'ISSUED',
+      discountPercent: new Prisma.Decimal('5'),
+      paymentTermsDays: 30,
+      dueOn: new Date('2026-12-17T00:00:00.000Z'),
+      creditNotes: [
+        {
+          id: 'cn-1',
+          number: 'CN-00001',
+          reason: 'One meal short',
+          discountPercent: new Prisma.Decimal('5'),
+          lines: [{ recipeId: 'recipe-1', billedQuantity: 1, amount: new Prisma.Decimal('650') }],
+        },
+      ],
+    });
+    const mocks = { invoice: { findMany: jest.fn().mockResolvedValue([issued]) } };
+    const [invoice] = await serviceFor(mocks).list(finance);
+    expect(invoice).toMatchObject({
+      subtotal: '13000.00',
+      discountPercent: '5',
+      discount: '650.00',
+      total: '12350.00',
+      paymentTermsDays: 30,
+      dueOn: '2026-12-17',
+      // The credit is 650 less 5%, so 617.50 comes off what is owed.
+      amountDue: '11732.50',
+    });
+    expect(invoice?.credits[0]?.total).toBe('617.50');
   });
 
   it('issues a one-off invoice without changing a service request', async () => {

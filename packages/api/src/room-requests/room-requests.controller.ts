@@ -1,4 +1,10 @@
-import type { Actor, FreeRoomRecord, RoomOfferRecord, RoomRequestRecord } from '@knazawy/shared';
+import type {
+  Actor,
+  FreeRoomRecord,
+  RoomAvailabilityRecord,
+  RoomOfferRecord,
+  RoomRequestRecord,
+} from '@knazawy/shared';
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
@@ -64,6 +70,14 @@ export class RoomRequestsController {
     @Body() body: RejectRoomRequestDto,
   ): Promise<RoomRequestRecord> {
     return this.requests.reject(actor, id, body);
+  }
+
+  @Get(':id/availability')
+  availability(
+    @CurrentUser() actor: Actor,
+    @Param('id') id: string,
+  ): Promise<RoomAvailabilityRecord> {
+    return this.requests.availability(actor, id);
   }
 
   @Get(':id/free-rooms')

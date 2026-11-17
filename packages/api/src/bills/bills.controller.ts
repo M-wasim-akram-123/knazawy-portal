@@ -50,7 +50,12 @@ export class BillsController {
     const file = await this.bills.readFile(actor, receiptId);
     response.setHeader('Content-Type', file.contentType);
     response.setHeader('X-Content-Type-Options', 'nosniff');
-    response.setHeader('Content-Disposition', `inline; filename="${file.fileName.replace(/"/g, '')}"`);
+    // Pictures show in the browser. A PDF downloads instead of opening as a page on our origin.
+    const disposition = file.contentType === 'application/pdf' ? 'attachment' : 'inline';
+    response.setHeader(
+      'Content-Disposition',
+      `${disposition}; filename="${file.fileName.replace(/[^\w .-]/g, '')}"`,
+    );
     response.send(file.bytes);
   }
 }

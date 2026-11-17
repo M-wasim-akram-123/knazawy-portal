@@ -22,6 +22,7 @@ import {
   priceInvoiceLines,
   requestStatusAfterInvoice,
 } from './invoices';
+import { csvCell } from './ledger';
 import { creditNotePosting, invoicePosting, journalBalanceError, journalCsv } from './ledger';
 import {
   billedQuantity,
@@ -42,6 +43,7 @@ import {
   passengerTotal,
 } from './requests';
 import { canRaiseRoomInvoice, roomBillError, roomCreditError } from './room-billing';
+import { roomAvailabilityLine } from './rooms';
 import {
   canDecideRoomRequest,
   canRequestRooms,
@@ -612,5 +614,52 @@ describe('statusTone', () => {
     expect(statusTone('IN_PRODUCTION')).toBe('progress');
     expect(statusTone('INVOICED')).toBe('done');
     expect(statusTone('CANCELLED')).toBe('problem');
+  });
+});
+
+describe('ledger CSV export', () => {
+  it('neutralises cells a spreadsheet would run as a formula', () => {
+    expect(csvCell('=HYPERLINK("http://evil","x")')).toBe(`"'=HYPERLINK(""http://evil"",""x"")"`);
+    expect(csvCell('+1+1')).toBe("'+1+1");
+    expect(csvCell('@SUM(A1)')).toBe("'@SUM(A1)");
+    expect(csvCell('-cmd')).toBe("'-cmd");
+  });
+
+  it('leaves amounts and ordinary text alone', () => {
+    expect(csvCell('-12.50')).toBe('-12.50');
+    expect(csvCell('1500.00')).toBe('1500.00');
+    expect(csvCell('Demo Airline 01')).toBe('Demo Airline 01');
+  });
+});
+
+describe('room availability', () => {
+  it('takes overlapping bookings off the active rooms and says how many are short', () => {
+    expect(
+      roomAvailabilityLine({
+        roomTypeId: 't',
+        roomTypeName: 'Single',
+        asked: 5,
+        rooms: 6,
+        booked: 3,
+      }),
+    ).toMatchObject({ free: 3, short: 2 });
+    expect(
+      roomAvailabilityLine({
+        roomTypeId: 't',
+        roomTypeName: 'Single',
+        asked: 2,
+        rooms: 6,
+        booked: 9,
+      }),
+    ).toMatchObject({ free: 0, short: 2 });
+    expect(
+      roomAvailabilityLine({
+        roomTypeId: 't',
+        roomTypeName: 'Single',
+        asked: 2,
+        rooms: 6,
+        booked: 1,
+      }),
+    ).toMatchObject({ free: 5, short: 0 });
   });
 });

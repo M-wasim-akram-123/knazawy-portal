@@ -10,7 +10,6 @@ import {
   roomNights,
   roomStayWindowError,
   roomStockError,
-  roomsStillFree,
   roomsToCheckIn,
   stayLineAmount,
   stayTotal,
@@ -22,6 +21,9 @@ import {
   type RoomRequestRecord,
   type RoomRequestStatus,
   type RoomStayRecord,
+  roomAvailabilityLine,
+  type RoomAvailabilityLine,
+  type RoomAvailabilityRecord,
 } from '@knazawy/shared';
 import {
   BadRequestException,
@@ -36,6 +38,7 @@ import { assertCan } from '../auth/permissions';
 import { requireBranch } from '../common/branch';
 import { formatIsoDate, parseIsoDate } from '../common/date';
 import { nextDocumentNumber } from '../common/document-number';
+import { lockRoomRequestStatus } from '../common/row-lock';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -177,6 +180,7 @@ export class RoomRequestsService {
     const karamOrgId = await this.karamOrganisationId();
 
     await this.prisma.$transaction(async (tx) => {
+      await lockRoomRequestStatus(tx, existing.id, existing.status);
       await this.ensureTypes(tx, karamOrgId, input.branchId, lines);
       await tx.roomRequest.update({
         where: { id },
@@ -223,6 +227,7 @@ export class RoomRequestsService {
     const karamOrgId = await this.karamOrganisationId();
 
     await this.prisma.$transaction(async (tx) => {
+      await lockRoomRequestStatus(tx, existing.id, existing.status);
       await this.ensureAvailable(tx, karamOrgId, existing);
       await tx.roomRequest.update({
         where: { id },
@@ -267,6 +272,7 @@ export class RoomRequestsService {
     const karamOrgId = await this.karamOrganisationId();
 
     await this.prisma.$transaction(async (tx) => {
+      await lockRoomRequestStatus(tx, existing.id, existing.status);
       await this.ensureAvailable(tx, karamOrgId, existing, true);
       for (const line of existing.lines) {
         const roomType = await tx.roomType.findFirst({
@@ -372,6 +378,7 @@ export class RoomRequestsService {
     const karamOrgId = await this.karamOrganisationId();
 
     await this.prisma.$transaction(async (tx) => {
+      await lockRoomRequestStatus(tx, existing.id, existing.status);
       await tx.$queryRaw`SELECT id FROM hotel_rooms WHERE id IN (${Prisma.join(ids)}) FOR UPDATE`;
       const rooms = await tx.hotelRoom.findMany({
         where: {
@@ -441,6 +448,7 @@ export class RoomRequestsService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      await lockRoomRequestStatus(tx, existing.id, existing.status);
       const released = await tx.roomStay.updateMany({
         where: { id: stayId, checkedOutAt: null },
         data: { checkedOutAt: new Date(), checkedOutById: actor.id },
@@ -467,6 +475,7 @@ export class RoomRequestsService {
     decisionNote: string | null,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      await lockRoomRequestStatus(tx, existing.id, existing.status);
       await tx.roomRequest.update({
         where: { id: existing.id },
         data: {
@@ -511,6 +520,25 @@ export class RoomRequestsService {
   }
 
   /** Confirms the types exist, then that enough rooms are free. When accepting, the rooms are locked first. */
+  /**
+   * Whether Karam has the rooms for a sent stay, by room type, before anyone presses accept.
+   * Uses the same count as accepting, so the screen and the decision always agree.
+   */
+  async availability(actor: Actor, id: string): Promise<RoomAvailabilityRecord> {
+    assertCan(actor, 'room_requests', 'R', 'check rooms for a request');
+    if (!isKaramRole(actor.role)) throw new ForbiddenException('You cannot see room availability.');
+    const existing = await this.findSent(actor, id);
+    const karamOrgId = await this.karamOrganisationId();
+    const lines = await this.prisma.$transaction((tx) =>
+      this.availabilityLines(tx, karamOrgId, existing, false),
+    );
+    return {
+      requestId: existing.id,
+      canAccept: lines.every((line) => line.short === 0),
+      lines,
+    };
+  }
+
   private async ensureAvailable(
     tx: Prisma.TransactionClient,
     karamOrgId: string,
@@ -522,6 +550,20 @@ export class RoomRequestsService {
       rooms: line.quantity,
     }));
     await this.ensureTypes(tx, karamOrgId, request.branchId, lines);
+    for (const line of await this.availabilityLines(tx, karamOrgId, request, lock)) {
+      const error = roomAvailabilityError(line.roomTypeName, line.free, line.asked);
+      if (error) throw new BadRequestException(error);
+    }
+  }
+
+  /** Active rooms of each type at the branch, less rooms promised to overlapping accepted stays. */
+  private async availabilityLines(
+    tx: Prisma.TransactionClient,
+    karamOrgId: string,
+    request: RequestRow,
+    lock: boolean,
+  ): Promise<RoomAvailabilityLine[]> {
+    const result: RoomAvailabilityLine[] = [];
     for (const line of request.lines) {
       if (lock) {
         await tx.$queryRaw`
@@ -545,6 +587,7 @@ export class RoomRequestsService {
         where: {
           roomTypeId: line.roomTypeId,
           request: {
+            id: { not: request.id },
             status: 'ACCEPTED',
             branchId: request.branchId,
             checkIn: { lt: request.checkOut },
@@ -553,14 +596,17 @@ export class RoomRequestsService {
         },
         select: { quantity: true },
       });
-      const taken = booked.reduce((sum, row) => sum + row.quantity, 0);
-      const error = roomAvailabilityError(
-        line.roomType.name,
-        roomsStillFree(active, taken),
-        line.quantity,
+      result.push(
+        roomAvailabilityLine({
+          roomTypeId: line.roomTypeId,
+          roomTypeName: line.roomType.name,
+          asked: line.quantity,
+          rooms: active,
+          booked: booked.reduce((sum, row) => sum + row.quantity, 0),
+        }),
       );
-      if (error) throw new BadRequestException(error);
     }
+    return result;
   }
 
   private async ensureTypes(

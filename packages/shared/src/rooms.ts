@@ -61,11 +61,6 @@ export function isRoomRequestEditable(status: RoomRequestStatus): boolean {
   return status === 'DRAFT';
 }
 
-/** Karam sees a room request once the airline has sent it. */
-export function isRoomRequestVisibleToKaram(status: RoomRequestStatus): boolean {
-  return status !== 'DRAFT';
-}
-
 /** A stay is counted in nights: check-out is later than check-in, dates are YYYY-MM-DD. */
 export function roomNights(checkIn: string, checkOut: string): number | null {
   const start = dayNumber(checkIn);
@@ -348,4 +343,35 @@ export function roomStayWindowError(
 /** Rooms on a line that still wait for a guest. */
 export function roomsToCheckIn(quantity: number, checkedIn: number): number {
   return Math.max(0, quantity - checkedIn);
+}
+
+/** One room type on a stay: what was asked for against the rooms free on those nights. */
+export interface RoomAvailabilityLine {
+  roomTypeId: string;
+  roomTypeName: string;
+  asked: number;
+  /** Active rooms of this type at the branch. */
+  rooms: number;
+  /** Rooms of this type promised to other accepted stays that overlap these nights. */
+  booked: number;
+  free: number;
+  short: number;
+}
+
+/** Whether Karam has the rooms for a stay. The same numbers decide whether it can be accepted. */
+export interface RoomAvailabilityRecord {
+  requestId: string;
+  canAccept: boolean;
+  lines: RoomAvailabilityLine[];
+}
+
+export function roomAvailabilityLine(input: {
+  roomTypeId: string;
+  roomTypeName: string;
+  asked: number;
+  rooms: number;
+  booked: number;
+}): RoomAvailabilityLine {
+  const free = roomsStillFree(input.rooms, input.booked);
+  return { ...input, free, short: Math.max(0, input.asked - free) };
 }

@@ -95,11 +95,6 @@ export function isRequestEditable(status: RequestStatus): boolean {
   return status === 'DRAFT';
 }
 
-/** Karam staff see a request once the airline has submitted it. */
-export function isRequestVisibleToKaram(status: RequestStatus): boolean {
-  return status !== 'DRAFT';
-}
-
 export interface PassengerSplit {
   adults: number;
   children: number;

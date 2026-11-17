@@ -1,5 +1,16 @@
 import { AIRLINE_ROLES } from '@knazawy/shared';
-import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class CreateAirlineDto {
   @IsString()
@@ -45,7 +56,7 @@ export class CreateAirlineUserDto {
   role!: (typeof AIRLINE_ROLES)[number];
 
   @IsString()
-  @MinLength(4)
+  @MinLength(10)
   @MaxLength(72)
   password!: string;
 }
@@ -72,7 +83,18 @@ export class UpdateAirlineUserDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(4)
+  @MinLength(10)
   @MaxLength(72)
   password?: string;
+}
+
+export class AirlineTermsDto {
+  @IsInt()
+  @Min(0)
+  @Max(180)
+  paymentTermsDays!: number;
+
+  @IsString()
+  @Matches(/^\d{1,3}(?:\.\d{1,2})?$/)
+  discountPercent!: string;
 }

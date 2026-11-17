@@ -28,6 +28,7 @@ import { RoomRequestsModule } from './room-requests/room-requests.module';
 import { RoomSetupModule } from './room-setup/room-setup.module';
 import { StockModule } from './stock/stock.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     LedgerModule,
     ItemsModule,
     SuppliersModule,
+    UsersModule,
     LocationsModule,
     PurchasesModule,
     ReceiptsModule,
