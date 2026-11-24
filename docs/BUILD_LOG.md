@@ -2,6 +2,14 @@
 
 Newest entry at the top.
 
+## 2026-11-24 — Head chef and chef, finance sees money only, clearer menu, amounts in SAR
+
+The kitchen lead role is now the head chef, who adds, edits, and approves recipes. A new chef role only reads: orders to prepare, recipes, and the week ahead. A chef never sees stock, money, meal cost, or setup. Existing kitchen lead accounts became head chefs when the migration ran, and anyone still signed in under the old role is sent back to sign in. The finance officer no longer sees recipes or hotel rooms. Finance keeps prices, invoices, disputes, the ledger, meal cost, and approving purchases. Meal cost has its own permission so finance can read it without reading recipes. Anyone who may read recipes may read item names, because recipes list them.
+
+The left menu uses plain, longer names for each screen, in English, Urdu, and Arabic, and the groups say what they hold. The Branches screen now opens only for roles the API lets read branches.
+
+Amounts are labelled SAR instead of PKR everywhere on screen, in messages, and in notes. This changes the label only. No stored amount was converted, so a price of 1500 now reads 1500 SAR. The time zone stays Asia/Karachi and dates stay DD/MM/YYYY. Notes and notifications already saved still say PKR.
+
 ## 2026-11-14 — Rooms and room requests belong to a branch
 
 Floors and the rooms on them belong to the branch the user is working in. Room types and the charges that make a night's price stay shared, so every branch offers the same kinds of room. An airline chooses a branch when it asks for rooms, and it only sees how many rooms that branch has, never the floor or the room name. Karam staff see and accept only the requests for the branch they are working in, and check guests into that branch's rooms. A room bill follows the request's branch. Existing floors and requests sit on MAIN.

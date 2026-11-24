@@ -7,7 +7,7 @@ export const productionCopy = defineCopy({
     intro:
       'Record a batch when it is cooked. Its ingredients leave stock straight away, oldest cost first, and the batch shows what each portion cost.',
     newBatch: 'New batch',
-    recorded: '{number} is recorded: {portions} portions at {cost} PKR each.',
+    recorded: '{number} is recorded: {portions} portions at {cost} SAR each.',
     recipe: 'Recipe',
     cookedAt: 'Cooked at',
     cookedOn: 'Cooked on',
@@ -44,7 +44,7 @@ export const productionCopy = defineCopy({
     intro:
       'بیچ پکنے پر اسے درج کریں۔ اس کے اجزاء فوراً اسٹاک سے نکل جاتے ہیں، سب سے پرانی لاگت پہلے، اور بیچ میں ہر حصے کی لاگت نظر آتی ہے۔',
     newBatch: 'نیا بیچ',
-    recorded: '{number} درج ہو گیا: {portions} حصے، فی حصہ {cost} PKR۔',
+    recorded: '{number} درج ہو گیا: {portions} حصے، فی حصہ {cost} SAR۔',
     recipe: 'ترکیب',
     cookedAt: 'پکانے کی جگہ',
     cookedOn: 'پکانے کی تاریخ',
@@ -81,7 +81,7 @@ export const productionCopy = defineCopy({
     intro:
       'سجّل الدفعة عند طهيها. تخرج مكوّناتها من المخزون فورًا، الأقدم تكلفةً أولًا، وتُظهر الدفعة تكلفة كل حصة.',
     newBatch: 'دفعة جديدة',
-    recorded: 'تم تسجيل {number}: {portions} حصة بسعر {cost} PKR للحصة.',
+    recorded: 'تم تسجيل {number}: {portions} حصة بسعر {cost} SAR للحصة.',
     recipe: 'الوصفة',
     cookedAt: 'مكان الطهي',
     cookedOn: 'تاريخ الطهي',

@@ -220,7 +220,7 @@ export function DisputesScreen() {
                   </div>
                   <div>
                     <dt>{t.factBillTotal}</dt>
-                    <dd>{selected.invoiceTotal} PKR</dd>
+                    <dd>{selected.invoiceTotal} SAR</dd>
                   </div>
                   {selected.decidedAt ? (
                     <div>

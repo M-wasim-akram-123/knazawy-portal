@@ -30,51 +30,51 @@ const GROUPS: Record<WorkspaceKey, { label: keyof Common; links: Array<[string, 
     orders: {
       label: 'navOrders',
       links: [
-        ['/requests', 'airlineOrders'],
-        ['/room-requests', 'roomRequests'],
-        ['/deliveries', 'deliveries'],
+        ['/requests', 'menuAirlineOrders'],
+        ['/room-requests', 'menuRoomRequests'],
+        ['/deliveries', 'menuDeliveries'],
       ],
     },
     stock: {
       label: 'navStock',
       links: [
-        ['/store', 'stockOnHand'],
-        ['/bills', 'goodsIn'],
-        ['/purchases', 'purchaseOrders'],
-        ['/issues', 'issueStock'],
-        ['/transfers', 'transferStock'],
-        ['/counts', 'countStock'],
+        ['/store', 'menuStockOnHand'],
+        ['/bills', 'menuGoodsIn'],
+        ['/purchases', 'menuPurchaseOrders'],
+        ['/issues', 'menuIssueStock'],
+        ['/transfers', 'menuTransferStock'],
+        ['/counts', 'menuCountStock'],
       ],
     },
     kitchen: {
       label: 'navKitchen',
       links: [
-        ['/recipes', 'recipes'],
-        ['/production', 'production'],
-        ['/meal-cost', 'mealCost'],
-        ['/forecast', 'forecast'],
+        ['/recipes', 'menuRecipes'],
+        ['/production', 'menuProduction'],
+        ['/meal-cost', 'menuMealCost'],
+        ['/forecast', 'menuForecast'],
       ],
     },
     billing: {
       label: 'navBilling',
       links: [
-        ['/invoices', 'invoices'],
-        ['/room-bills', 'roomBills'],
-        ['/rates', 'rateCards'],
-        ['/disputes', 'disputes'],
-        ['/ledger', 'ledger'],
+        ['/invoices', 'menuInvoices'],
+        ['/room-bills', 'menuRoomBills'],
+        ['/rates', 'menuRateCards'],
+        ['/disputes', 'menuDisputes'],
+        ['/ledger', 'menuLedger'],
       ],
     },
     setup: {
       label: 'navSetup',
       links: [
-        ['/users', 'users'],
-        ['/airlines', 'airlines'],
-        ['/items', 'items'],
-        ['/suppliers', 'suppliers'],
-        ['/locations', 'locations'],
-        ['/rooms', 'rooms'],
-        ['/branches', 'branches'],
+        ['/users', 'menuUsers'],
+        ['/airlines', 'menuAirlines'],
+        ['/items', 'menuItems'],
+        ['/suppliers', 'menuSuppliers'],
+        ['/locations', 'menuLocations'],
+        ['/rooms', 'menuRooms'],
+        ['/branches', 'menuBranches'],
       ],
     },
   };
@@ -83,15 +83,17 @@ const GROUPS: Record<WorkspaceKey, { label: keyof Common; links: Array<[string, 
 const ROLE_ORDER: Partial<Record<Role, WorkspaceKey[]>> = {
   OPERATIONS_MANAGER: ['orders', 'stock', 'kitchen', 'billing', 'setup'],
   STOREKEEPER: ['stock', 'orders', 'kitchen', 'billing', 'setup'],
-  KITCHEN_LEAD: ['kitchen', 'orders', 'stock', 'billing', 'setup'],
-  FINANCE_OFFICER: ['billing', 'orders', 'stock', 'kitchen', 'setup'],
+  HEAD_CHEF: ['kitchen', 'orders', 'stock', 'setup'],
+  CHEF: ['kitchen', 'orders'],
+  FINANCE_OFFICER: ['billing', 'stock', 'kitchen', 'setup'],
   ADMINISTRATOR: ['orders', 'stock', 'kitchen', 'billing', 'setup'],
 };
 
 const WORKSPACE_NAMES: Partial<Record<Role, keyof Chrome>> = {
   OPERATIONS_MANAGER: 'wsOperations',
   STOREKEEPER: 'wsStore',
-  KITCHEN_LEAD: 'wsKitchen',
+  HEAD_CHEF: 'wsHeadChef',
+  CHEF: 'wsChef',
   FINANCE_OFFICER: 'wsFinance',
   ADMINISTRATOR: 'wsAdministration',
 };
@@ -105,7 +107,7 @@ export function navigationFor(role: Role, common: Common): NavGroup[] {
   const home: NavGroup = {
     key: 'home',
     label: common.home,
-    links: [{ href: '/', label: common.today }],
+    links: [{ href: '/', label: common.menuToday }],
   };
   return [
     home,
@@ -142,10 +144,15 @@ const ROLE_STEPS: Partial<Record<Role, Array<[string, keyof Chrome, keyof Chrome
     ['/issues', 'storeIssueTitle', 'storeIssueText'],
     ['/counts', 'storeCountTitle', 'storeCountText'],
   ],
-  KITCHEN_LEAD: [
+  HEAD_CHEF: [
     ['/requests', 'kitchenOrdersTitle', 'kitchenOrdersText'],
-    ['/recipes', 'kitchenRecipesTitle', 'kitchenRecipesText'],
+    ['/recipes', 'headChefRecipesTitle', 'headChefRecipesText'],
     ['/production', 'kitchenCookTitle', 'kitchenCookText'],
+    ['/forecast', 'kitchenWeekTitle', 'weekText'],
+  ],
+  CHEF: [
+    ['/requests', 'kitchenOrdersTitle', 'kitchenOrdersText'],
+    ['/recipes', 'chefRecipesTitle', 'chefRecipesText'],
     ['/forecast', 'kitchenWeekTitle', 'weekText'],
   ],
   FINANCE_OFFICER: [

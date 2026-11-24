@@ -44,7 +44,9 @@ export class ProductionService {
   ) {}
 
   async list(actor: Actor): Promise<ProductionRecord[]> {
+    // Batches carry what the ingredients cost, so a recipe reader alone does not see them.
     assertCan(actor, 'recipes', 'R', 'view production');
+    assertCan(actor, 'stock', 'R', 'view production');
     const rows = await this.prisma.productionBatch.findMany({
       where: { organisationId: actor.organisationId, location: { branchId: requireBranch(actor) } },
       include: productionInclude,

@@ -53,7 +53,7 @@ export function MealCostScreen() {
     const session = readSessionUser();
     setUser(session);
     setReady(true);
-    if (!session || !can(session.role, 'recipes', 'R')) return;
+    if (!session || !can(session.role, 'meal_cost', 'R')) return;
     void api
       .listMealCosts()
       .then(setCosts)
@@ -68,7 +68,7 @@ export function MealCostScreen() {
       </p>
     );
   }
-  if (!can(user.role, 'recipes', 'R')) {
+  if (!can(user.role, 'meal_cost', 'R')) {
     return <p>{t.notAllowed}</p>;
   }
 
@@ -298,7 +298,7 @@ export function MealCostScreen() {
                               ? `${line.quantityWithWastage} ${label(BASE_UNIT_LABELS[line.baseUnit])}`
                               : '—'}
                           </td>
-                          <td>{line.unitCost ? `${line.unitCost} PKR` : t.noPrice}</td>
+                          <td>{line.unitCost ? `${line.unitCost} SAR` : t.noPrice}</td>
                           <td>{money(line.lineCost)}</td>
                         </tr>
                       ))}
@@ -331,5 +331,5 @@ function DifferenceBadge({ cost }: { cost: MealCostRecord }) {
 }
 
 function money(value: string | null): string {
-  return value === null ? '—' : `${value} PKR`;
+  return value === null ? '—' : `${value} SAR`;
 }

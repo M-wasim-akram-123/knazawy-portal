@@ -1,4 +1,4 @@
-import type { Actor, ItemRecord } from '@knazawy/shared';
+import { can, type Actor, type ItemRecord } from '@knazawy/shared';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 
@@ -22,7 +22,8 @@ export class ItemsService {
   ) {}
 
   async list(actor: Actor, includeArchived: boolean): Promise<ItemRecord[]> {
-    assertCan(actor, 'stock', 'R', 'view items');
+    // Recipes name their ingredients, so whoever may read recipes may read the item names.
+    if (!can(actor.role, 'recipes', 'R')) assertCan(actor, 'stock', 'R', 'view items');
     const rows = await this.prisma.item.findMany({
       where: {
         organisationId: actor.organisationId,
@@ -90,7 +91,9 @@ export class ItemsService {
             ...(input.name === undefined ? {} : { name: input.name.trim() }),
             ...(input.category === undefined ? {} : { category: input.category.trim() }),
             ...(input.baseUnit === undefined ? {} : { baseUnit: input.baseUnit }),
-            ...(input.purchaseUnit === undefined ? {} : { purchaseUnit: input.purchaseUnit.trim() }),
+            ...(input.purchaseUnit === undefined
+              ? {}
+              : { purchaseUnit: input.purchaseUnit.trim() }),
             ...(input.conversionToBase === undefined
               ? {}
               : {

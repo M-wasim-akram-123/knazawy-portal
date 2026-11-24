@@ -22,7 +22,7 @@ export const stockOnHandCopy = defineCopy({
     received: 'Received',
     lines: 'Lines',
     view: 'View',
-    receiptLine: '{item}: {quantity} {purchaseUnit} ({quantityBase} {unit} at {unitCost} PKR)',
+    receiptLine: '{item}: {quantity} {purchaseUnit} ({quantityBase} {unit} at {unitCost} SAR)',
   },
   ur: {
     loading: 'اسٹاک لوڈ ہو رہا ہے',
@@ -46,7 +46,7 @@ export const stockOnHandCopy = defineCopy({
     lines: 'سطریں',
     view: 'دیکھیں',
     receiptLine:
-      '{item}: {quantity} {purchaseUnit} ({quantityBase} {unit}، {unitCost} PKR فی یونٹ)',
+      '{item}: {quantity} {purchaseUnit} ({quantityBase} {unit}، {unitCost} SAR فی یونٹ)',
   },
   ar: {
     loading: 'جارٍ تحميل المخزون',
@@ -69,6 +69,6 @@ export const stockOnHandCopy = defineCopy({
     received: 'تاريخ الاستلام',
     lines: 'البنود',
     view: 'عرض',
-    receiptLine: '{item}: {quantity} {purchaseUnit} ({quantityBase} {unit} بسعر {unitCost} PKR)',
+    receiptLine: '{item}: {quantity} {purchaseUnit} ({quantityBase} {unit} بسعر {unitCost} SAR)',
   },
 });

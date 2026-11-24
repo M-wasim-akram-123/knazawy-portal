@@ -12,7 +12,8 @@ import { can, isKaramRole } from './rbac';
 export const STAFF_ROLES = [
   'OPERATIONS_MANAGER',
   'STOREKEEPER',
-  'KITCHEN_LEAD',
+  'HEAD_CHEF',
+  'CHEF',
   'FINANCE_OFFICER',
   'ADMINISTRATOR',
 ] as const satisfies readonly Role[];
@@ -25,7 +26,8 @@ export const ROLE_LABELS: Record<Role, string> = {
   HOTEL_COORDINATOR: 'Hotel coordinator',
   OPERATIONS_MANAGER: 'Operations manager',
   STOREKEEPER: 'Storekeeper',
-  KITCHEN_LEAD: 'Kitchen lead',
+  HEAD_CHEF: 'Head chef',
+  CHEF: 'Chef',
   FINANCE_OFFICER: 'Finance officer',
   ADMINISTRATOR: 'Administrator',
 };

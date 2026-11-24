@@ -82,7 +82,7 @@ export function costOnePortion(input: {
   };
 }
 
-/** Actual minus standard, in PKR to 2 decimal places. */
+/** Actual minus standard, in SAR to 2 decimal places. */
 export function costDifference(actual: string, standard: string): string | null {
   const left = parseScaled(actual, 2);
   const right = parseScaled(standard, 2);

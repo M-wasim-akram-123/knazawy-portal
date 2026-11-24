@@ -374,7 +374,7 @@ describe('RequestsService', () => {
     };
     const service = serviceFor(mocks);
     await expect(service.cancel(airline, 'rq-1')).rejects.toThrow(
-      'Cancelling now costs 13000.00 PKR. Confirm the charge.',
+      'Cancelling now costs 13000.00 SAR. Confirm the charge.',
     );
     expect(mocks.invoice.create).not.toHaveBeenCalled();
   });

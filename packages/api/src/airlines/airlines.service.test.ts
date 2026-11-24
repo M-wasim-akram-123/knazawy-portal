@@ -42,7 +42,7 @@ function serviceFor(tx: Record<string, unknown>): AirlinesService {
 describe('AirlinesService', () => {
   it('refuses the kitchen lead', async () => {
     const service = serviceFor({});
-    await expect(service.list({ ...actor, role: 'KITCHEN_LEAD' })).rejects.toBeInstanceOf(
+    await expect(service.list({ ...actor, role: 'HEAD_CHEF' })).rejects.toBeInstanceOf(
       ForbiddenException,
     );
   });

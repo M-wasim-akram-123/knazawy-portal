@@ -58,13 +58,43 @@ describe('RecipesService', () => {
     );
   });
 
-  it('refuses the kitchen lead when they try to approve', async () => {
+  it('refuses a chef who tries to approve a recipe', async () => {
     const tx = { recipe: { findFirst: jest.fn() } };
     const service = serviceFor(tx);
-    await expect(service.approve({ ...actor, role: 'KITCHEN_LEAD' }, 'recipe-1')).rejects.toBeInstanceOf(
+    await expect(service.approve({ ...actor, role: 'CHEF' }, 'recipe-1')).rejects.toBeInstanceOf(
       ForbiddenException,
     );
     expect(tx.recipe.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('refuses a chef who tries to add a recipe', async () => {
+    const tx = { item: { findMany: jest.fn() }, recipe: { create: jest.fn() } };
+    const service = serviceFor(tx);
+    await expect(service.create({ ...actor, role: 'CHEF' }, input)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(tx.recipe.create).not.toHaveBeenCalled();
+  });
+
+  it('lets a chef read recipes', async () => {
+    const tx = { recipe: { findMany: jest.fn().mockResolvedValue([recipeRow()]) } };
+    const service = serviceFor(tx);
+    const rows = await service.list({ ...actor, role: 'CHEF' }, false);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('lets the head chef approve a draft', async () => {
+    const tx = {
+      recipe: {
+        findFirst: jest.fn().mockResolvedValue(recipeRow('DRAFT')),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue(recipeRow('APPROVED')),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({ id: 'audit-1' }) },
+    };
+    const service = serviceFor(tx);
+    const saved = await service.approve({ ...actor, role: 'HEAD_CHEF' }, 'recipe-1');
+    expect(saved.status).toBe('APPROVED');
   });
 
   it('uses each ingredient once', async () => {

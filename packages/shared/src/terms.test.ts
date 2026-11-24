@@ -70,13 +70,13 @@ describe('invoice summary', () => {
 
   it('shows the discount, the total, and when it is due', () => {
     expect(invoiceSummary(base, '2026-11-17')).toBe(
-      'Subtotal 13000.00 PKR, less 5% discount 650.00 PKR. Total 12350.00 PKR. Amount due 12350.00 PKR. Net 30, due 17/12/2026.',
+      'Subtotal 13000.00 SAR, less 5% discount 650.00 SAR. Total 12350.00 SAR. Amount due 12350.00 SAR. Net 30, due 17/12/2026.',
     );
   });
 
   it('says when it is overdue, and leaves out a discount of nothing', () => {
     expect(invoiceSummary({ ...base, discount: '0.00', discountPercent: '0' }, '2026-12-18')).toBe(
-      'Total 12350.00 PKR. Amount due 12350.00 PKR. Net 30, due 17/12/2026. Overdue.',
+      'Total 12350.00 SAR. Amount due 12350.00 SAR. Net 30, due 17/12/2026. Overdue.',
     );
   });
 });

@@ -19,7 +19,7 @@ export class RateCardLineDto {
   @MinLength(1)
   recipeId!: string;
 
-  /** PKR, up to 2 decimal places. */
+  /** SAR, up to 2 decimal places. */
   @IsString()
   @MaxLength(13)
   unitPrice!: string;

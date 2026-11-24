@@ -436,7 +436,7 @@ function sideTotal(lines: JournalEntryRecord['lines'], side: JournalSide): strin
 }
 
 function money(amount: string | null): string {
-  return amount === null ? '—' : `${amount} PKR`;
+  return amount === null ? '—' : `${amount} SAR`;
 }
 
 /** The posted day in Karachi as YYYY-MM-DD, which compares directly with a date input. */

@@ -214,10 +214,10 @@ export function setupNameError(value: string, label: string): string | null {
   return null;
 }
 
-/** A charge is an amount in PKR for one night. Zero is allowed. */
+/** A charge is an amount in SAR for one night. Zero is allowed. */
 export function chargeAmountError(value: string): string | null {
   if (!isMoney(value.trim())) {
-    return 'Enter the charge per night in PKR, such as 8000 or 8000.50.';
+    return 'Enter the charge per night in SAR, such as 8000 or 8000.50.';
   }
   return null;
 }

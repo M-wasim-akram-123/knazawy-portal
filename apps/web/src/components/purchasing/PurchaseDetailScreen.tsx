@@ -120,7 +120,7 @@ export function PurchaseDetailScreen({ purchaseId }: { purchaseId: string }) {
                 <td>
                   {line.quantity} {line.purchaseUnit}
                 </td>
-                <td>{line.unitPrice} PKR</td>
+                <td>{line.unitPrice} SAR</td>
                 <td>
                   {line.receivedQuantity} {line.purchaseUnit}
                 </td>

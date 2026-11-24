@@ -237,7 +237,7 @@ export function RoomsScreen() {
               <ul>
                 {roomType.charges.map((charge) => (
                   <li key={charge.id}>
-                    {charge.name}: {charge.amountPerNight} PKR
+                    {charge.name}: {charge.amountPerNight} SAR
                     {charge.active ? '' : t.archivedSuffix}
                     {canChange && charge.active ? (
                       <button
@@ -366,7 +366,7 @@ export function RoomsScreen() {
                 <option value="">{t.chooseType}</option>
                 {openTypes.map((roomType) => (
                   <option key={roomType.id} value={roomType.id}>
-                    {roomType.name} · {roomType.nightlyTotal} PKR
+                    {roomType.name} · {roomType.nightlyTotal} SAR
                   </option>
                 ))}
               </select>

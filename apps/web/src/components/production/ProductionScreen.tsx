@@ -330,8 +330,8 @@ export function ProductionScreen() {
                       ? fill(t.plannedSuffix, { count: batch.plannedPortions })
                       : ''}
                   </td>
-                  <td>{batch.totalCost} PKR</td>
-                  <td>{batch.costPerPortion} PKR</td>
+                  <td>{batch.totalCost} SAR</td>
+                  <td>{batch.costPerPortion} SAR</td>
                 </tr>
               ))}
             </tbody>

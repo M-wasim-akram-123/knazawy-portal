@@ -915,13 +915,13 @@ function PriceCells({
   return (
     <>
       <td>
-        {rate ? `${rate.unitPrice} PKR` : '—'}
+        {rate ? `${rate.unitPrice} SAR` : '—'}
         {rate && rate.minimumQuantity > 0 ? (
           <span className="kz-help">{fill(t.atLeast, { count: rate.minimumQuantity })}</span>
         ) : null}
       </td>
       <td>
-        {charge?.amount ? `${charge.amount} PKR` : '—'}
+        {charge?.amount ? `${charge.amount} SAR` : '—'}
         {charge && charge.billedQuantity > charge.quantity ? (
           <span className="kz-help">{fill(t.billedAs, { count: charge.billedQuantity })}</span>
         ) : null}

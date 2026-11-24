@@ -312,7 +312,7 @@ export function RoomRequestsScreen() {
                   </div>
                   <div>
                     <dt>{t.factTotal}</dt>
-                    <dd>{selected.total} PKR</dd>
+                    <dd>{selected.total} SAR</dd>
                   </div>
                   {selected.party ? (
                     <div>
@@ -345,8 +345,8 @@ export function RoomRequestsScreen() {
                               ) : null}
                             </td>
                             <td>{line.rooms}</td>
-                            <td>{line.nightly} PKR</td>
-                            <td>{line.amount} PKR</td>
+                            <td>{line.nightly} SAR</td>
+                            <td>{line.amount} SAR</td>
                             {selected.status === 'ACCEPTED' ? (
                               <td>
                                 {fill(t.checkedInCount, {

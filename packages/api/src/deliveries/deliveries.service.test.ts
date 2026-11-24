@@ -66,10 +66,10 @@ function serviceFor(tx: Record<string, unknown>): DeliveriesService {
 }
 
 describe('DeliveriesService', () => {
-  it('refuses the kitchen lead', async () => {
+  it('refuses the head chef', async () => {
     const service = serviceFor({});
     await expect(
-      service.start({ ...operations, role: 'KITCHEN_LEAD' }, { requestId: 'rq-1' }),
+      service.start({ ...operations, role: 'HEAD_CHEF' }, { requestId: 'rq-1' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 

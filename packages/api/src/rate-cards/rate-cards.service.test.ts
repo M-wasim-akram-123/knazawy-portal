@@ -96,7 +96,7 @@ describe('RateCardsService', () => {
         finance,
         input({ lines: [{ recipeId: 'recipe-1', unitPrice: '12.345', minimumQuantity: 0 }] }),
       ),
-    ).rejects.toThrow('Enter each price in PKR, such as 650 or 650.50.');
+    ).rejects.toThrow('Enter each price in SAR, such as 650 or 650.50.');
   });
 
   it('refuses an end date before the start date', async () => {
