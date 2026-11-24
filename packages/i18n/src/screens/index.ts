@@ -24,6 +24,7 @@ export { goodsInCopy } from './goods-in';
 export { purchasesCopy } from './purchases';
 export { mealCostCopy } from './meal-cost';
 export { roomsCopy } from './rooms';
+export { roomBoardCopy } from './room-board';
 export { staffRoomRequestsCopy } from './staff-room-requests';
 export { roomBillsCopy } from './room-bills';
 export { productionCopy } from './production';

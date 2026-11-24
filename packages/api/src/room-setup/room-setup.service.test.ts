@@ -157,13 +157,66 @@ describe('RoomSetupService', () => {
           count: jest.fn().mockResolvedValue(1),
           update: jest.fn().mockResolvedValue({ ...room, active: false }),
         },
-        roomStay: { count: jest.fn().mockResolvedValue(0) },
+        roomStay: {
+          count: jest.fn().mockResolvedValue(0),
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+        roomReservation: { findFirst: jest.fn().mockResolvedValue(null) },
         roomRequestLine: { findMany: jest.fn().mockResolvedValue([]) },
         $queryRaw: jest.fn().mockResolvedValue([]),
         auditLog: { create: jest.fn().mockResolvedValue({}) },
         ...overrides,
       };
     }
+
+    it('refuses while the room is set aside for a stay that has not ended', async () => {
+      const mocks = roomMocks({
+        roomReservation: {
+          findFirst: jest.fn().mockResolvedValue({
+            requestLine: { request: { number: 'RR-00009' } },
+          }),
+        },
+      });
+      const service = serviceFor(mocks);
+      await expect(service.updateRoom(admin, 'room-1', { active: false })).rejects.toThrow(
+        'This room is set aside for RR-00009. Release it from that stay first.',
+      );
+      expect(mocks.hotelRoom.update).not.toHaveBeenCalled();
+    });
+
+    it('will not make a room smaller than the guests in it', async () => {
+      const mocks = roomMocks({
+        roomStay: {
+          count: jest.fn().mockResolvedValue(1),
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ guestsMale: 1, guestsFemale: 1, guestsChildren: 1 }),
+        },
+      });
+      const service = serviceFor(mocks);
+      await expect(service.updateRoom(admin, 'room-1', { capacity: 2 })).rejects.toThrow(
+        '3 guests are in this room. Keep the capacity at 3 or more until they check out.',
+      );
+      expect(mocks.hotelRoom.update).not.toHaveBeenCalled();
+    });
+
+    it('changes the capacity when the guests still fit', async () => {
+      const mocks = roomMocks({
+        roomStay: {
+          count: jest.fn().mockResolvedValue(0),
+          findFirst: jest.fn().mockResolvedValue({
+            guestsMale: 1,
+            guestsFemale: 0,
+            guestsChildren: 0,
+          }),
+        },
+      });
+      const service = serviceFor(mocks);
+      await service.updateRoom(admin, 'room-1', { capacity: 4 });
+      expect(mocks.hotelRoom.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { capacity: 4 } }),
+      );
+    });
 
     it('refuses while a guest is in the room', async () => {
       const mocks = roomMocks({ roomStay: { count: jest.fn().mockResolvedValue(1) } });
@@ -203,6 +256,79 @@ describe('RoomSetupService', () => {
       await service.updateRoom(admin, 'room-1', { active: false });
       expect(mocks.hotelRoom.update).toHaveBeenCalled();
       expect(mocks.$queryRaw).toHaveBeenCalled();
+    });
+  });
+
+  describe('room capacity', () => {
+    function createMocks() {
+      return {
+        roomFloor: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'floor-1', active: true, branchId: 'b' }),
+        },
+        roomType: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'type-1', active: true, charges: [] }),
+        },
+        hotelRoom: {
+          findFirst: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({
+            id: 'room-1',
+            name: '101',
+            floorId: 'floor-1',
+            roomTypeId: 'type-1',
+            capacity: 2,
+            active: true,
+            floor: { name: 'Ground' },
+            roomType: { name: 'Single' },
+          }),
+        },
+        auditLog: { create: jest.fn().mockResolvedValue({}) },
+      };
+    }
+
+    it('gives a new room the standard capacity of two when none is given', async () => {
+      const mocks = createMocks();
+      const created = await serviceFor(mocks).createRoom(admin, {
+        floorId: 'floor-1',
+        roomTypeId: 'type-1',
+        name: '101',
+      });
+      expect(mocks.hotelRoom.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ capacity: 2 }) }),
+      );
+      expect(created.capacity).toBe(2);
+    });
+
+    it('stores the capacity the administrator chose', async () => {
+      const mocks = createMocks();
+      await serviceFor(mocks).createRoom(admin, {
+        floorId: 'floor-1',
+        roomTypeId: 'type-1',
+        name: '101',
+        capacity: 4,
+      });
+      expect(mocks.hotelRoom.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ capacity: 4 }) }),
+      );
+    });
+
+    it('refuses a capacity below one or above twenty', async () => {
+      const service = serviceFor(createMocks());
+      await expect(
+        service.createRoom(admin, {
+          floorId: 'floor-1',
+          roomTypeId: 'type-1',
+          name: '101',
+          capacity: 0,
+        }),
+      ).rejects.toThrow('A room sleeps at least one guest.');
+      await expect(
+        service.createRoom(admin, {
+          floorId: 'floor-1',
+          roomTypeId: 'type-1',
+          name: '101',
+          capacity: 21,
+        }),
+      ).rejects.toThrow('A room sleeps at most 20 guests.');
     });
   });
 

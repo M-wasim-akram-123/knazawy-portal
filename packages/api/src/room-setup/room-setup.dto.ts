@@ -92,6 +92,13 @@ export class CreateHotelRoomDto {
   @IsString()
   @MaxLength(80)
   name!: string;
+
+  /** How many guests the room sleeps. Two when left out. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  capacity?: number;
 }
 
 export class UpdateHotelRoomDto {
@@ -107,6 +114,12 @@ export class UpdateHotelRoomDto {
   @IsString()
   @MaxLength(80)
   name?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  capacity?: number;
 
   @IsOptional()
   @IsBoolean()

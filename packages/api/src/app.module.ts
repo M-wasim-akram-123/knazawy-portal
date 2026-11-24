@@ -23,6 +23,7 @@ import { RateCardsModule } from './rate-cards/rate-cards.module';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { RecipesModule } from './recipes/recipes.module';
 import { RequestsModule } from './requests/requests.module';
+import { RoomBoardModule } from './room-board/room-board.module';
 import { RoomInvoicesModule } from './room-invoices/room-invoices.module';
 import { RoomRequestsModule } from './room-requests/room-requests.module';
 import { RoomSetupModule } from './room-setup/room-setup.module';
@@ -60,6 +61,7 @@ import { UsersModule } from './users/users.module';
     MealCostsModule,
     RequestsModule,
     RoomSetupModule,
+    RoomBoardModule,
     RoomRequestsModule,
     RoomInvoicesModule,
     RateCardsModule,

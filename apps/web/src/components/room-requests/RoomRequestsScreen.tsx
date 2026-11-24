@@ -6,12 +6,15 @@ import {
   ROOM_REQUEST_STATUS_LABELS,
   canDecideRoomRequest,
   canManageRoomStays,
+  checkOutTimeError,
   formatDisplayDate,
+  guestCountsError,
   formatKarachiDateTime,
   roomRequestStatusTone,
   roomStayWindowError,
   roomsToCheckIn,
   todayInKarachi,
+  type CheckInRoomInput,
   type FreeRoomRecord,
   type RoomAvailabilityRecord,
   type RoomRequestRecord,
@@ -32,6 +35,14 @@ import { fill, useCopy, useCommon, useLabel } from '../../lib/i18n';
 import { api, readSessionUser } from '../../lib/session';
 import { Field } from '../master/Field';
 
+/** What is typed for one room being checked in. Numbers stay text until the form is sent. */
+interface GuestInput {
+  male: string;
+  female: string;
+  children: string;
+  time: string;
+}
+
 export function RoomRequestsScreen() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
@@ -39,6 +50,7 @@ export function RoomRequestsScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [freeRooms, setFreeRooms] = useState<FreeRoomRecord[]>([]);
   const [picked, setPicked] = useState<string[]>([]);
+  const [guestInputs, setGuestInputs] = useState<Record<string, GuestInput>>({});
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
@@ -105,11 +117,15 @@ export function RoomRequestsScreen() {
         : t.stayEnded
       : null;
 
+  // Rooms can be set aside any time until the stay ends; guests can only move in during the stay.
+  const stayEnded = selected !== null && todayInKarachi() >= selected.checkOut;
+
   function loadFreeRooms(record: RoomRequestRecord | undefined, session: SessionUser): void {
     setFreeRooms([]);
     setPicked([]);
+    setGuestInputs({});
     if (!record || record.status !== 'ACCEPTED' || !canManageRoomStays(session.role)) return;
-    if (roomStayWindowError(todayInKarachi(), record.checkIn, record.checkOut)) return;
+    if (todayInKarachi() >= record.checkOut) return;
     api
       .freeRoomsForRequest(record.id)
       .then((rows) => setFreeRooms(rows))
@@ -147,7 +163,17 @@ export function RoomRequestsScreen() {
     setError('');
     setSaved('');
     try {
-      const record = await api.checkInRoomRequest(selected.id, picked);
+      const rooms: CheckInRoomInput[] = picked.map((roomId) => {
+        const input = guestInputOf(roomId);
+        return {
+          hotelRoomId: roomId,
+          male: Number(input.male) || 0,
+          female: Number(input.female) || 0,
+          children: Number(input.children) || 0,
+          checkOutTime: input.time,
+        };
+      });
+      const record = await api.checkInRoomRequest(selected.id, rooms);
       replace(record);
       setSaved(
         fill(picked.length === 1 ? t.guestCheckedIn : t.guestsCheckedIn, { count: picked.length }),
@@ -158,6 +184,75 @@ export function RoomRequestsScreen() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function setAside(): Promise<void> {
+    if (!selected) return;
+    const ids = picked.filter((id) => !freeRooms.find((room) => room.id === id)?.reserved);
+    if (ids.length === 0) return;
+    setBusy(true);
+    setError('');
+    setSaved('');
+    try {
+      const record = await api.reserveRooms(selected.id, ids);
+      replace(record);
+      setSaved(
+        fill(ids.length === 1 ? t.roomsSetAside : t.roomsSetAsidePlural, { count: ids.length }),
+      );
+      if (user) loadFreeRooms(record, user);
+    } catch (caught: unknown) {
+      setError(explainApiError(caught, setUser));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function release(reservationId: string): Promise<void> {
+    if (!selected) return;
+    setBusy(true);
+    setError('');
+    setSaved('');
+    try {
+      const record = await api.releaseRoom(selected.id, reservationId);
+      replace(record);
+      setSaved(t.roomReleased);
+      if (user) loadFreeRooms(record, user);
+    } catch (caught: unknown) {
+      setError(explainApiError(caught, setUser));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function guestInputOf(roomId: string): GuestInput {
+    return guestInputs[roomId] ?? { male: '0', female: '0', children: '0', time: '12:00' };
+  }
+
+  function changeGuests(roomId: string, patch: Partial<GuestInput>): void {
+    setGuestInputs((current) => ({
+      ...current,
+      [roomId]: { ...(current[roomId] ?? guestInputOf(roomId)), ...patch },
+    }));
+  }
+
+  /** The first thing wrong with the guests entered for the picked rooms, or null. */
+  function guestProblem(): string | null {
+    for (const roomId of picked) {
+      const room = freeRooms.find((row) => row.id === roomId);
+      if (!room) continue;
+      const input = guestInputOf(roomId);
+      const problem =
+        guestCountsError(
+          {
+            male: Number(input.male) || 0,
+            female: Number(input.female) || 0,
+            children: Number(input.children) || 0,
+          },
+          room.capacity,
+        ) ?? checkOutTimeError(input.time);
+      if (problem) return `${room.name}: ${problem}`;
+    }
+    return null;
   }
 
   async function checkOut(stayId: string): Promise<void> {
@@ -432,15 +527,39 @@ export function RoomRequestsScreen() {
 
                 {canStay && selected.status === 'ACCEPTED' ? (
                   <section className="kz-order-section">
-                    <h3>{t.checkIn}</h3>
-                    {windowHint ? (
-                      <p className="kz-help">{windowHint}</p>
+                    <h3>{t.roomsToUse}</h3>
+                    {selected.reservations.length > 0 ? (
+                      <div className="kz-stack">
+                        <h4>{t.setAsideTitle}</h4>
+                        <p className="kz-help">{t.setAsideHelp}</p>
+                        <ul className="kz-stack">
+                          {selected.reservations.map((reservation) => (
+                            <li key={reservation.id}>
+                              {reservation.roomName} · {reservation.floorName} ·{' '}
+                              {reservation.roomTypeName} ·{' '}
+                              {fill(t.roomSleeps, { count: reservation.capacity })}
+                              <button
+                                type="button"
+                                className="kz-button-quiet"
+                                disabled={busy}
+                                onClick={() => void release(reservation.id)}
+                              >
+                                {t.releaseRoom}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {stayEnded ? (
+                      <p className="kz-help">{t.stayEndedRooms}</p>
                     ) : stillToCheckIn === 0 ? (
                       <p className="kz-help">{t.allCheckedIn}</p>
                     ) : freeRooms.length === 0 ? (
                       <p className="kz-help">{t.noFreeRooms}</p>
                     ) : (
                       <>
+                        <p className="kz-help">{t.roomsToUseHelp}</p>
                         <p className="kz-help">
                           {fill(t.stillToCheckIn, { count: stillToCheckIn })}
                         </p>
@@ -453,16 +572,91 @@ export function RoomRequestsScreen() {
                                 onChange={() => togglePick(room.id)}
                               />
                               <span>
-                                {room.name} · {room.floorName} · {room.roomTypeName}
+                                {room.name} · {room.floorName} · {room.roomTypeName} ·{' '}
+                                {fill(t.roomSleeps, { count: room.capacity })}
+                                {room.reserved ? ` · ${t.roomSetAsideMark}` : ''}
                               </span>
                             </label>
                           ))}
                         </div>
+                        {picked.length === 0 ? <p className="kz-help">{t.pickRoomsFirst}</p> : null}
+                        {picked.length > 0 ? (
+                          <div className="kz-stack">
+                            <h4>{t.guestsStaying}</h4>
+                            <p className="kz-help">{t.guestsStayingHelp}</p>
+                            {picked.map((roomId) => {
+                              const room = freeRooms.find((row) => row.id === roomId);
+                              if (!room) return null;
+                              const input = guestInputOf(roomId);
+                              return (
+                                <div key={roomId} className="kz-form-grid">
+                                  <strong>
+                                    {room.name} · {fill(t.roomSleeps, { count: room.capacity })}
+                                  </strong>
+                                  {(
+                                    [
+                                      ['male', t.men],
+                                      ['female', t.women],
+                                      ['children', t.children],
+                                    ] as const
+                                  ).map(([key, text]) => (
+                                    <Field key={key} label={text}>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={room.capacity}
+                                        value={input[key]}
+                                        onChange={(event) =>
+                                          changeGuests(roomId, { [key]: event.target.value })
+                                        }
+                                      />
+                                    </Field>
+                                  ))}
+                                  <Field label={t.checkOutTime} hint={t.checkOutTimeHint}>
+                                    <input
+                                      type="time"
+                                      value={input.time}
+                                      onChange={(event) =>
+                                        changeGuests(roomId, { time: event.target.value })
+                                      }
+                                    />
+                                  </Field>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                        {picked.length > 0 && !windowHint && guestProblem() ? (
+                          <p className="kz-error" role="alert">
+                            {guestProblem()}
+                          </p>
+                        ) : null}
+                        {windowHint ? <p className="kz-help">{windowHint}</p> : null}
                         <div className="kz-order-actions">
                           <button
                             type="button"
+                            className="kz-button kz-button-outline"
+                            disabled={
+                              busy ||
+                              picked.every(
+                                (id) => freeRooms.find((room) => room.id === id)?.reserved ?? true,
+                              )
+                            }
+                            onClick={() => void setAside()}
+                          >
+                            {picked.length > 0
+                              ? fill(t.setAsideCountSelected, { count: picked.length })
+                              : t.setAsideSelected}
+                          </button>
+                          <button
+                            type="button"
                             className="kz-button"
-                            disabled={busy || picked.length === 0}
+                            disabled={
+                              busy ||
+                              picked.length === 0 ||
+                              windowHint !== null ||
+                              guestProblem() !== null
+                            }
                             onClick={() => void checkIn()}
                           >
                             {picked.length > 0
@@ -485,7 +679,9 @@ export function RoomRequestsScreen() {
                             <th>{t.room}</th>
                             <th>{t.floor}</th>
                             <th>{t.type}</th>
+                            <th>{t.guestsColumn}</th>
                             <th>{t.checkedIn}</th>
+                            <th>{t.dueOutColumn}</th>
                             <th>{t.status}</th>
                           </tr>
                         </thead>
@@ -495,7 +691,20 @@ export function RoomRequestsScreen() {
                               <td>{stay.roomName}</td>
                               <td>{stay.floorName}</td>
                               <td>{stay.roomTypeName}</td>
+                              <td>
+                                {fill(t.guestsLine, {
+                                  male: stay.guests.male,
+                                  female: stay.guests.female,
+                                  children: stay.guests.children,
+                                })}
+                              </td>
                               <td>{formatKarachiDateTime(new Date(stay.checkedInAt))}</td>
+                              <td>
+                                {formatKarachiDateTime(new Date(stay.plannedCheckOutAt))}
+                                {!stay.checkedOutAt && new Date(stay.plannedCheckOutAt) < new Date()
+                                  ? ` · ${t.overdueMark}`
+                                  : ''}
+                              </td>
                               <td>
                                 {stay.checkedOutAt ? (
                                   fill(t.outAt, {

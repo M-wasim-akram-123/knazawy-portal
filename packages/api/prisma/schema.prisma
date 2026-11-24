@@ -71,6 +71,7 @@ model Organisation {
   hotelRooms        HotelRoom[]
   roomRequests      RoomRequest[]
   roomStays         RoomStay[]
+  roomReservations  RoomReservation[]
   roomInvoices      RoomInvoice[]
   payables          SupplierPayable[]
   branches          Branch[]
@@ -127,6 +128,7 @@ model User {
   roomRequestsDecided  RoomRequest[]      @relation("RoomRequestDecidedBy")
   roomStaysCheckedIn   RoomStay[]         @relation("RoomStayCheckedInBy")
   roomStaysCheckedOut  RoomStay[]         @relation("RoomStayCheckedOutBy")
+  roomReservationsMade RoomReservation[]  @relation("RoomReservationCreatedBy")
   roomInvoicesCreated  RoomInvoice[]      @relation("RoomInvoiceCreatedBy")
   status               UserStatus         @default(INVITED)
   passwordHash         String             @map("password_hash")
@@ -1094,11 +1096,14 @@ model HotelRoom {
   roomTypeId     String       @map("room_type_id")
   roomType       RoomType     @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
   name           String
+  /// How many guests the room sleeps.
+  capacity       Int          @default(2)
   active         Boolean      @default(true)
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  stays RoomStay[]
+  stays        RoomStay[]
+  reservations RoomReservation[]
 
   @@unique([floorId, name])
   @@index([organisationId])
@@ -1154,6 +1159,7 @@ model RoomRequestLine {
   quantity      Int
   nightlyQuoted Decimal?    @map("nightly_quoted") @db.Decimal(12, 2)
   stays         RoomStay[]
+  reservations  RoomReservation[]
 
   @@unique([requestId, roomTypeId])
   @@index([requestId])
@@ -1176,6 +1182,12 @@ model RoomStay {
   checkedOutAt   DateTime?       @map("checked_out_at")
   checkedOutById String?         @map("checked_out_by_id")
   checkedOutBy   User?           @relation("RoomStayCheckedOutBy", fields: [checkedOutById], references: [id], onDelete: Restrict)
+  /// Who is in the room: men, women, and children. At least one.
+  guestsMale     Int             @default(0) @map("guests_male")
+  guestsFemale   Int             @default(0) @map("guests_female")
+  guestsChildren Int             @default(0) @map("guests_children")
+  /// When the guest is due out on the stay's check-out date, HH:MM in Karachi.
+  checkOutTime   String          @default("12:00") @map("check_out_time")
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
 
@@ -1183,6 +1195,25 @@ model RoomStay {
   @@index([requestLineId])
   @@index([hotelRoomId, checkedOutAt])
   @@map("room_stays")
+}
+
+/// A room set aside for an accepted stay before the guests arrive. Check-in turns it into a stay and removes it.
+model RoomReservation {
+  id             String          @id @default(cuid())
+  organisationId String          @map("organisation_id")
+  organisation   Organisation    @relation(fields: [organisationId], references: [id])
+  requestLineId  String          @map("request_line_id")
+  requestLine    RoomRequestLine @relation(fields: [requestLineId], references: [id], onDelete: Restrict)
+  hotelRoomId    String          @map("hotel_room_id")
+  hotelRoom      HotelRoom       @relation(fields: [hotelRoomId], references: [id], onDelete: Restrict)
+  createdById    String          @map("created_by_id")
+  createdBy      User            @relation("RoomReservationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  @@unique([requestLineId, hotelRoomId])
+  @@index([organisationId])
+  @@index([hotelRoomId])
+  @@map("room_reservations")
 }
 
 enum RoomInvoiceKind {

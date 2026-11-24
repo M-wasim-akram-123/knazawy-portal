@@ -4175,3 +4175,8 @@ a {
 .kz-app .kz-top-user .kz-notification-item.is-read strong {
   color: var(--kz-ink-soft);
 }
+
+/* A quiet action sitting after text in a list row, such as Release on a room. */
+.kz-order-section li > .kz-button-quiet {
+  margin-inline-start: 0.75rem;
+}

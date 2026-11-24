@@ -631,6 +631,168 @@ function passengers(total) {
   return { adults: total - crew - children - infants, children, infants, crew, specialDiets: 2 };
 }
 
+/** How many guests each kind of room sleeps. */
+const ROOM_CAPACITY = { Single: 2, Double: 3, 'Crew suite': 4 };
+
+/** Who is staying in the rooms the seed checks in, one entry per room in turn. */
+const GUEST_PLANS = [
+  { male: 1, female: 0, children: 0 },
+  { male: 0, female: 1, children: 0 },
+  { male: 1, female: 1, children: 0 },
+];
+
+const ROOM_DEMO_MARKER = 'Room board seed';
+
+/** Signs in as an airline requester from the scenario seed, or from `pnpm seed:demo`. */
+async function airlineLogin(code, number) {
+  const who = `air:${code}`;
+  if (tokens[who]) return who;
+  const choices = [
+    [`requests@${code.toLowerCase()}.example`, AIRLINE_PASSWORD],
+    [`requester@demoair${String(number).padStart(2, '0')}.local`, STAFF_PASSWORD],
+  ];
+  for (const [email, password] of choices) {
+    try {
+      await login(who, email, password);
+      return who;
+    } catch {
+      // Try the next account.
+    }
+  }
+  throw new Error(`No airline login found for ${code}. Run pnpm seed:demo or the scenario seed.`);
+}
+
+/** Room sizes and the room board stays, for a database that already has its rooms. */
+async function seedRoomsOnly() {
+  console.log('Rooms only');
+  await seedRoomBoard(await ensureRooms());
+}
+
+/**
+ * Stays that make the room board worth looking at: guests in the rooms now, rooms set aside ahead
+ * of arrival, and stays accepted but not yet given a room. Runs once.
+ */
+async function seedRoomBoard(freshTypes) {
+  const ops = await get('ops', '/v1/room-requests');
+  if (ops.some((row) => row.note === ROOM_DEMO_MARKER)) {
+    console.log('Room board stays already seeded.');
+    return;
+  }
+  console.log('Room board: guests in rooms, rooms set aside ahead');
+  const single = freshTypes.find((row) => row.name === 'Single');
+  const double = freshTypes.find((row) => row.name === 'Double');
+  const suite = freshTypes.find((row) => row.name === 'Crew suite');
+  const stayBranches = await get(await airlineLogin('MRG', 1), '/v1/branches/for-stays');
+
+  // [airline, from day, to day, [[type, rooms]], what Karam does, check-out time or null]
+  const stays = [
+    ['MRG', 0, 3, [[double, 2]], 'checkin', '11:00'],
+    ['GWD', 0, 2, [[single, 2]], 'checkin', '12:00'],
+    ['THR', 1, 4, [[suite, 1]], 'reserve', null],
+    ['SWT', 2, 5, [[single, 3]], 'reserve', null],
+    ['RAV', 3, 6, [[double, 2]], 'reserve', null],
+    ['ARC', 5, 8, [[single, 4]], 'reserve-some', null],
+    ['CHN', 6, 9, [[suite, 2]], 'accept', null],
+  ];
+  for (const [number, [code, from, to, lines, action, time]] of stays.entries()) {
+    const who = await airlineLogin(code, number + 1);
+    const request = await post(who, '/v1/room-requests', {
+      checkIn: isoDate(from),
+      checkOut: isoDate(to),
+      branchId: stayBranches[0].id,
+      party: 'Operating crew',
+      note: ROOM_DEMO_MARKER,
+      lines: lines.map(([type, rooms]) => ({ roomTypeId: type.id, rooms })),
+    });
+    await post(who, `/v1/room-requests/${request.id}/submit`);
+    await post('ops', `/v1/room-requests/${request.id}/accept`);
+    if (action === 'accept') {
+      log(`${code} room request accepted`);
+      continue;
+    }
+    const free = await get('ops', `/v1/room-requests/${request.id}/free-rooms`);
+    const wanted = lines.flatMap(([type, count]) =>
+      free.filter((room) => room.roomTypeId === type.id && !room.reserved).slice(0, count),
+    );
+    if (action === 'checkin') {
+      await post('ops', `/v1/room-requests/${request.id}/check-in`, {
+        rooms: wanted.map((room, index) => ({
+          hotelRoomId: room.id,
+          ...GUEST_PLANS[index % GUEST_PLANS.length],
+          checkOutTime: time,
+        })),
+      });
+      log(`${code} guests checked in to ${wanted.length} rooms, out at ${time}`);
+      continue;
+    }
+    const some = action === 'reserve-some' ? wanted.slice(0, 2) : wanted;
+    await post('ops', `/v1/room-requests/${request.id}/reservations`, {
+      hotelRoomIds: some.map((room) => room.id),
+    });
+    log(`${code} ${some.length} rooms set aside for ${isoDate(from)}`);
+  }
+}
+
+/** Floors, room types with their charges, and the demo rooms. Returns the room types. */
+async function ensureRooms() {
+  console.log('Rooms');
+  const floors = await get('admin', '/v1/room-floors');
+  for (const [index, name] of FLOORS.entries()) {
+    await ensure(
+      floors,
+      (row) => row.name === name,
+      () => post('admin', '/v1/room-floors', { name, sortOrder: index }),
+      name,
+    );
+  }
+  const roomTypes = await get('admin', '/v1/room-types');
+  for (const [name, note, amountPerNight] of ROOM_TYPES) {
+    const type = await ensure(
+      roomTypes,
+      (row) => row.name === name,
+      () => post('admin', '/v1/room-types', { name, note }),
+      name,
+    );
+    if (!(type.charges ?? []).length) {
+      await post('admin', `/v1/room-types/${type.id}/charges`, { name: 'Room', amountPerNight });
+      await post('admin', `/v1/room-types/${type.id}/charges`, {
+        name: 'Breakfast',
+        amountPerNight: '1500',
+      });
+    }
+  }
+  const rooms = await get('admin', '/v1/hotel-rooms');
+  const freshFloors = await get('admin', '/v1/room-floors');
+  const freshTypes = await get('admin', '/v1/room-types');
+  for (let number = 0; number < 18; number += 1) {
+    const floor = freshFloors.find((row) => row.name === FLOORS[Math.floor(number / 6)]);
+    const type = freshTypes.find(
+      (row) => row.name === ROOM_TYPES[number % 6 < 3 ? 0 : number % 6 < 5 ? 1 : 2][0],
+    );
+    const name = `${Math.floor(number / 6) + 1}${String((number % 6) + 1).padStart(2, '0')}`;
+    await ensure(
+      rooms,
+      (row) => row.name === name,
+      () =>
+        post('admin', '/v1/hotel-rooms', {
+          floorId: floor.id,
+          roomTypeId: type.id,
+          name,
+          capacity: ROOM_CAPACITY[type.name],
+        }),
+      `room ${name}`,
+    );
+  }
+  for (const room of await get('admin', '/v1/hotel-rooms')) {
+    const wanted = ROOM_CAPACITY[room.roomTypeName];
+    if (wanted && room.capacity !== wanted) {
+      await patch('admin', `/v1/hotel-rooms/${room.id}`, { capacity: wanted });
+      log(`room ${room.name} now sleeps ${wanted}`);
+    }
+  }
+  return freshTypes;
+}
+
 // ---------------------------------------------------------------- run
 
 async function main() {
@@ -641,6 +803,12 @@ async function main() {
   await login('store', 'store@karam.local', STAFF_PASSWORD);
   await login('kitchen', 'kitchen@karam.local', STAFF_PASSWORD);
   await login('finance', 'finance@karam.local', STAFF_PASSWORD);
+
+  // SEED_ONLY=rooms fills just the room board, for a database made by `pnpm seed:demo`.
+  if (process.env.SEED_ONLY === 'rooms') {
+    await seedRoomsOnly();
+    return;
+  }
 
   console.log('Staff');
   const users = await get('admin', '/v1/users');
@@ -814,53 +982,13 @@ async function main() {
     }
   }
 
-  console.log('Rooms');
-  const floors = await get('admin', '/v1/room-floors');
-  for (const [index, name] of FLOORS.entries()) {
-    await ensure(
-      floors,
-      (row) => row.name === name,
-      () => post('admin', '/v1/room-floors', { name, sortOrder: index }),
-      name,
-    );
-  }
-  const roomTypes = await get('admin', '/v1/room-types');
-  for (const [name, note, amountPerNight] of ROOM_TYPES) {
-    const type = await ensure(
-      roomTypes,
-      (row) => row.name === name,
-      () => post('admin', '/v1/room-types', { name, note }),
-      name,
-    );
-    if (!(type.charges ?? []).length) {
-      await post('admin', `/v1/room-types/${type.id}/charges`, { name: 'Room', amountPerNight });
-      await post('admin', `/v1/room-types/${type.id}/charges`, {
-        name: 'Breakfast',
-        amountPerNight: '1500',
-      });
-    }
-  }
-  const rooms = await get('admin', '/v1/hotel-rooms');
-  const freshFloors = await get('admin', '/v1/room-floors');
-  const freshTypes = await get('admin', '/v1/room-types');
-  for (let number = 0; number < 18; number += 1) {
-    const floor = freshFloors.find((row) => row.name === FLOORS[Math.floor(number / 6)]);
-    const type = freshTypes.find(
-      (row) => row.name === ROOM_TYPES[number % 6 < 3 ? 0 : number % 6 < 5 ? 1 : 2][0],
-    );
-    const name = `${Math.floor(number / 6) + 1}${String((number % 6) + 1).padStart(2, '0')}`;
-    await ensure(
-      rooms,
-      (row) => row.name === name,
-      () => post('admin', '/v1/hotel-rooms', { floorId: floor.id, roomTypeId: type.id, name }),
-      `room ${name}`,
-    );
-  }
+  const freshTypes = await ensureRooms();
 
   // ------------------------------------------------------------ scenarios (once)
   const existing = await get('ops', '/v1/requests');
   if (existing.some((row) => row.note === MARKER)) {
     console.log('Scenarios already seeded. Master data is up to date.');
+    await seedRoomBoard(freshTypes);
     return;
   }
 
@@ -1273,11 +1401,16 @@ async function main() {
         free.filter((room) => room.roomTypeId === type.id).slice(0, count),
       );
       await post('ops', `/v1/room-requests/${request.id}/check-in`, {
-        hotelRoomIds: wanted.map((room) => room.id),
+        rooms: wanted.map((room, index) => ({
+          hotelRoomId: room.id,
+          ...GUEST_PLANS[index % GUEST_PLANS.length],
+        })),
       });
       log(`${code} crew checked in to ${wanted.length} rooms`);
     } else log(`${code} room request accepted`);
   }
+
+  await seedRoomBoard(freshTypes);
 
   console.log('Done.');
   console.log(

@@ -1,11 +1,17 @@
 import {
+  STANDARD_CHECK_OUT_TIME,
   canManageRoomStays,
+  checkOutTimeError,
   formatDisplayDate,
+  guestCountsError,
   isKaramRole,
   isRoomRequestEditable,
   nightlyChargeTotal,
   nextRoomRequestStatus,
+  openStayHold,
+  plannedCheckOutAt,
   roomAvailabilityError,
+  roomIsFreeFor,
   roomLineError,
   roomNights,
   roomStayWindowError,
@@ -15,11 +21,14 @@ import {
   stayTotal,
   todayInKarachi,
   type Actor,
+  type CheckInRoomInput,
   type FreeRoomRecord,
+  type RoomHold,
   type RoomOfferRecord,
   type RoomRequestLineRecord,
   type RoomRequestRecord,
   type RoomRequestStatus,
+  type RoomReservationRecord,
   type RoomStayRecord,
   roomAvailabilityLine,
   type RoomAvailabilityLine,
@@ -60,9 +69,48 @@ const requestInclude = {
         include: { hotelRoom: { select: { name: true, floor: { select: { name: true } } } } },
         orderBy: { checkedInAt: 'asc' },
       },
+      reservations: {
+        include: {
+          hotelRoom: {
+            select: { name: true, capacity: true, floor: { select: { name: true } } },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      },
     },
   },
 } satisfies Prisma.RoomRequestInclude;
+
+/** What decides whether a room is free on given nights: guests in it and rooms set aside for stays. */
+const roomHoldInclude = {
+  floor: { select: { name: true, sortOrder: true } },
+  roomType: { select: { name: true } },
+  stays: {
+    where: { checkedOutAt: null },
+    include: {
+      requestLine: {
+        select: { request: { select: { number: true, checkIn: true, checkOut: true } } },
+      },
+    },
+  },
+  reservations: {
+    where: { requestLine: { request: { status: 'ACCEPTED' as const } } },
+    include: {
+      requestLine: {
+        select: {
+          requestId: true,
+          request: { select: { number: true, checkIn: true, checkOut: true } },
+        },
+      },
+    },
+  },
+} satisfies Prisma.HotelRoomInclude;
+
+type HoldRoom = Prisma.HotelRoomGetPayload<{ include: typeof roomHoldInclude }>;
+
+interface NamedHold extends RoomHold {
+  number: string;
+}
 
 type RequestRow = Prisma.RoomRequestGetPayload<{ include: typeof requestInclude }>;
 
@@ -97,7 +145,7 @@ export class RoomRequestsService {
     });
     return rows.map((row) => {
       const record = toRequest(row);
-      return isKaramRole(actor.role) ? record : { ...record, stays: [] };
+      return isKaramRole(actor.role) ? record : { ...record, stays: [], reservations: [] };
     });
   }
 
@@ -324,15 +372,24 @@ export class RoomRequestsService {
     return this.load(id);
   }
 
-  /** Rooms of an accepted stay that Karam can check a guest in to now, by room type. */
+  /**
+   * Rooms Karam can use for the nights of an accepted stay, by room type: no guest in them and
+   * nothing else set aside on those nights. Rooms already set aside for this stay come back marked.
+   */
   async freeRooms(actor: Actor, id: string): Promise<FreeRoomRecord[]> {
     assertCanManageStays(actor);
     const existing = await this.findSent(actor, id);
-    assertOpenStay(existing);
+    if (existing.status !== 'ACCEPTED') {
+      throw new BadRequestException('Only an accepted request has rooms to set aside.');
+    }
+    const today = todayInKarachi();
+    const checkIn = formatIsoDate(existing.checkIn);
+    const checkOut = formatIsoDate(existing.checkOut);
+    if (today >= checkOut) return [];
     const karamOrgId = await this.karamOrganisationId();
-    const wanted = [...remainingByType(existing.lines).entries()]
-      .filter(([, line]) => line.left > 0)
-      .map(([roomTypeId]) => roomTypeId);
+    const wanted = existing.lines
+      .filter((line) => roomsToCheckIn(line.quantity, line.stays.length) > 0)
+      .map((line) => line.roomTypeId);
     if (wanted.length === 0) return [];
 
     const rooms = await this.prisma.hotelRoom.findMany({
@@ -341,19 +398,16 @@ export class RoomRequestsService {
         active: true,
         roomTypeId: { in: wanted },
         floor: { branchId: existing.branchId },
-        stays: { none: { checkedOutAt: null } },
       },
-      include: {
-        floor: { select: { name: true, sortOrder: true } },
-        roomType: { select: { name: true } },
-      },
+      include: roomHoldInclude,
     });
     return rooms
+      .filter((room) => roomIsFreeFor(holdsOf(room, today, existing.id), checkIn, checkOut))
       .sort(
         (left, right) =>
           left.floor.sortOrder - right.floor.sortOrder ||
           left.floor.name.localeCompare(right.floor.name) ||
-          left.name.localeCompare(right.name),
+          left.name.localeCompare(right.name, undefined, { numeric: true }),
       )
       .map((room) => ({
         id: room.id,
@@ -361,11 +415,13 @@ export class RoomRequestsService {
         floorName: room.floor.name,
         roomTypeId: room.roomTypeId,
         roomTypeName: room.roomType.name,
+        capacity: room.capacity,
+        reserved: room.reservations.some((row) => row.requestLine.requestId === existing.id),
       }));
   }
 
-  /** Moves guests into the rooms Karam picked. A room can hold one guest at a time. */
-  async checkIn(
+  /** Sets rooms aside for an accepted stay before the guests arrive, so the calendar shows them booked. */
+  async reserve(
     actor: Actor,
     id: string,
     input: { hotelRoomIds: string[] },
@@ -374,8 +430,138 @@ export class RoomRequestsService {
     const ids = input.hotelRoomIds;
     if (new Set(ids).size !== ids.length) throw new BadRequestException('Pick each room once.');
     const existing = await this.findSent(actor, id);
+    if (existing.status !== 'ACCEPTED') {
+      throw new BadRequestException('Only an accepted request can have rooms set aside.');
+    }
+    const today = todayInKarachi();
+    const checkIn = formatIsoDate(existing.checkIn);
+    const checkOut = formatIsoDate(existing.checkOut);
+    if (today >= checkOut) throw new BadRequestException('This stay has ended.');
+    const karamOrgId = await this.karamOrganisationId();
+
+    await this.prisma.$transaction(async (tx) => {
+      await lockRoomRequestStatus(tx, existing.id, existing.status);
+      await tx.$queryRaw`SELECT id FROM hotel_rooms WHERE id IN (${Prisma.join(ids)}) FOR UPDATE`;
+      const fresh = await tx.roomRequestLine.findMany({
+        where: { requestId: existing.id },
+        include: {
+          roomType: { select: { name: true } },
+          _count: { select: { stays: true, reservations: true } },
+        },
+      });
+      const left = new Map(
+        fresh.map((line) => [
+          line.roomTypeId,
+          {
+            lineId: line.id,
+            name: line.roomType.name,
+            left: line.quantity - line._count.stays - line._count.reservations,
+          },
+        ]),
+      );
+      const rooms = await tx.hotelRoom.findMany({
+        where: {
+          id: { in: ids },
+          organisationId: karamOrgId,
+          active: true,
+          floor: { branchId: existing.branchId },
+        },
+        include: roomHoldInclude,
+      });
+      if (rooms.length !== ids.length) {
+        throw new BadRequestException('One of the rooms is not available. Choose it again.');
+      }
+      for (const room of rooms) {
+        const line = left.get(room.roomTypeId);
+        if (!line) {
+          throw new BadRequestException(
+            `Room ${room.name} is not one of the room types on this stay.`,
+          );
+        }
+        if (line.left < 1) {
+          throw new BadRequestException(
+            `All the ${line.name} rooms on this stay already have a room or a guest.`,
+          );
+        }
+        if (room.reservations.some((row) => row.requestLine.requestId === existing.id)) {
+          throw new BadRequestException(`Room ${room.name} is already set aside for this stay.`);
+        }
+        const busy = firstClash(holdsOf(room, today, existing.id), checkIn, checkOut);
+        if (busy) {
+          throw new BadRequestException(
+            `Room ${room.name} is already taken ${formatDisplayDate(busy.from)} to ${formatDisplayDate(busy.to)} (${busy.number}).`,
+          );
+        }
+        line.left -= 1;
+        await tx.roomReservation.create({
+          data: {
+            organisationId: karamOrgId,
+            requestLineId: line.lineId,
+            hotelRoomId: room.id,
+            createdById: actor.id,
+          },
+        });
+      }
+      await this.audit.record(tx, {
+        userId: actor.id,
+        entity: 'RoomRequest',
+        entityId: id,
+        action: 'reserve_rooms',
+        after: { rooms: rooms.map((room) => room.name) },
+      });
+    });
+    return this.load(id);
+  }
+
+  /** Frees a room that was set aside, so another stay can use those nights. */
+  async release(actor: Actor, id: string, reservationId: string): Promise<RoomRequestRecord> {
+    assertCanManageStays(actor);
+    const existing = await this.findSent(actor, id);
+    const reservation = existing.lines
+      .flatMap((line) => line.reservations)
+      .find((row) => row.id === reservationId);
+    if (!reservation) throw new NotFoundException('That room was not found on this stay.');
+
+    await this.prisma.$transaction(async (tx) => {
+      await lockRoomRequestStatus(tx, existing.id, existing.status);
+      const removed = await tx.roomReservation.deleteMany({ where: { id: reservationId } });
+      if (removed.count !== 1) {
+        throw new BadRequestException('This room is no longer set aside.');
+      }
+      await this.audit.record(tx, {
+        userId: actor.id,
+        entity: 'RoomRequest',
+        entityId: id,
+        action: 'release_room',
+        before: { room: reservation.hotelRoom.name },
+      });
+    });
+    return this.load(id);
+  }
+
+  /**
+   * Moves guests into the rooms Karam picked and records who is staying and when they are due out.
+   * A room holds one guest at a time, and a room set aside for another stay is left alone.
+   */
+  async checkIn(
+    actor: Actor,
+    id: string,
+    input: { rooms: CheckInRoomInput[] },
+  ): Promise<RoomRequestRecord> {
+    assertCanManageStays(actor);
+    const picks = input.rooms.map(normaliseCheckIn);
+    const ids = picks.map((pick) => pick.hotelRoomId);
+    if (new Set(ids).size !== ids.length) throw new BadRequestException('Pick each room once.');
+    for (const pick of picks) {
+      const timeError = checkOutTimeError(pick.checkOutTime);
+      if (timeError) throw new BadRequestException(timeError);
+    }
+    const existing = await this.findSent(actor, id);
     assertOpenStay(existing);
     const karamOrgId = await this.karamOrganisationId();
+    const today = todayInKarachi();
+    const checkIn = formatIsoDate(existing.checkIn);
+    const checkOut = formatIsoDate(existing.checkOut);
 
     await this.prisma.$transaction(async (tx) => {
       await lockRoomRequestStatus(tx, existing.id, existing.status);
@@ -387,17 +573,29 @@ export class RoomRequestsService {
           active: true,
           floor: { branchId: existing.branchId },
         },
-        include: {
-          roomType: { select: { id: true, name: true } },
-          stays: { where: { checkedOutAt: null }, select: { id: true } },
-        },
+        include: roomHoldInclude,
       });
       if (rooms.length !== ids.length) {
         throw new BadRequestException('One of the rooms is not available. Choose it again.');
       }
-      const remaining = remainingByType(existing.lines);
+      const fresh = await tx.roomRequestLine.findMany({
+        where: { requestId: existing.id },
+        include: { _count: { select: { stays: true } }, roomType: { select: { name: true } } },
+      });
+      const remaining = new Map(
+        fresh.map((line) => [
+          line.roomTypeId,
+          {
+            lineId: line.id,
+            name: line.roomType.name,
+            left: roomsToCheckIn(line.quantity, line._count.stays),
+          },
+        ]),
+      );
       const now = new Date();
       for (const room of rooms) {
+        const pick = picks.find((row) => row.hotelRoomId === room.id);
+        if (!pick) continue;
         if (room.stays.length > 0) {
           throw new BadRequestException(`Room ${room.name} already has a guest.`);
         }
@@ -412,6 +610,14 @@ export class RoomRequestsService {
             `All the ${line.name} rooms on this stay are already checked in.`,
           );
         }
+        const guestError = guestCountsError(pick.guests, room.capacity);
+        if (guestError) throw new BadRequestException(`Room ${room.name}: ${guestError}`);
+        const busy = firstClash(holdsOf(room, today, existing.id), checkIn, checkOut);
+        if (busy) {
+          throw new BadRequestException(
+            `Room ${room.name} is set aside ${formatDisplayDate(busy.from)} to ${formatDisplayDate(busy.to)} (${busy.number}). Pick another room.`,
+          );
+        }
         line.left -= 1;
         await tx.roomStay.create({
           data: {
@@ -420,7 +626,15 @@ export class RoomRequestsService {
             hotelRoomId: room.id,
             checkedInAt: now,
             checkedInById: actor.id,
+            guestsMale: pick.guests.male,
+            guestsFemale: pick.guests.female,
+            guestsChildren: pick.guests.children,
+            checkOutTime: pick.checkOutTime,
           },
+        });
+        // Moving in uses up the room that was set aside for this stay.
+        await tx.roomReservation.deleteMany({
+          where: { requestLineId: line.lineId, hotelRoomId: room.id },
         });
       }
       await this.audit.record(tx, {
@@ -428,7 +642,18 @@ export class RoomRequestsService {
         entity: 'RoomRequest',
         entityId: id,
         action: 'check_in',
-        after: { rooms: rooms.map((room) => room.name) },
+        after: {
+          rooms: rooms.map((room) => {
+            const pick = picks.find((row) => row.hotelRoomId === room.id);
+            return {
+              room: room.name,
+              male: pick?.guests.male,
+              female: pick?.guests.female,
+              children: pick?.guests.children,
+              checkOutTime: pick?.checkOutTime,
+            };
+          }),
+        },
       });
     });
     return this.load(id);
@@ -704,20 +929,44 @@ function assertOpenStay(request: RequestRow): void {
   if (error) throw new BadRequestException(error);
 }
 
-/** Rooms still to check in, by room type, with the line each one belongs to. */
-function remainingByType(
-  lines: RequestRow['lines'],
-): Map<string, { lineId: string; name: string; left: number }> {
-  return new Map(
-    lines.map((line) => [
-      line.roomTypeId,
-      {
-        lineId: line.id,
-        name: line.roomType.name,
-        left: roomsToCheckIn(line.quantity, line.stays.length),
-      },
-    ]),
-  );
+/**
+ * Every span of nights a room is spoken for, other than by `exceptRequestId` itself: a guest who
+ * is in the room, and rooms set aside for other accepted stays that have not ended.
+ */
+function holdsOf(room: HoldRoom, today: string, exceptRequestId: string): NamedHold[] {
+  const holds: NamedHold[] = room.stays.map((stay) => ({
+    ...openStayHold(stay.checkedInAt, formatIsoDate(stay.requestLine.request.checkOut), today),
+    number: stay.requestLine.request.number,
+  }));
+  for (const row of room.reservations) {
+    if (row.requestLine.requestId === exceptRequestId) continue;
+    const checkOut = formatIsoDate(row.requestLine.request.checkOut);
+    if (checkOut <= today) continue;
+    holds.push({
+      from: formatIsoDate(row.requestLine.request.checkIn),
+      to: checkOut,
+      number: row.requestLine.request.number,
+    });
+  }
+  return holds;
+}
+
+/** The first hold that shares a night with the stay, so the message can name it. */
+function firstClash(holds: NamedHold[], from: string, to: string): NamedHold | null {
+  return holds.find((hold) => !roomIsFreeFor([hold], from, to)) ?? null;
+}
+
+/** The guests of one room and the time they are due out, with the defaults filled in. */
+function normaliseCheckIn(input: CheckInRoomInput): {
+  hotelRoomId: string;
+  guests: { male: number; female: number; children: number };
+  checkOutTime: string;
+} {
+  return {
+    hotelRoomId: input.hotelRoomId,
+    guests: { male: input.male, female: input.female, children: input.children },
+    checkOutTime: input.checkOutTime?.trim() || STANDARD_CHECK_OUT_TIME,
+  };
 }
 
 function stayFrom(input: { checkIn: string; checkOut: string }): Stay {
@@ -795,9 +1044,30 @@ function toRequest(row: RequestRow): RoomRequestRecord {
       roomTypeName: line.roomType.name,
       checkedInAt: stay.checkedInAt.toISOString(),
       checkedOutAt: stay.checkedOutAt?.toISOString() ?? null,
+      guests: {
+        male: stay.guestsMale,
+        female: stay.guestsFemale,
+        children: stay.guestsChildren,
+      },
+      checkOutTime: stay.checkOutTime,
+      plannedCheckOutAt: plannedCheckOutAt(checkOut, stay.checkOutTime),
+    })),
+  );
+  const reservations: RoomReservationRecord[] = row.lines.flatMap((line) =>
+    line.reservations.map((reservation) => ({
+      id: reservation.id,
+      roomId: reservation.hotelRoomId,
+      roomName: reservation.hotelRoom.name,
+      floorName: reservation.hotelRoom.floor.name,
+      roomTypeId: line.roomTypeId,
+      roomTypeName: line.roomType.name,
+      capacity: reservation.hotelRoom.capacity,
     })),
   );
   return {
+    reservations: reservations.sort((left, right) =>
+      left.roomName.localeCompare(right.roomName, undefined, { numeric: true }),
+    ),
     id: row.id,
     number: row.number,
     airlineId: row.organisationId,
