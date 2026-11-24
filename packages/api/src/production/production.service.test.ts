@@ -8,8 +8,8 @@ import { ProductionService } from './production.service';
 const actor = {
   id: 'user-1',
   email: 'kitchen@karam.local',
-  name: 'Kitchen Lead',
-  role: 'KITCHEN_LEAD' as const,
+  name: 'Head Chef',
+  role: 'HEAD_CHEF' as const,
   organisationId: 'org-1',
   branchId: 'branch-1',
 };
@@ -97,6 +97,22 @@ describe('ProductionService', () => {
   it('refuses the storekeeper', async () => {
     const service = serviceFor({});
     await expect(service.create({ ...actor, role: 'STOREKEEPER' }, input)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('keeps batch costs from a chef, who may read recipes but not stock', async () => {
+    const tx = { productionBatch: { findMany: jest.fn() } };
+    const service = serviceFor(tx);
+    await expect(service.list({ ...actor, role: 'CHEF' })).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(tx.productionBatch.findMany).not.toHaveBeenCalled();
+  });
+
+  it('refuses a chef who tries to record a batch', async () => {
+    const service = serviceFor({});
+    await expect(service.create({ ...actor, role: 'CHEF' }, input)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
   });

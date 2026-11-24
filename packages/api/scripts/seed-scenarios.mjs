@@ -581,8 +581,8 @@ const EXTRA_STAFF = [
   ['Hamza Operations', 'hamza.ops@karam.local', 'OPERATIONS_MANAGER'],
   ['Ali Store', 'ali.store@karam.local', 'STOREKEEPER'],
   ['Noman Store', 'noman.store@karam.local', 'STOREKEEPER'],
-  ['Chef Rizwan', 'rizwan.kitchen@karam.local', 'KITCHEN_LEAD'],
-  ['Chef Amna', 'amna.kitchen@karam.local', 'KITCHEN_LEAD'],
+  ['Head Chef Rizwan', 'rizwan.kitchen@karam.local', 'HEAD_CHEF'],
+  ['Chef Amna', 'amna.kitchen@karam.local', 'CHEF'],
   ['Fatima Finance', 'fatima.finance@karam.local', 'FINANCE_OFFICER'],
 ];
 
@@ -1202,7 +1202,7 @@ async function main() {
     }
     const draft = await post('finance', '/v1/invoices', { requestId: request.id, note: MARKER });
     const invoice = await post('finance', `/v1/invoices/${draft.id}/issue`);
-    log(`${request.number} ${code} invoiced as ${invoice.number}, ${invoice.total} PKR`);
+    log(`${request.number} ${code} invoiced as ${invoice.number}, ${invoice.total} SAR`);
     if (outcome === 'credit') {
       await post('finance', `/v1/invoices/${invoice.id}/credit`, {
         reason: 'Three meals arrived cold',

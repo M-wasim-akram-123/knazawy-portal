@@ -403,7 +403,7 @@ export function RateCardsScreen() {
                     {selected.lines.map((line) => (
                       <tr key={line.recipeId}>
                         <td>{line.recipeName}</td>
-                        <td>{line.unitPrice} PKR</td>
+                        <td>{line.unitPrice} SAR</td>
                         <td>{line.minimumQuantity}</td>
                       </tr>
                     ))}

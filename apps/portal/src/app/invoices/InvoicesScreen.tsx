@@ -117,8 +117,8 @@ export function InvoicesScreen() {
                         <td>{line.roomTypeName}</td>
                         <td>{line.rooms}</td>
                         <td>{line.nights}</td>
-                        <td>{line.nightly} PKR</td>
-                        <td>{line.amount} PKR</td>
+                        <td>{line.nightly} SAR</td>
+                        <td>{line.amount} SAR</td>
                       </tr>
                     ))}
                   </tbody>
@@ -176,7 +176,7 @@ export function InvoicesScreen() {
                     <td>{line.deliveredQuantity}</td>
                     <td>{line.billedQuantity}</td>
                     <td>{line.unitPrice}</td>
-                    <td>{line.amount} PKR</td>
+                    <td>{line.amount} SAR</td>
                   </tr>
                 ))}
               </tbody>

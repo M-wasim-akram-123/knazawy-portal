@@ -277,7 +277,7 @@ export class InvoicesService {
           organisationId: existing.organisationId,
           role: 'AIRLINE_FINANCE',
           title: `${existing.number} was issued`,
-          body: `The bill is ${total} PKR, due by ${formatDisplayDate(
+          body: `The bill is ${total} SAR, due by ${formatDisplayDate(
             invoiceDueOn(todayInKarachi(), terms.paymentTermsDays),
           )}.`,
           entity: 'Invoice',
@@ -366,7 +366,7 @@ export class InvoicesService {
           organisationId: existing.organisationId,
           role: 'AIRLINE_FINANCE',
           title: `${number} credits ${existing.number}`,
-          body: `${reason} The credit is ${total} PKR.`,
+          body: `${reason} The credit is ${total} SAR.`,
           entity: 'Invoice',
           entityId: creditNote.id,
           exceptUserId: actor.id,
@@ -459,7 +459,7 @@ export class InvoicesService {
       if (!recipe) throw new BadRequestException('Choose an active, approved menu item.');
       const price = line.unitPrice.trim();
       parsePositiveDecimal(price, 'Enter a unit price greater than zero.');
-      if (!isMoney(price)) throw new BadRequestException('Enter a valid PKR unit price.');
+      if (!isMoney(price)) throw new BadRequestException('Enter a valid SAR unit price.');
       const amount = chargeFor(line.quantity, price);
       if (amount === null || new Prisma.Decimal(amount).gt('999999999999.99')) {
         throw new BadRequestException('This invoice line exceeds the supported amount.');

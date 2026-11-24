@@ -8,7 +8,7 @@ export const portalRequestsCopy = defineCopy({
     sent: '{number} is sent to Karam.',
     savedDraft: '{number} is saved as a draft.',
     cancelConfirm:
-      'Cancelling {number} now costs {total} PKR. Karam bills that charge straight away.',
+      'Cancelling {number} now costs {total} SAR. Karam bills that charge straight away.',
     cancelConfirmUnknown:
       'Cancelling {number} now costs an amount Karam will confirm. Karam bills that charge straight away.',
     cancelledBilled: '{number} is cancelled and the charge is billed.',
@@ -46,7 +46,7 @@ export const portalRequestsCopy = defineCopy({
     price: 'Price',
     charge: 'Charge',
     portionsOf: 'Portions of {name}',
-    estimate: 'Estimated charge: {total} PKR on {card}. The invoice uses the portions delivered.',
+    estimate: 'Estimated charge: {total} SAR on {card}. The invoice uses the portions delivered.',
     missingPrice: 'One of these items has no price on {card}. Karam will confirm the charge.',
     noCard: 'No rate card covers this service date yet. Karam will confirm the charge.',
     noteForKaram: 'Note for Karam',
@@ -96,7 +96,7 @@ export const portalRequestsCopy = defineCopy({
     changed: '{number} میں تبدیلی ہو گئی۔',
     sent: '{number} کرم کو بھیج دی گئی۔',
     savedDraft: '{number} مسودے کے طور پر محفوظ ہو گئی۔',
-    cancelConfirm: 'اب {number} منسوخ کرنے پر {total} PKR لگیں گے۔ کرم یہ چارج فوراً بل کر دیتا ہے۔',
+    cancelConfirm: 'اب {number} منسوخ کرنے پر {total} SAR لگیں گے۔ کرم یہ چارج فوراً بل کر دیتا ہے۔',
     cancelConfirmUnknown:
       'اب {number} منسوخ کرنے پر ایک رقم لگے گی جس کی تصدیق کرم کرے گا۔ کرم یہ چارج فوراً بل کر دیتا ہے۔',
     cancelledBilled: '{number} منسوخ ہو گئی اور چارج بل کر دیا گیا۔',
@@ -134,7 +134,7 @@ export const portalRequestsCopy = defineCopy({
     price: 'قیمت',
     charge: 'چارج',
     portionsOf: '{name} کے حصے',
-    estimate: 'اندازاً چارج: {card} پر {total} PKR۔ انوائس پہنچائے گئے حصوں کے مطابق بنتی ہے۔',
+    estimate: 'اندازاً چارج: {card} پر {total} SAR۔ انوائس پہنچائے گئے حصوں کے مطابق بنتی ہے۔',
     missingPrice: 'ان میں سے ایک آئٹم کی {card} پر کوئی قیمت نہیں۔ کرم چارج کی تصدیق کرے گا۔',
     noCard: 'اس سروس کی تاریخ کے لیے ابھی کوئی ریٹ کارڈ نہیں۔ کرم چارج کی تصدیق کرے گا۔',
     noteForKaram: 'کرم کے لیے نوٹ',
@@ -184,7 +184,7 @@ export const portalRequestsCopy = defineCopy({
     changed: 'تم تعديل {number}.',
     sent: 'تم إرسال {number} إلى كرم.',
     savedDraft: 'تم حفظ {number} كمسودة.',
-    cancelConfirm: 'إلغاء {number} الآن يكلّف {total} PKR. تُصدر كرم فاتورة بهذا المبلغ فورًا.',
+    cancelConfirm: 'إلغاء {number} الآن يكلّف {total} SAR. تُصدر كرم فاتورة بهذا المبلغ فورًا.',
     cancelConfirmUnknown:
       'إلغاء {number} الآن يكلّف مبلغًا ستؤكده كرم. تُصدر كرم فاتورة بهذا المبلغ فورًا.',
     cancelledBilled: 'تم إلغاء {number} وإصدار فاتورة الرسوم.',
@@ -222,7 +222,7 @@ export const portalRequestsCopy = defineCopy({
     price: 'السعر',
     charge: 'الرسوم',
     portionsOf: 'حصص {name}',
-    estimate: 'الرسوم التقديرية: {total} PKR حسب {card}. تعتمد الفاتورة على الحصص المسلّمة.',
+    estimate: 'الرسوم التقديرية: {total} SAR حسب {card}. تعتمد الفاتورة على الحصص المسلّمة.',
     missingPrice: 'أحد هذه الأصناف بلا سعر في {card}. ستؤكد كرم الرسوم.',
     noCard: 'لا توجد بطاقة أسعار لهذا التاريخ بعد. ستؤكد كرم الرسوم.',
     noteForKaram: 'ملاحظة إلى كرم',

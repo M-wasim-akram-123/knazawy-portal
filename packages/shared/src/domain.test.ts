@@ -14,6 +14,7 @@ import {
   dispatchQuantityError,
   requestStatusAfterDelivery,
 } from './distribution';
+import type { Role } from './enums';
 import {
   amountDue,
   canIssueInvoice,
@@ -31,7 +32,7 @@ import {
   rateCardCovers,
   rateCardsOverlap,
 } from './rates';
-import { can, canReadOrganisation } from './rbac';
+import { can, canReadOrganisation, isKaramRole } from './rbac';
 import { recipeIngredientQuantity, recipeStockYield } from './recipes';
 import {
   amendmentError,
@@ -68,6 +69,7 @@ import {
 } from './rooms';
 import { purchaseStatusTone, statusTone } from './status';
 import { countStatusTone } from './stock';
+import { roleFitsOrganisation } from './users';
 
 describe('permissions', () => {
   it('lets the storekeeper create a purchase and blocks the airline requester', () => {
@@ -80,14 +82,14 @@ describe('permissions', () => {
     expect(can('ADMINISTRATOR', 'stock', 'A')).toBe(true);
     expect(can('ADMINISTRATOR', 'recipes', 'C')).toBe(true);
     expect(can('ADMINISTRATOR', 'recipes', 'A')).toBe(true);
-    expect(can('KITCHEN_LEAD', 'recipes', 'C')).toBe(true);
-    expect(can('KITCHEN_LEAD', 'recipes', 'A')).toBe(false);
+    expect(can('HEAD_CHEF', 'recipes', 'C')).toBe(true);
+    expect(can('HEAD_CHEF', 'recipes', 'A')).toBe(true);
     expect(can('STOREKEEPER', 'recipes', 'R')).toBe(false);
     expect(can('OPERATIONS_MANAGER', 'stock', 'A')).toBe(true);
     expect(can('STOREKEEPER', 'stock', 'A')).toBe(false);
-    expect(can('KITCHEN_LEAD', 'purchases', 'R')).toBe(false);
-    expect(can('KITCHEN_LEAD', 'stock', 'R')).toBe(true);
-    expect(can('FINANCE_OFFICER', 'recipes', 'R')).toBe(true);
+    expect(can('HEAD_CHEF', 'purchases', 'R')).toBe(false);
+    expect(can('HEAD_CHEF', 'stock', 'R')).toBe(true);
+    expect(can('FINANCE_OFFICER', 'recipes', 'R')).toBe(false);
     expect(can('FINANCE_OFFICER', 'recipes', 'C')).toBe(false);
     expect(can('ADMINISTRATOR', 'users', 'C')).toBe(true);
     expect(can('OPERATIONS_MANAGER', 'users', 'R')).toBe(false);
@@ -411,8 +413,66 @@ describe('service requests', () => {
     expect(can('OPERATIONS_MANAGER', 'service_requests', 'A')).toBe(true);
     expect(can('OPERATIONS_MANAGER', 'service_requests', 'C')).toBe(false);
     expect(can('ADMINISTRATOR', 'service_requests', 'A')).toBe(false);
-    expect(can('KITCHEN_LEAD', 'service_requests', 'R')).toBe(true);
-    expect(can('KITCHEN_LEAD', 'service_requests', 'A')).toBe(false);
+    expect(can('HEAD_CHEF', 'service_requests', 'R')).toBe(true);
+    expect(can('HEAD_CHEF', 'service_requests', 'A')).toBe(false);
+  });
+});
+
+describe('kitchen and finance roles', () => {
+  it('lets the head chef add, change, and approve recipes', () => {
+    expect(can('HEAD_CHEF', 'recipes', 'C')).toBe(true);
+    expect(can('HEAD_CHEF', 'recipes', 'R')).toBe(true);
+    expect(can('HEAD_CHEF', 'recipes', 'U')).toBe(true);
+    expect(can('HEAD_CHEF', 'recipes', 'A')).toBe(true);
+  });
+
+  it('lets a chef see recipes, orders, and the week ahead, and change nothing', () => {
+    expect(can('CHEF', 'recipes', 'R')).toBe(true);
+    expect(can('CHEF', 'service_requests', 'R')).toBe(true);
+    expect(can('CHEF', 'forecast', 'R')).toBe(true);
+    for (const access of ['C', 'U', 'A'] as const) {
+      expect(can('CHEF', 'recipes', access)).toBe(false);
+    }
+    expect(can('CHEF', 'service_requests', 'U')).toBe(false);
+  });
+
+  it('keeps a chef away from stock, money, and meal cost', () => {
+    expect(can('CHEF', 'stock', 'R')).toBe(false);
+    expect(can('CHEF', 'purchases', 'R')).toBe(false);
+    expect(can('CHEF', 'invoices', 'R')).toBe(false);
+    expect(can('CHEF', 'ledger', 'R')).toBe(false);
+    expect(can('CHEF', 'meal_cost', 'R')).toBe(false);
+    expect(can('CHEF', 'users', 'R')).toBe(false);
+  });
+
+  it('shows finance only the money side of the business', () => {
+    for (const area of ['service_rates', 'invoices', 'disputes', 'ledger', 'meal_cost'] as const) {
+      expect(can('FINANCE_OFFICER', area, 'R')).toBe(true);
+    }
+    expect(can('FINANCE_OFFICER', 'purchases', 'A')).toBe(true);
+    for (const area of [
+      'recipes',
+      'rooms',
+      'stock',
+      'service_requests',
+      'distribution',
+      'forecast',
+      'users',
+    ] as const) {
+      expect(can('FINANCE_OFFICER', area, 'R')).toBe(false);
+    }
+  });
+
+  it('treats the head chef and chef as Karam staff, never as an airline', () => {
+    expect(isKaramRole('HEAD_CHEF')).toBe(true);
+    expect(isKaramRole('CHEF')).toBe(true);
+    expect(roleFitsOrganisation('HEAD_CHEF', true)).toBe(true);
+    expect(roleFitsOrganisation('CHEF', true)).toBe(true);
+    expect(roleFitsOrganisation('CHEF', false)).toBe(false);
+  });
+
+  it('does not throw for a role that no longer exists', () => {
+    expect(can('KITCHEN_LEAD' as unknown as Role, 'recipes', 'R')).toBe(false);
   });
 });
 
@@ -498,7 +558,7 @@ describe('room requests', () => {
     expect(nightlyChargeTotal([])).toBe('0.00');
     expect(nightlyChargeTotal([{ amountPerNight: 'free', active: true }])).toBeNull();
     expect(chargeAmountError('8000.50')).toBeNull();
-    expect(chargeAmountError('eight thousand')).toMatch(/PKR/);
+    expect(chargeAmountError('eight thousand')).toMatch(/SAR/);
     expect(setupNameError('  ', 'floor')).toBe('Enter a floor.');
     expect(setupNameError('Ground', 'floor')).toBeNull();
   });
@@ -508,7 +568,7 @@ describe('room requests', () => {
     expect(can('ADMINISTRATOR', 'rooms', 'U')).toBe(true);
     expect(can('OPERATIONS_MANAGER', 'rooms', 'R')).toBe(true);
     expect(can('OPERATIONS_MANAGER', 'rooms', 'C')).toBe(false);
-    expect(can('FINANCE_OFFICER', 'rooms', 'R')).toBe(true);
+    expect(can('FINANCE_OFFICER', 'rooms', 'R')).toBe(false);
     expect(can('AIRLINE_REQUESTER', 'rooms', 'R')).toBe(false);
   });
 

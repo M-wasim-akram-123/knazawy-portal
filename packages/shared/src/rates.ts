@@ -38,19 +38,19 @@ export function billedQuantity(delivered: number, minimum: number): number {
   return Math.max(delivered, minimum);
 }
 
-/** A price in PKR with up to 2 decimal places. */
+/** A price in SAR with up to 2 decimal places. */
 export function isMoney(value: string): boolean {
   return /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/.test(value.trim());
 }
 
-/** Portions times price, in PKR to 2 dp. Null when the price is not money. */
+/** Portions times price, in SAR to 2 dp. Null when the price is not money. */
 export function chargeFor(quantity: number, unitPrice: string): string | null {
   const price = toPaisa(unitPrice);
   if (price === null || !Number.isInteger(quantity) || quantity < 0) return null;
   return fromPaisa(price * BigInt(quantity));
 }
 
-/** Left minus right, in PKR to 2 dp. Null when either value is not money, or the result is negative. */
+/** Left minus right, in SAR to 2 dp. Null when either value is not money, or the result is negative. */
 export function subtractMoney(left: string, right: string): string | null {
   const from = toPaisa(left);
   const taken = toPaisa(right);

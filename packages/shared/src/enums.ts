@@ -14,7 +14,8 @@ export const ROLES = [
   'HOTEL_COORDINATOR',
   'OPERATIONS_MANAGER',
   'STOREKEEPER',
-  'KITCHEN_LEAD',
+  'HEAD_CHEF',
+  'CHEF',
   'FINANCE_OFFICER',
   'ADMINISTRATOR',
 ] as const;
@@ -106,6 +107,7 @@ export const AREAS = [
   'purchases',
   'stock',
   'recipes',
+  'meal_cost',
   'distribution',
   'invoices',
   'disputes',

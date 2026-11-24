@@ -21,6 +21,36 @@ describe('ItemsService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('lets a chef read item names for recipes, and finance not at all', async () => {
+    const prisma = { item: { findMany: jest.fn().mockResolvedValue([]) } };
+    const service = new ItemsService(prisma as never, new AuditService());
+    await expect(service.list({ ...actor, role: 'CHEF' }, false)).resolves.toEqual([]);
+    await expect(service.list({ ...actor, role: 'FINANCE_OFFICER' }, false)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(prisma.item.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a chef from adding items', async () => {
+    const service = new ItemsService({} as never, new AuditService());
+    await expect(
+      service.create(
+        { ...actor, role: 'CHEF' },
+        {
+          code: 'RICE',
+          name: 'Rice',
+          category: 'Dry goods',
+          baseUnit: 'KG',
+          purchaseUnit: 'bag',
+          conversionToBase: '25',
+          reorderLevel: '10',
+          shelfLifeDays: 180,
+          storageType: 'DRY',
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('turns a duplicate code into a plain message', async () => {
     const tx = {
       item: { create: jest.fn() },

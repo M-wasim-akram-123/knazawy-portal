@@ -4,7 +4,7 @@ export const portalDisputesCopy = defineCopy({
   en: {
     loadFailed: 'Disputes could not load.',
     signInToSee: '{link} to see disputes.',
-    roomBillOption: 'Room bill {number} · {total} PKR · {date}',
+    roomBillOption: 'Room bill {number} · {total} SAR · {date}',
     opened: '{number} is open. Karam will decide it. The bill is unchanged.',
     openFailed: 'The dispute could not be opened.',
     intro:
@@ -21,7 +21,7 @@ export const portalDisputesCopy = defineCopy({
   ur: {
     loadFailed: 'تنازعات نہیں کھل سکے۔',
     signInToSee: 'تنازعات دیکھنے کے لیے {link}۔',
-    roomBillOption: 'کمروں کا بل {number} · {total} PKR · {date}',
+    roomBillOption: 'کمروں کا بل {number} · {total} SAR · {date}',
     opened: '{number} کھل گیا ہے۔ کرم اس کا فیصلہ کرے گا۔ بل میں کوئی تبدیلی نہیں ہوئی۔',
     openFailed: 'تنازعہ نہیں کھولا جا سکا۔',
     intro:
@@ -38,7 +38,7 @@ export const portalDisputesCopy = defineCopy({
   ar: {
     loadFailed: 'تعذّر تحميل الاعتراضات.',
     signInToSee: '{link} لعرض الاعتراضات.',
-    roomBillOption: 'فاتورة غرف {number} · {total} PKR · {date}',
+    roomBillOption: 'فاتورة غرف {number} · {total} SAR · {date}',
     opened: 'تم فتح {number}. ستبتّ كرم فيه. لم تتغير الفاتورة.',
     openFailed: 'تعذّر فتح الاعتراض.',
     intro: 'اعترضوا على فاتورة صادرة لشركتكم. اعتراض واحد لكل فاتورة. قرار كرم لا يغيّر الفاتورة.',

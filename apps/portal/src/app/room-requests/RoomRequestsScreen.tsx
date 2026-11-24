@@ -454,7 +454,7 @@ export function RoomRequestsScreen() {
                   <td>{formatDisplayDate(row.checkOut)}</td>
                   <td>{row.nights}</td>
                   <td>{row.lines.reduce((sum, line) => sum + line.rooms, 0)}</td>
-                  <td>{row.total} PKR</td>
+                  <td>{row.total} SAR</td>
                   <td>
                     <span className="kz-status" data-tone={roomRequestStatusTone(row.status)}>
                       {label(ROOM_REQUEST_STATUS_LABELS[row.status])}
@@ -543,7 +543,7 @@ export function RoomRequestsScreen() {
                   <div>
                     <dt>{t.total}</dt>
                     <dd>
-                      {selected.total} PKR
+                      {selected.total} SAR
                       {selected.lines.some((line) => line.quoted) ? '' : t.atCurrentCharges}
                     </dd>
                   </div>
@@ -584,8 +584,8 @@ export function RoomRequestsScreen() {
                               ) : null}
                             </td>
                             <td>{line.rooms}</td>
-                            <td>{line.nightly} PKR</td>
-                            <td>{line.amount} PKR</td>
+                            <td>{line.nightly} SAR</td>
+                            <td>{line.amount} SAR</td>
                             {selected.status === 'ACCEPTED' ? (
                               <td>
                                 {fill(t.checkedInCount, {

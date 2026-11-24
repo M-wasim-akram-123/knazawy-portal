@@ -308,7 +308,7 @@ export class RequestsService {
       return this.load(id);
     }
     if (!input.acceptCharge) {
-      throw new BadRequestException(`Cancelling now costs ${quote.total} PKR. Confirm the charge.`);
+      throw new BadRequestException(`Cancelling now costs ${quote.total} SAR. Confirm the charge.`);
     }
     const karamOrgId = await this.karamOrganisationId();
     await this.prisma.$transaction(async (tx) => {
@@ -335,7 +335,7 @@ export class RequestsService {
           status: next,
           decidedAt: new Date(),
           decidedById: actor.id,
-          decisionNote: `Cancellation charge ${quote.total} PKR`,
+          decisionNote: `Cancellation charge ${quote.total} SAR`,
         },
       });
       await this.audit.record(tx, {
@@ -353,7 +353,7 @@ export class RequestsService {
         memo: `Cancellation ${number} for ${existing.number}`,
         lines: invoicePosting(quote.total),
       });
-      const charged = `${existing.number} was cancelled. The charge is ${quote.total} PKR.`;
+      const charged = `${existing.number} was cancelled. The charge is ${quote.total} SAR.`;
       await this.notifications.notify(tx, {
         organisationId: karamOrgId,
         role: 'OPERATIONS_MANAGER',

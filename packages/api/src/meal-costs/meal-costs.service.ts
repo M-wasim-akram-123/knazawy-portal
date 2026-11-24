@@ -16,7 +16,7 @@ export class MealCostsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(actor: Actor): Promise<MealCostRecord[]> {
-    assertCan(actor, 'recipes', 'R', 'view meal cost');
+    assertCan(actor, 'meal_cost', 'R', 'view meal cost');
     const recipes = await this.prisma.recipe.findMany({
       where: { organisationId: actor.organisationId, active: true },
       include: recipeInclude,

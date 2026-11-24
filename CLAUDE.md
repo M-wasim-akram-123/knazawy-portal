@@ -24,7 +24,7 @@ PostgreSQL is the system of record (Prisma). The PRD requires a relational stock
 
 | App | Audience | Port | Phase |
 | --- | --- | --- | --- |
-| `apps/web` | Operations, store, kitchen, finance, administrator | 3000 | 1A then 1B |
+| `apps/web` | Operations, store, head chef, chef, finance, administrator | 3000 | 1A then 1B |
 | `apps/portal` | Airline requester, airline finance | 3002 | 1B, hotel in 2 |
 
 Native mobile apps are out of scope. Both surfaces are responsive. Store, kitchen, and drivers are mobile-first.
@@ -67,7 +67,8 @@ Restaurant functionality ships first. Each phase needs a sign-off before the nex
 - Billed quantity is the delivered quantity, subject to a rate-card minimum.
 - A request uses the rate card valid on the service date.
 - Stock is valued FIFO. A receipt creates a cost layer; issues consume the oldest layer first.
-- Currency default is PKR. Time zone is Asia/Karachi. Dates are DD/MM/YYYY.
+- Currency default is SAR (Saudi riyal). Time zone is Asia/Karachi. Dates are DD/MM/YYYY.
+- Staff roles see only their own work. Finance sees money screens only. The head chef adds, edits, and approves recipes; a chef reads them.
 - Labels use plain language ("Goods received", not "GRN").
 - English and Urdu are both first-class. Urdu strings live in `@knazawy/i18n` from the start.
 

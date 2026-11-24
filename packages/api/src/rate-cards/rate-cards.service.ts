@@ -288,7 +288,7 @@ function linesFrom(lines: RateCardDto['lines']): LineInput[] {
     seen.add(line.recipeId);
     const unitPrice = line.unitPrice.trim();
     if (!isMoney(unitPrice) || Number(unitPrice) <= 0) {
-      throw new BadRequestException('Enter each price in PKR, such as 650 or 650.50.');
+      throw new BadRequestException('Enter each price in SAR, such as 650 or 650.50.');
     }
     return { recipeId: line.recipeId, unitPrice, minimumQuantity: line.minimumQuantity };
   });

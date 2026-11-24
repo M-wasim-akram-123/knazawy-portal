@@ -21,7 +21,7 @@ export function EntryLines({ entry }: { entry: JournalEntryRecord }) {
             <tr key={`${line.account}-${line.side}`}>
               <td>{line.accountName}</td>
               <td>{label(JOURNAL_SIDE_LABELS[line.side])}</td>
-              <td>{line.amount} PKR</td>
+              <td>{line.amount} SAR</td>
             </tr>
           ))}
         </tbody>

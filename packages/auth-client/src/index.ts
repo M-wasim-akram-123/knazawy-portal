@@ -1,4 +1,4 @@
-import type { Actor } from '@knazawy/shared';
+import { ROLES, type Actor } from '@knazawy/shared';
 
 export type SessionUser = Actor;
 
@@ -21,7 +21,13 @@ export function readSessionUser(): SessionUser | null {
   const raw = window.localStorage.getItem(USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as SessionUser;
+    const user = JSON.parse(raw) as SessionUser;
+    // A role renamed or removed since this person signed in would open nothing. Make them sign in again.
+    if (!(ROLES as readonly string[]).includes(user.role)) {
+      window.localStorage.removeItem(USER_KEY);
+      return null;
+    }
+    return user;
   } catch {
     return null;
   }

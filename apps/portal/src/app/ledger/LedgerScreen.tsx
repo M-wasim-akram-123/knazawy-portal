@@ -49,7 +49,7 @@ export function LedgerScreen() {
           <h2>{entry.number}</h2>
           <p className="kz-help">
             {formatDisplayDate(todayInKarachi(new Date(entry.postedAt)))} · {entry.memo} ·{' '}
-            {entry.total} PKR
+            {entry.total} SAR
           </p>
           <EntryLines entry={entry} />
         </article>

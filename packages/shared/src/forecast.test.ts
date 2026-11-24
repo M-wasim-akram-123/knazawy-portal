@@ -117,9 +117,10 @@ describe('forecast rows', () => {
 });
 
 describe('forecast permissions', () => {
-  it('lets operations, the kitchen lead, and administrators read it, and no airline', () => {
+  it('lets operations, the kitchen, and administrators read it, and no airline', () => {
     expect(can('OPERATIONS_MANAGER', 'forecast', 'R')).toBe(true);
-    expect(can('KITCHEN_LEAD', 'forecast', 'R')).toBe(true);
+    expect(can('HEAD_CHEF', 'forecast', 'R')).toBe(true);
+    expect(can('CHEF', 'forecast', 'R')).toBe(true);
     expect(can('ADMINISTRATOR', 'forecast', 'R')).toBe(true);
     expect(can('AIRLINE_REQUESTER', 'forecast', 'R')).toBe(false);
     expect(can('FINANCE_OFFICER', 'forecast', 'R')).toBe(false);

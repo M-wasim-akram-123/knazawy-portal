@@ -81,7 +81,7 @@ export function DisputesScreen() {
       )
       .map((invoice) => ({
         key: `invoice:${invoice.id}`,
-        label: `${invoice.number} · ${invoice.total} PKR${
+        label: `${invoice.number} · ${invoice.total} SAR${
           invoice.serviceDate ? ` · ${formatDisplayDate(invoice.serviceDate)}` : ''
         }`,
       })),
@@ -217,7 +217,7 @@ export function DisputesScreen() {
             {row.source === 'ROOM_INVOICE'
               ? fill(t.roomBill, { number: row.invoiceNumber })
               : row.invoiceNumber}{' '}
-            · {row.invoiceTotal} PKR · {formatDisplayDate(row.createdAt.slice(0, 10))}
+            · {row.invoiceTotal} SAR · {formatDisplayDate(row.createdAt.slice(0, 10))}
           </p>
           <p>{row.reason}</p>
           {row.resolution ? <p>{fill(t.decision, { resolution: row.resolution })}</p> : null}

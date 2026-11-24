@@ -122,7 +122,7 @@ export function RoomBillsScreen() {
                       })}
                     </td>
                     <td>{row.nights}</td>
-                    <td>{row.total} PKR</td>
+                    <td>{row.total} SAR</td>
                     <td>
                       <button
                         type="button"
@@ -183,8 +183,8 @@ export function RoomBillsScreen() {
                       <td>{line.roomTypeName}</td>
                       <td>{line.rooms}</td>
                       <td>{line.nights}</td>
-                      <td>{line.nightly} PKR</td>
-                      <td>{line.amount} PKR</td>
+                      <td>{line.nightly} SAR</td>
+                      <td>{line.amount} SAR</td>
                     </tr>
                   ))}
                 </tbody>

@@ -363,7 +363,7 @@ async function main(): Promise<void> {
       console.info(`  ${airline.name}: ${airlineLoginEmails.get(airline.id)}`);
     }
     console.info(
-      'Demo rate cards use PKR 1,500 per meal and PKR 500 per snack where no current approved card existed.',
+      'Demo rate cards use SAR 1,500 per meal and SAR 500 per snack where no current approved card existed.',
     );
     console.info('No stock quantities were fabricated.');
   } finally {

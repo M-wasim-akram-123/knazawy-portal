@@ -14,8 +14,9 @@ const routePermissions: Array<{
   { path: '/suppliers', allowed: (role) => can(role, 'purchases', 'R') },
   { path: '/locations', allowed: (role) => can(role, 'stock', 'R') },
   { path: '/recipes', allowed: (role) => can(role, 'recipes', 'R') },
-  { path: '/production', allowed: (role) => can(role, 'recipes', 'R') },
-  { path: '/meal-cost', allowed: (role) => can(role, 'recipes', 'R') },
+  // The production screen also lists locations and stock, so it needs stock access too.
+  { path: '/production', allowed: (role) => can(role, 'recipes', 'R') && can(role, 'stock', 'R') },
+  { path: '/meal-cost', allowed: (role) => can(role, 'meal_cost', 'R') },
   { path: '/requests', allowed: (role) => can(role, 'service_requests', 'R') },
   { path: '/deliveries', allowed: (role) => can(role, 'distribution', 'R') },
   { path: '/rates', allowed: (role) => can(role, 'service_rates', 'R') },
@@ -28,7 +29,11 @@ const routePermissions: Array<{
   { path: '/disputes', allowed: (role) => can(role, 'disputes', 'R') },
   { path: '/ledger', allowed: (role) => can(role, 'ledger', 'R') },
   { path: '/forecast', allowed: (role) => can(role, 'forecast', 'R') },
-  { path: '/branches', allowed: (role) => isKaramRole(role) },
+  {
+    path: '/branches',
+    allowed: (role) =>
+      isKaramRole(role) && (can(role, 'branches', 'R') || can(role, 'room_requests', 'R')),
+  },
 ];
 
 export function canAccessStaffPath(role: Role, pathname: string): boolean {

@@ -29,7 +29,7 @@ export const issuesCopy = defineCopy({
     location: 'Location',
     date: 'Date',
     lines: 'Lines',
-    lineSummary: '{item}: {quantity} {unit} ({cost} PKR)',
+    lineSummary: '{item}: {quantity} {unit} ({cost} SAR)',
   },
   ur: {
     loading: 'اسٹاک لوڈ ہو رہا ہے',
@@ -59,7 +59,7 @@ export const issuesCopy = defineCopy({
     location: 'جگہ',
     date: 'تاریخ',
     lines: 'سطریں',
-    lineSummary: '{item}: {quantity} {unit} ({cost} PKR)',
+    lineSummary: '{item}: {quantity} {unit} ({cost} SAR)',
   },
   ar: {
     loading: 'جارٍ تحميل المخزون',
@@ -88,6 +88,6 @@ export const issuesCopy = defineCopy({
     location: 'الموقع',
     date: 'التاريخ',
     lines: 'البنود',
-    lineSummary: '{item}: {quantity} {unit} ({cost} PKR)',
+    lineSummary: '{item}: {quantity} {unit} ({cost} SAR)',
   },
 });

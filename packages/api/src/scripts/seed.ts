@@ -5,7 +5,8 @@ import bcrypt from 'bcryptjs';
 const SAMPLE_STAFF = [
   { email: 'ops@karam.local', name: 'Operations Manager', role: UserRole.OPERATIONS_MANAGER },
   { email: 'store@karam.local', name: 'Storekeeper', role: UserRole.STOREKEEPER },
-  { email: 'kitchen@karam.local', name: 'Kitchen Lead', role: UserRole.KITCHEN_LEAD },
+  { email: 'kitchen@karam.local', name: 'Head Chef', role: UserRole.HEAD_CHEF },
+  { email: 'chef@karam.local', name: 'Chef', role: UserRole.CHEF },
   { email: 'finance@karam.local', name: 'Finance Officer', role: UserRole.FINANCE_OFFICER },
 ] as const;
 
@@ -72,6 +73,7 @@ async function main(): Promise<void> {
       await prisma.user.upsert({
         where: { email: staff.email },
         update: {
+          name: staff.name,
           passwordHash: staffHash,
           role: staff.role,
           status: UserStatus.ACTIVE,

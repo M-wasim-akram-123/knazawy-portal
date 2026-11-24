@@ -3,7 +3,8 @@ import type { Access, Area, Role } from './enums';
 const KARAM_ROLES: readonly Role[] = [
   'OPERATIONS_MANAGER',
   'STOREKEEPER',
-  'KITCHEN_LEAD',
+  'HEAD_CHEF',
+  'CHEF',
   'FINANCE_OFFICER',
   'ADMINISTRATOR',
 ];
@@ -32,6 +33,7 @@ export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>>
     purchases: ['R', 'A'],
     stock: ['R', 'A'],
     recipes: ['R', 'A'],
+    meal_cost: ['R'],
     distribution: ['C', 'R', 'U'],
     invoices: ['R'],
     forecast: ['R'],
@@ -41,17 +43,25 @@ export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>>
     purchases: ['C', 'R', 'U'],
     stock: ['C', 'R', 'U'],
   },
-  KITCHEN_LEAD: {
+  // The head chef owns the recipes: adds, changes, and approves them.
+  HEAD_CHEF: {
     service_requests: ['R'],
     stock: ['R'],
-    recipes: ['C', 'R', 'U'],
+    recipes: ['C', 'R', 'U', 'A'],
+    meal_cost: ['R'],
     forecast: ['R'],
   },
+  // A chef only looks: the orders to prepare, the recipes, and the week ahead.
+  CHEF: {
+    service_requests: ['R'],
+    recipes: ['R'],
+    forecast: ['R'],
+  },
+  // Money only: prices, invoices, disputes, the ledger, meal cost, and approving what is bought.
   FINANCE_OFFICER: {
     service_rates: ['C', 'R', 'U', 'A'],
     purchases: ['R', 'A'],
-    recipes: ['R'],
-    rooms: ['R'],
+    meal_cost: ['R'],
     invoices: ['C', 'R', 'U', 'A'],
     disputes: ['R', 'A'],
     ledger: ['C', 'R', 'U'],
@@ -64,6 +74,7 @@ export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>>
     purchases: ['C', 'R', 'U'],
     stock: ['C', 'R', 'U', 'A'],
     recipes: ['C', 'R', 'U', 'A'],
+    meal_cost: ['R'],
     invoices: ['R'],
     disputes: ['R'],
     ledger: ['R'],
@@ -78,7 +89,7 @@ export function isKaramRole(role: Role): boolean {
 }
 
 export function can(role: Role, area: Area, access: Access): boolean {
-  return ROLE_ACCESS[role][area]?.includes(access) ?? false;
+  return ROLE_ACCESS[role]?.[area]?.includes(access) ?? false;
 }
 
 export interface OrganisationActor {

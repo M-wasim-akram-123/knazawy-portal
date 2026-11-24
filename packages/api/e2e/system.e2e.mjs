@@ -886,7 +886,7 @@ describe('12. User accounts are managed by an administrator', () => {
 
   test('a new staff account can sign in at once', async () => {
     const created = ok(
-      await post('admin', '/v1/users', { name: 'E2E Cook', email, role: 'KITCHEN_LEAD', password }),
+      await post('admin', '/v1/users', { name: 'E2E Cook', email, role: 'CHEF', password }),
       'create user',
     );
     assert.equal(created.staff, true);

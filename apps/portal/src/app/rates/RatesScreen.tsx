@@ -85,7 +85,7 @@ export function RatesScreen() {
                   <tr key={line.recipeId}>
                     <td>{line.recipeName}</td>
                     <td>{label(RECIPE_KIND_LABELS[line.kind])}</td>
-                    <td>{line.unitPrice} PKR</td>
+                    <td>{line.unitPrice} SAR</td>
                     <td>{line.minimumQuantity}</td>
                   </tr>
                 ))}

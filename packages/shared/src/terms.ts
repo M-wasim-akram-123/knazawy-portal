@@ -62,7 +62,7 @@ export function isOverdue(dueOn: string | null, today: string, amountDue: string
 }
 
 /**
- * Subtotal less the discount, in PKR to 2 dp. The discount rounds half up to the paisa.
+ * Subtotal less the discount, in SAR to 2 dp. The discount rounds half up to the paisa.
  * Null when the subtotal is not money or the percent is not valid.
  */
 export function applyDiscount(
@@ -94,7 +94,7 @@ function formatPaisa(value: bigint): string {
 
 /**
  * One line both apps show under an invoice, such as
- * "Subtotal 13000.00 PKR, less 5% discount 650.00 PKR. Total 12350.00 PKR. Amount due 12350.00 PKR. Net 30, due 17/12/2026."
+ * "Subtotal 13000.00 SAR, less 5% discount 650.00 SAR. Total 12350.00 SAR. Amount due 12350.00 SAR. Net 30, due 17/12/2026."
  */
 export function invoiceSummary(
   invoice: {
@@ -112,11 +112,11 @@ export function invoiceSummary(
   const parts: string[] = [];
   if (invoice.discount !== '0.00') {
     parts.push(
-      `Subtotal ${invoice.subtotal} PKR, less ${invoice.discountPercent}% discount ${invoice.discount} PKR.`,
+      `Subtotal ${invoice.subtotal} SAR, less ${invoice.discountPercent}% discount ${invoice.discount} SAR.`,
     );
   }
-  parts.push(`Total ${invoice.total} PKR.`);
-  if (invoice.kind !== 'CREDIT_NOTE') parts.push(`Amount due ${invoice.amountDue} PKR.`);
+  parts.push(`Total ${invoice.total} SAR.`);
+  if (invoice.kind !== 'CREDIT_NOTE') parts.push(`Amount due ${invoice.amountDue} SAR.`);
   if (invoice.dueOn && invoice.paymentTermsDays !== null) {
     const overdue = isOverdue(invoice.dueOn, today, invoice.amountDue);
     parts.push(
