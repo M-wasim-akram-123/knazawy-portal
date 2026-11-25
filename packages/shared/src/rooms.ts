@@ -1,6 +1,7 @@
 import type { Role } from './enums';
 import { chargeFor, isMoney, sumMoney } from './rates';
 import { can, isKaramRole } from './rbac';
+import type { GuestCounts } from './room-board';
 import type { StatusTone } from './status';
 
 /**
@@ -259,6 +260,8 @@ export interface HotelRoomRecord {
   floorName: string;
   roomTypeId: string;
   roomTypeName: string;
+  /** How many guests the room sleeps. */
+  capacity: number;
   active: boolean;
 }
 
@@ -303,6 +306,8 @@ export interface RoomRequestRecord {
   lines: RoomRequestLineRecord[];
   /** Karam's view of which rooms guests are in. An airline is sent an empty list. */
   stays: RoomStayRecord[];
+  /** Rooms Karam has set aside for this stay before the guests arrive. An airline is sent an empty list. */
+  reservations: RoomReservationRecord[];
 }
 
 /** A room a guest has been checked in to on an accepted stay. */
@@ -313,15 +318,49 @@ export interface RoomStayRecord {
   roomTypeName: string;
   checkedInAt: string;
   checkedOutAt: string | null;
+  guests: GuestCounts;
+  /** The agreed check-out time, HH:MM in Karachi, on the stay's check-out date. */
+  checkOutTime: string;
+  /** The instant the guest is due out. */
+  plannedCheckOutAt: string;
 }
 
-/** A room Karam can check a guest in to right now. */
+/** A room set aside for an accepted stay that has not moved in yet. */
+export interface RoomReservationRecord {
+  id: string;
+  roomId: string;
+  roomName: string;
+  floorName: string;
+  roomTypeId: string;
+  roomTypeName: string;
+  capacity: number;
+}
+
+/** A room Karam can set aside or check a guest in to, for the nights of one stay. */
 export interface FreeRoomRecord {
   id: string;
   name: string;
   floorName: string;
   roomTypeId: string;
   roomTypeName: string;
+  capacity: number;
+  /** True when this room is already set aside for this stay. */
+  reserved: boolean;
+}
+
+/** One room a guest moves into, with who is staying and when they are due out. */
+export interface CheckInRoomInput {
+  hotelRoomId: string;
+  male: number;
+  female: number;
+  children: number;
+  /** HH:MM in Karachi. Noon when left out. */
+  checkOutTime?: string;
+}
+
+/** Karam staff who can read rooms see the board. An airline never does. */
+export function canViewRoomBoard(role: Role): boolean {
+  return isKaramRole(role) && can(role, 'rooms', 'R');
 }
 
 /** Only Karam operations checks guests in and out. */

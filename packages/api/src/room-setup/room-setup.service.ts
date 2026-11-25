@@ -1,7 +1,9 @@
 import {
+  DEFAULT_ROOM_CAPACITY,
   chargeAmountError,
   nightlyChargeTotal,
   peakRoomsNeeded,
+  roomCapacityError,
   roomRemovalError,
   setupNameError,
   todayInKarachi,
@@ -295,6 +297,7 @@ export class RoomSetupService {
   async createRoom(actor: Actor, input: CreateHotelRoomDto): Promise<HotelRoomRecord> {
     assertCan(actor, 'rooms', 'C', 'add a room');
     const name = requireName(input.name, 'room');
+    const capacity = requireCapacity(input.capacity ?? DEFAULT_ROOM_CAPACITY);
     const branchId = requireBranch(actor);
     const floor = await this.requireActiveFloor(actor.organisationId, branchId, input.floorId);
     await this.requireActiveType(actor.organisationId, input.roomTypeId);
@@ -307,6 +310,7 @@ export class RoomSetupService {
             floorId: floor.id,
             roomTypeId: input.roomTypeId,
             name,
+            capacity,
           },
           include: roomInclude,
         });
@@ -330,6 +334,8 @@ export class RoomSetupService {
     const branchId = requireBranch(actor);
     const existing = await this.requireRoom(actor.organisationId, branchId, id);
     const name = input.name === undefined ? undefined : requireName(input.name, 'room');
+    const capacity = input.capacity === undefined ? undefined : requireCapacity(input.capacity);
+    if (capacity !== undefined) await this.assertCapacityFits(existing.id, capacity);
     const floorId = input.floorId ?? existing.floorId;
     if (input.floorId) await this.requireActiveFloor(actor.organisationId, branchId, input.floorId);
     if (input.roomTypeId) await this.requireActiveType(actor.organisationId, input.roomTypeId);
@@ -358,6 +364,7 @@ export class RoomSetupService {
             ...(name === undefined ? {} : { name }),
             ...(input.floorId === undefined ? {} : { floorId: input.floorId }),
             ...(input.roomTypeId === undefined ? {} : { roomTypeId: input.roomTypeId }),
+            ...(capacity === undefined ? {} : { capacity }),
             ...(input.active === undefined ? {} : { active: input.active }),
           },
           include: roomInclude,
@@ -375,6 +382,21 @@ export class RoomSetupService {
       return toRoom(updated);
     } catch (error) {
       rethrowUnique(error, 'That room name is already used on this floor.');
+    }
+  }
+
+  /** A room cannot be made smaller than the guests already in it. */
+  private async assertCapacityFits(roomId: string, capacity: number): Promise<void> {
+    const stay = await this.prisma.roomStay.findFirst({
+      where: { hotelRoomId: roomId, checkedOutAt: null },
+      select: { guestsMale: true, guestsFemale: true, guestsChildren: true },
+    });
+    if (!stay) return;
+    const guests = stay.guestsMale + stay.guestsFemale + stay.guestsChildren;
+    if (guests > capacity) {
+      throw new BadRequestException(
+        `${guests} guests are in this room. Keep the capacity at ${guests} or more until they check out.`,
+      );
     }
   }
 
@@ -465,6 +487,20 @@ export class RoomSetupService {
       throw new BadRequestException('A guest is in this room. Check them out first.');
     }
     const today = todayInKarachi();
+    const setAside = await tx.roomReservation.findFirst({
+      where: {
+        hotelRoomId: room.id,
+        requestLine: {
+          request: { status: 'ACCEPTED', checkOut: { gt: parseIsoDate(today) } },
+        },
+      },
+      select: { requestLine: { select: { request: { select: { number: true } } } } },
+    });
+    if (setAside) {
+      throw new BadRequestException(
+        `This room is set aside for ${setAside.requestLine.request.number}. Release it from that stay first.`,
+      );
+    }
     const roomsLeft = await tx.hotelRoom.count({
       where: {
         organisationId,
@@ -523,6 +559,12 @@ function requireName(value: string, label: string): string {
   return value.trim();
 }
 
+function requireCapacity(value: number): number {
+  const error = roomCapacityError(value);
+  if (error) throw new BadRequestException(error);
+  return value;
+}
+
 function requireAmount(value: string): string {
   const error = chargeAmountError(value);
   if (error) throw new BadRequestException(error);
@@ -569,6 +611,7 @@ function toRoom(row: RoomRow): HotelRoomRecord {
     floorName: row.floor.name,
     roomTypeId: row.roomTypeId,
     roomTypeName: row.roomType.name,
+    capacity: row.capacity,
     active: row.active,
   };
 }

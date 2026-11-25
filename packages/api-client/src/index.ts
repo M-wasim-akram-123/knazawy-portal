@@ -28,6 +28,8 @@ import type {
   RoomFloorRecord,
   RoomTypeRecord,
   HotelRoomRecord,
+  CheckInRoomInput,
+  RoomBoardRecord,
   FreeRoomRecord,
   RoomOfferRecord,
   RoomBillableRecord,
@@ -724,13 +726,20 @@ export class ApiClient {
     floorId: string;
     roomTypeId: string;
     name: string;
+    capacity?: number;
   }): Promise<HotelRoomRecord> {
     return this.request('POST', '/v1/hotel-rooms', input);
   }
 
   updateHotelRoom(
     id: string,
-    input: { floorId?: string; roomTypeId?: string; name?: string; active?: boolean },
+    input: {
+      floorId?: string;
+      roomTypeId?: string;
+      name?: string;
+      capacity?: number;
+      active?: boolean;
+    },
   ): Promise<HotelRoomRecord> {
     return this.request('PATCH', `/v1/hotel-rooms/${id}`, input);
   }
@@ -775,8 +784,24 @@ export class ApiClient {
     return this.request('GET', `/v1/room-requests/${id}/free-rooms`);
   }
 
-  checkInRoomRequest(id: string, hotelRoomIds: string[]): Promise<RoomRequestRecord> {
-    return this.request('POST', `/v1/room-requests/${id}/check-in`, { hotelRoomIds });
+  checkInRoomRequest(id: string, rooms: CheckInRoomInput[]): Promise<RoomRequestRecord> {
+    return this.request('POST', `/v1/room-requests/${id}/check-in`, { rooms });
+  }
+
+  reserveRooms(id: string, hotelRoomIds: string[]): Promise<RoomRequestRecord> {
+    return this.request('POST', `/v1/room-requests/${id}/reservations`, { hotelRoomIds });
+  }
+
+  releaseRoom(requestId: string, reservationId: string): Promise<RoomRequestRecord> {
+    return this.request('DELETE', `/v1/room-requests/${requestId}/reservations/${reservationId}`);
+  }
+
+  roomBoard(options: { from?: string; days?: number } = {}): Promise<RoomBoardRecord> {
+    const query = new URLSearchParams();
+    if (options.from) query.set('from', options.from);
+    if (options.days) query.set('days', String(options.days));
+    const text = query.toString();
+    return this.request('GET', `/v1/room-board${text ? `?${text}` : ''}`);
   }
 
   checkOutRoomStay(requestId: string, stayId: string): Promise<RoomRequestRecord> {

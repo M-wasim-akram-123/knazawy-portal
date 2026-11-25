@@ -20,6 +20,7 @@ export * from './production';
 export * from './rates';
 export * from './requests';
 export * from './rooms';
+export * from './room-board';
 export * from './session';
 export * from './room-billing';
 export * from './recipes';

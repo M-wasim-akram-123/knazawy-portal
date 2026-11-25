@@ -5,13 +5,28 @@ import type {
   RoomOfferRecord,
   RoomRequestRecord,
 } from '@knazawy/shared';
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../auth/current-user';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-import { CheckInRoomsDto, RejectRoomRequestDto, RoomRequestDto } from './room-requests.dto';
+import {
+  CheckInRoomsDto,
+  RejectRoomRequestDto,
+  ReserveRoomsDto,
+  RoomRequestDto,
+} from './room-requests.dto';
 import { RoomRequestsService } from './room-requests.service';
 
 @ApiTags('Room requests')
@@ -83,6 +98,24 @@ export class RoomRequestsController {
   @Get(':id/free-rooms')
   freeRooms(@CurrentUser() actor: Actor, @Param('id') id: string): Promise<FreeRoomRecord[]> {
     return this.requests.freeRooms(actor, id);
+  }
+
+  @Post(':id/reservations')
+  reserve(
+    @CurrentUser() actor: Actor,
+    @Param('id') id: string,
+    @Body() body: ReserveRoomsDto,
+  ): Promise<RoomRequestRecord> {
+    return this.requests.reserve(actor, id, body);
+  }
+
+  @Delete(':id/reservations/:reservationId')
+  release(
+    @CurrentUser() actor: Actor,
+    @Param('id') id: string,
+    @Param('reservationId') reservationId: string,
+  ): Promise<RoomRequestRecord> {
+    return this.requests.release(actor, id, reservationId);
   }
 
   @Post(':id/check-in')
