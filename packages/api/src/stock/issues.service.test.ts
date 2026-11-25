@@ -21,23 +21,32 @@ const input = {
   lines: [{ itemId: 'item-1', quantity: '30' }],
 };
 
-function serviceFor(tx: Record<string, unknown>): IssuesService {
+function noAlerts() {
+  return {
+    levels: jest.fn().mockResolvedValue(new Map()),
+    notifyCrossed: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
+function serviceFor(tx: Record<string, unknown>, alerts = noAlerts()): IssuesService {
   const prisma = {
     ...tx,
     $transaction: (run: (client: object) => Promise<unknown>) => run(tx),
   };
-  return new IssuesService(prisma as never, new AuditService());
+  return new IssuesService(prisma as never, new AuditService(), alerts as never);
 }
 
 function baseMocks(layers: unknown[]) {
   return {
     stockLocation: {
-      findFirst: jest.fn().mockResolvedValue({ id: 'loc-1', name: 'Dry store' }),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ id: 'loc-1', name: 'Dry store', branchId: 'branch-1' }),
     },
     item: {
-      findMany: jest.fn().mockResolvedValue([
-        { id: 'item-1', name: 'Wheat flour', baseUnit: 'KG' },
-      ]),
+      findMany: jest
+        .fn()
+        .mockResolvedValue([{ id: 'item-1', name: 'Wheat flour', baseUnit: 'KG' }]),
     },
     documentSequence: { upsert: jest.fn().mockResolvedValue({ lastNumber: 1 }) },
     stockIssue: {
@@ -77,13 +86,37 @@ describe('IssuesService', () => {
     const mocks = baseMocks([
       { id: 'old', quantityBase: new Prisma.Decimal('25'), unitCost: new Prisma.Decimal('200') },
     ]);
-    const service = serviceFor(mocks);
+    const alerts = noAlerts();
+    const service = serviceFor(mocks, alerts);
 
     await expect(service.create(actor, input)).rejects.toThrow(
       new BadRequestException('Only 25 kg of Wheat flour is in Dry store.'),
     );
     expect(mocks.stockIssue.create).toHaveBeenCalled();
     expect(mocks.stockMovement.create).not.toHaveBeenCalled();
+    expect(alerts.notifyCrossed).not.toHaveBeenCalled();
+  });
+
+  it('reads stock before taking it out, then checks the reorder level for the branch', async () => {
+    const mocks = baseMocks([
+      { id: 'old', quantityBase: new Prisma.Decimal('100'), unitCost: new Prisma.Decimal('200') },
+    ]);
+    const alerts = noAlerts();
+    const before = new Map([['item-1', '100']]);
+    alerts.levels.mockResolvedValue(before);
+    const service = serviceFor(mocks, alerts);
+
+    await service.create(actor, input);
+
+    expect(alerts.levels).toHaveBeenCalledWith(expect.anything(), 'org-1', 'branch-1', ['item-1']);
+    expect(alerts.notifyCrossed).toHaveBeenCalledWith(expect.anything(), {
+      organisationId: 'org-1',
+      branchId: 'branch-1',
+      before,
+    });
+    expect(alerts.levels.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.stockLayer.updateMany.mock.invocationCallOrder[0] ?? Infinity,
+    );
   });
 
   it('takes from the oldest layer first and records negative movements at each layer cost', async () => {
@@ -96,7 +129,10 @@ describe('IssuesService', () => {
     await service.create(actor, input);
 
     expect(mocks.stockIssueLine.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ quantityBase: new Prisma.Decimal('30'), cost: new Prisma.Decimal('6100') }),
+      data: expect.objectContaining({
+        quantityBase: new Prisma.Decimal('30'),
+        cost: new Prisma.Decimal('6100'),
+      }),
     });
     expect(mocks.stockLayer.updateMany).toHaveBeenNthCalledWith(1, {
       where: { id: 'old', quantityBase: { gte: new Prisma.Decimal('25') } },

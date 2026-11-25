@@ -17,6 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 import type { CreateCountDto, SubmitCountDto } from './counts.dto';
 import { drawFifo } from './fifo';
+import { StockAlertsService } from './stock-alerts.service';
 
 const countInclude = {
   location: true,
@@ -33,6 +34,7 @@ export class CountsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly alerts: StockAlertsService,
   ) {}
 
   async list(actor: Actor): Promise<StockCountRecord[]> {
@@ -233,6 +235,13 @@ export class CountsService {
         throw new BadRequestException('This count is not waiting for approval.');
       }
 
+      const before = await this.alerts.levels(
+        tx,
+        actor.organisationId,
+        count.location.branchId,
+        count.lines.map((line) => line.itemId),
+      );
+
       for (const line of count.lines) {
         const counted = line.countedQuantity;
         if (!counted)
@@ -248,6 +257,12 @@ export class CountsService {
           data: { varianceCost },
         });
       }
+
+      await this.alerts.notifyCrossed(tx, {
+        organisationId: actor.organisationId,
+        branchId: count.location.branchId,
+        before,
+      });
 
       const full = await tx.stockCount.findUnique({
         where: { id: count.id },

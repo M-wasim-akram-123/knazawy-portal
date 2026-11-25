@@ -60,6 +60,31 @@ describe('live notification stream', () => {
     expect(someoneElse).not.toHaveBeenCalled();
   });
 
+  it('can be aimed at one branch, still reaching people who are not tied to a branch', async () => {
+    const service = new NotificationsService({} as never);
+    const client = tx(['user-2']);
+
+    await service.notify(client as never, { ...input, branchId: 'branch-1' });
+
+    expect(client.user.findMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        role: 'AIRLINE_REQUESTER',
+        OR: [{ branchId: 'branch-1' }, { branchId: null }],
+      }),
+      select: { id: true },
+    });
+  });
+
+  it('reaches the whole role when no branch is given', async () => {
+    const service = new NotificationsService({} as never);
+    const client = tx(['user-2']);
+
+    await service.notify(client as never, input);
+
+    const where = client.user.findMany.mock.calls[0]?.[0].where as Record<string, unknown>;
+    expect(where).not.toHaveProperty('OR');
+  });
+
   it('stops pinging a closed stream', async () => {
     const service = new NotificationsService({} as never);
     const listener = jest.fn();

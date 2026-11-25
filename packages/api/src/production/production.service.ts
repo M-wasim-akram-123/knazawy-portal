@@ -20,6 +20,7 @@ import { parsePositiveDecimal } from '../common/decimal';
 import { nextDocumentNumber } from '../common/document-number';
 import { PrismaService } from '../prisma/prisma.service';
 import { drawFifo } from '../stock/fifo';
+import { StockAlertsService } from '../stock/stock-alerts.service';
 
 import type { CreateProductionDto } from './production.dto';
 
@@ -41,6 +42,7 @@ export class ProductionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly alerts: StockAlertsService,
   ) {}
 
   async list(actor: Actor): Promise<ProductionRecord[]> {
@@ -116,6 +118,13 @@ export class ProductionService {
         },
       });
 
+      const before = await this.alerts.levels(
+        tx,
+        actor.organisationId,
+        location.branchId,
+        needs.map((need) => need.line.itemId),
+      );
+
       let total = new Prisma.Decimal(0);
       for (const need of needs) {
         const layers = await tx.stockLayer.findMany({
@@ -168,6 +177,12 @@ export class ProductionService {
         }
         total = total.plus(plan.cost);
       }
+
+      await this.alerts.notifyCrossed(tx, {
+        organisationId: actor.organisationId,
+        branchId: location.branchId,
+        before,
+      });
 
       await tx.productionBatch.update({
         where: { id: batch.id },

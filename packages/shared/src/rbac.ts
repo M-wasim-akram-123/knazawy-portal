@@ -67,7 +67,7 @@ export const ROLE_ACCESS: Record<Role, Partial<Record<Area, readonly Access[]>>>
     ledger: ['C', 'R', 'U'],
   },
   ADMINISTRATOR: {
-    service_requests: ['R', 'U'],
+    service_requests: ['R', 'U', 'A'],
     room_requests: ['R'],
     rooms: ['C', 'R', 'U'],
     service_rates: ['R', 'U'],
