@@ -17,6 +17,8 @@ export interface NotifyInput {
   entity: string;
   entityId: string;
   exceptUserId?: string;
+  /** Only people working in this branch, plus anyone not tied to a branch. */
+  branchId?: string;
 }
 
 @Injectable()
@@ -58,6 +60,7 @@ export class NotificationsService {
         role: input.role,
         status: 'ACTIVE',
         ...(input.exceptUserId ? { id: { not: input.exceptUserId } } : {}),
+        ...(input.branchId ? { OR: [{ branchId: input.branchId }, { branchId: null }] } : {}),
       },
       select: { id: true },
     });

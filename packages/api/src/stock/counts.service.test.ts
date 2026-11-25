@@ -14,12 +14,19 @@ const actor = {
   branchId: 'branch-1',
 };
 
-function serviceFor(tx: Record<string, unknown>): CountsService {
+function noAlerts() {
+  return {
+    levels: jest.fn().mockResolvedValue(new Map()),
+    notifyCrossed: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
+function serviceFor(tx: Record<string, unknown>, alerts = noAlerts()): CountsService {
   const prisma = {
     ...tx,
     $transaction: (run: (client: object) => Promise<unknown>) => run(tx),
   };
-  return new CountsService(prisma as never, new AuditService());
+  return new CountsService(prisma as never, new AuditService(), alerts as never);
 }
 
 function line(book: string, counted: string | null = null) {
@@ -38,7 +45,7 @@ function countRow(status: string, book: string, counted: string | null = null) {
     id: 'count-1',
     number: 'SC-00001',
     locationId: 'loc-1',
-    location: { name: 'Dry store' },
+    location: { name: 'Dry store', branchId: 'branch-1' },
     countedOn: new Date('2026-11-13T00:00:00.000Z'),
     status,
     note: null,
@@ -72,9 +79,9 @@ describe('CountsService', () => {
   it('refuses the storekeeper when they try to approve', async () => {
     const tx = { stockCount: { findFirst: jest.fn() } };
     const service = serviceFor(tx);
-    await expect(service.approve({ ...actor, role: 'STOREKEEPER' }, 'count-1')).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(
+      service.approve({ ...actor, role: 'STOREKEEPER' }, 'count-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
     expect(tx.stockCount.findFirst).not.toHaveBeenCalled();
   });
 
@@ -86,9 +93,11 @@ describe('CountsService', () => {
         findUnique: jest.fn().mockResolvedValue(countRow('WAITING', '110', '105')),
       },
       stockLayer: {
-        groupBy: jest.fn().mockResolvedValue([
-          { itemId: 'item-1', _sum: { quantityBase: new Prisma.Decimal('110') } },
-        ]),
+        groupBy: jest
+          .fn()
+          .mockResolvedValue([
+            { itemId: 'item-1', _sum: { quantityBase: new Prisma.Decimal('110') } },
+          ]),
       },
       stockCountLine: { update: jest.fn().mockResolvedValue({}) },
       auditLog: { create: jest.fn().mockResolvedValue({ id: 'audit-1' }) },
@@ -112,9 +121,11 @@ describe('CountsService', () => {
         update: jest.fn(),
       },
       stockLayer: {
-        groupBy: jest.fn().mockResolvedValue([
-          { itemId: 'item-1', _sum: { quantityBase: new Prisma.Decimal('100') } },
-        ]),
+        groupBy: jest
+          .fn()
+          .mockResolvedValue([
+            { itemId: 'item-1', _sum: { quantityBase: new Prisma.Decimal('100') } },
+          ]),
       },
       stockCountLine: { update: jest.fn().mockResolvedValue({}) },
     };
@@ -144,11 +155,17 @@ describe('CountsService', () => {
         findUnique: jest.fn().mockResolvedValue(countRow('POSTED', '30', '0')),
       },
       stockLayer: {
-        groupBy: jest.fn().mockResolvedValue([
-          { itemId: 'item-1', _sum: { quantityBase: new Prisma.Decimal('30') } },
-        ]),
+        groupBy: jest
+          .fn()
+          .mockResolvedValue([
+            { itemId: 'item-1', _sum: { quantityBase: new Prisma.Decimal('30') } },
+          ]),
         findMany: jest.fn().mockResolvedValue([
-          { id: 'old', quantityBase: new Prisma.Decimal('25'), unitCost: new Prisma.Decimal('200') },
+          {
+            id: 'old',
+            quantityBase: new Prisma.Decimal('25'),
+            unitCost: new Prisma.Decimal('200'),
+          },
           { id: 'new', quantityBase: new Prisma.Decimal('5'), unitCost: new Prisma.Decimal('220') },
         ]),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -157,14 +174,25 @@ describe('CountsService', () => {
       stockCountLine: { update: jest.fn().mockResolvedValue({}) },
       auditLog: { create: jest.fn().mockResolvedValue({ id: 'audit-1' }) },
     };
-    const service = serviceFor(tx);
+    const alerts = noAlerts();
+    const before = new Map([['item-1', '30']]);
+    alerts.levels.mockResolvedValue(before);
+    const service = serviceFor(tx, alerts);
     await service.approve(actor, 'count-1');
+    expect(alerts.levels).toHaveBeenCalledWith(expect.anything(), 'org-1', 'branch-1', ['item-1']);
+    expect(alerts.notifyCrossed).toHaveBeenCalledWith(expect.anything(), {
+      organisationId: 'org-1',
+      branchId: 'branch-1',
+      before,
+    });
     expect(tx.stockCountLine.update).toHaveBeenCalledWith({
       where: { id: 'line-1' },
       data: { varianceCost: new Prisma.Decimal('-6100') },
     });
     const movements = tx.stockMovement.create.mock.calls.map(
-      (call: [{ data: { quantityBase: Prisma.Decimal; unitCost: Prisma.Decimal; type: string } }]) => [
+      (
+        call: [{ data: { quantityBase: Prisma.Decimal; unitCost: Prisma.Decimal; type: string } }],
+      ) => [
         call[0].data.type,
         call[0].data.quantityBase.toString(),
         call[0].data.unitCost.toString(),
@@ -184,9 +212,11 @@ describe('CountsService', () => {
         findUnique: jest.fn().mockResolvedValue(countRow('POSTED', '10', '15')),
       },
       stockLayer: {
-        groupBy: jest.fn().mockResolvedValue([
-          { itemId: 'item-1', _sum: { quantityBase: new Prisma.Decimal('10') } },
-        ]),
+        groupBy: jest
+          .fn()
+          .mockResolvedValue([
+            { itemId: 'item-1', _sum: { quantityBase: new Prisma.Decimal('10') } },
+          ]),
         findFirst: jest.fn().mockResolvedValue({ unitCost: new Prisma.Decimal('200') }),
         create: jest.fn().mockResolvedValue({ id: 'layer-new' }),
       },
@@ -220,16 +250,20 @@ describe('CountsService', () => {
         updateMany: jest.fn(),
       },
       stockLayer: {
-        groupBy: jest.fn().mockResolvedValue([
-          { itemId: 'item-1', _sum: { quantityBase: new Prisma.Decimal('20') } },
-        ]),
+        groupBy: jest
+          .fn()
+          .mockResolvedValue([
+            { itemId: 'item-1', _sum: { quantityBase: new Prisma.Decimal('20') } },
+          ]),
         findMany: jest.fn(),
       },
       stockMovement: { create: jest.fn() },
     };
     const service = serviceFor(tx);
     await expect(service.approve(actor, 'count-1')).rejects.toThrow(
-      new ConflictException('Stock changed while this count was waiting. Send it back and count again.'),
+      new ConflictException(
+        'Stock changed while this count was waiting. Send it back and count again.',
+      ),
     );
     expect(tx.stockCount.updateMany).not.toHaveBeenCalled();
     expect(tx.stockMovement.create).not.toHaveBeenCalled();

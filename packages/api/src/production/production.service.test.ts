@@ -22,12 +22,19 @@ const input = {
   actualPortions: '10',
 };
 
-function serviceFor(tx: Record<string, unknown>): ProductionService {
+function noAlerts() {
+  return {
+    levels: jest.fn().mockResolvedValue(new Map()),
+    notifyCrossed: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
+function serviceFor(tx: Record<string, unknown>, alerts = noAlerts()): ProductionService {
   const prisma = {
     ...tx,
     $transaction: (run: (client: object) => Promise<unknown>) => run(tx),
   };
-  return new ProductionService(prisma as never, new AuditService());
+  return new ProductionService(prisma as never, new AuditService(), alerts as never);
 }
 
 function recipeRow(status = 'APPROVED') {
@@ -75,7 +82,9 @@ function baseMocks(recipe = recipeRow(), layers: unknown[] = []) {
   return {
     recipe: { findFirst: jest.fn().mockResolvedValue(recipe) },
     stockLocation: {
-      findFirst: jest.fn().mockResolvedValue({ id: 'loc-1', name: 'Dry store' }),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ id: 'loc-1', name: 'Dry store', branchId: 'branch-1' }),
     },
     documentSequence: { upsert: jest.fn().mockResolvedValue({ lastNumber: 1 }) },
     productionBatch: {
@@ -137,10 +146,12 @@ describe('ProductionService', () => {
     const mocks = baseMocks(recipeRow(), [
       { id: 'old', quantityBase: new Prisma.Decimal('1'), unitCost: new Prisma.Decimal('200') },
     ]);
-    const service = serviceFor(mocks);
+    const alerts = noAlerts();
+    const service = serviceFor(mocks, alerts);
     await expect(service.create(actor, input)).rejects.toThrow(
       new BadRequestException('Only 1 kg of Wheat flour is in Dry store.'),
     );
+    expect(alerts.notifyCrossed).not.toHaveBeenCalled();
     expect(mocks.productionLine.create).not.toHaveBeenCalled();
     expect(mocks.stockMovement.create).not.toHaveBeenCalled();
     expect(mocks.productionBatch.update).not.toHaveBeenCalled();
@@ -151,9 +162,18 @@ describe('ProductionService', () => {
       { id: 'old', quantityBase: new Prisma.Decimal('1'), unitCost: new Prisma.Decimal('200') },
       { id: 'new', quantityBase: new Prisma.Decimal('5'), unitCost: new Prisma.Decimal('220') },
     ]);
-    const service = serviceFor(mocks);
+    const alerts = noAlerts();
+    const before = new Map([['item-1', '6']]);
+    alerts.levels.mockResolvedValue(before);
+    const service = serviceFor(mocks, alerts);
     await service.create(actor, input);
 
+    expect(alerts.levels).toHaveBeenCalledWith(expect.anything(), 'org-1', 'branch-1', ['item-1']);
+    expect(alerts.notifyCrossed).toHaveBeenCalledWith(expect.anything(), {
+      organisationId: 'org-1',
+      branchId: 'branch-1',
+      before,
+    });
     expect(mocks.productionLine.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         quantityBase: new Prisma.Decimal('1.5'),

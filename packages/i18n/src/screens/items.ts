@@ -15,7 +15,8 @@ export const itemsCopy = defineCopy({
     conversion: 'Base units in one purchase unit',
     conversionHint: 'A 25 kg bag is 25 when the base unit is kg.',
     reorderLevel: 'Reorder level',
-    reorderLevelHint: 'In the base unit.',
+    reorderLevelHint:
+      'In the base unit. The administrator and head chef are told to restock when stock falls to this level. Leave 0 for no alert.',
     shelfLife: 'Shelf life (days)',
     storage: 'Storage',
     suppliers: 'Suppliers',
@@ -40,7 +41,8 @@ export const itemsCopy = defineCopy({
     conversion: 'ایک خریداری اکائی میں بنیادی اکائیاں',
     conversionHint: 'اگر بنیادی اکائی kg ہو تو 25 kg کا تھیلا 25 ہے۔',
     reorderLevel: 'دوبارہ آرڈر کی حد',
-    reorderLevelHint: 'بنیادی اکائی میں۔',
+    reorderLevelHint:
+      'بنیادی اکائی میں۔ اسٹاک اس حد تک گرنے پر ایڈمنسٹریٹر اور ہیڈ شیف کو دوبارہ اسٹاک بھرنے کی اطلاع ملتی ہے۔ اطلاع نہ چاہیے تو 0 رکھیں۔',
     shelfLife: 'قابلِ استعمال مدت (دن)',
     storage: 'ذخیرہ',
     suppliers: 'سپلائرز',
@@ -65,7 +67,8 @@ export const itemsCopy = defineCopy({
     conversion: 'عدد الوحدات الأساسية في وحدة شراء واحدة',
     conversionHint: 'كيس 25 kg يساوي 25 عندما تكون الوحدة الأساسية kg.',
     reorderLevel: 'حد إعادة الطلب',
-    reorderLevelHint: 'بالوحدة الأساسية.',
+    reorderLevelHint:
+      'بالوحدة الأساسية. يُبلَّغ المسؤول ورئيس الطهاة بإعادة التخزين عندما ينخفض المخزون إلى هذا الحد. اتركه 0 لإيقاف التنبيه.',
     shelfLife: 'مدة الصلاحية (أيام)',
     storage: 'التخزين',
     suppliers: 'الموردون',

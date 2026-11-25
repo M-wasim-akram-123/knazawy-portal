@@ -17,6 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 import { drawFifo } from './fifo';
 import type { CreateIssueDto } from './issues.dto';
+import { StockAlertsService } from './stock-alerts.service';
 
 const issueInclude = {
   location: true,
@@ -30,6 +31,7 @@ export class IssuesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly alerts: StockAlertsService,
   ) {}
 
   async list(actor: Actor): Promise<StockIssueRecord[]> {
@@ -91,6 +93,8 @@ export class IssuesService {
         },
       });
 
+      const before = await this.alerts.levels(tx, actor.organisationId, location.branchId, itemIds);
+
       for (const line of requested) {
         const item = itemsById.get(line.itemId);
         if (!item) throw new BadRequestException('Choose an item that exists.');
@@ -143,6 +147,12 @@ export class IssuesService {
           });
         }
       }
+
+      await this.alerts.notifyCrossed(tx, {
+        organisationId: actor.organisationId,
+        branchId: location.branchId,
+        before,
+      });
 
       const full = await tx.stockIssue.findUnique({
         where: { id: issue.id },

@@ -412,7 +412,8 @@ describe('service requests', () => {
     expect(can('AIRLINE_FINANCE', 'service_requests', 'R')).toBe(false);
     expect(can('OPERATIONS_MANAGER', 'service_requests', 'A')).toBe(true);
     expect(can('OPERATIONS_MANAGER', 'service_requests', 'C')).toBe(false);
-    expect(can('ADMINISTRATOR', 'service_requests', 'A')).toBe(false);
+    expect(can('ADMINISTRATOR', 'service_requests', 'A')).toBe(true);
+    expect(can('ADMINISTRATOR', 'service_requests', 'C')).toBe(false);
     expect(can('HEAD_CHEF', 'service_requests', 'R')).toBe(true);
     expect(can('HEAD_CHEF', 'service_requests', 'A')).toBe(false);
   });

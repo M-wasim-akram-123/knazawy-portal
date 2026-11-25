@@ -76,6 +76,15 @@ export function needsReorder(onHand: string, reorderLevel: string): boolean {
   return stock <= level;
 }
 
+/**
+ * True when stock has just fallen through the reorder level: it was above before and is at or
+ * below now. This is when the head chef and administrator are told to restock. An item that is
+ * already low is not announced again until it has been restocked above the level.
+ */
+export function crossedReorderLevel(before: string, after: string, reorderLevel: string): boolean {
+  return !needsReorder(before, reorderLevel) && needsReorder(after, reorderLevel);
+}
+
 function scaledQuantity(value: string): bigint | null {
   const trimmed = value.trim();
   if (!/^\d+(?:\.\d+)?$/.test(trimmed)) return null;
