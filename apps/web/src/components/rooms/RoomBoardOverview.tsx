@@ -1,15 +1,11 @@
 'use client';
 
-import {
-  formatDisplayDate,
-  type RoomBoardRecord,
-  type RoomBoardRoom,
-  roomStateTone,
-} from '@knazawy/shared';
+import type { RoomBoardRecord } from '@knazawy/shared';
 
 import { fill } from '../../lib/i18n';
 
-import { clockOf, percent, shortDate, stateText, type RoomBoardText } from './boardView';
+import { percent, type RoomBoardText } from './boardView';
+import { RoomFloorPlan } from './RoomFloorPlan';
 
 interface OverviewProps {
   board: RoomBoardRecord;
@@ -200,86 +196,7 @@ export function RoomBoardOverview({ board, t, selectedId, onSelect }: OverviewPr
         </section>
       </div>
 
-      <section className="kz-panel kz-stack">
-        <h3>{t.floorsTitle}</h3>
-        <p className="kz-help">{t.floorsHelp}</p>
-        <ul className="kz-rb-legend kz-rb-legend-row">
-          {[
-            ['free', t.stateFree],
-            ['reserved', t.stateReserved],
-            ['occupied', t.stateOccupied],
-            ['due', t.stateDueOut],
-            ['overdue', t.stateOverdue],
-          ].map(([tone, label]) => (
-            <li key={tone}>
-              <span className={`kz-rb-dot kz-rb-dot-${tone}`} aria-hidden="true" />
-              {label}
-            </li>
-          ))}
-        </ul>
-        {board.floors.length === 0 ? <p className="kz-empty">{t.noRooms}</p> : null}
-        {board.floors.map((floor) => (
-          <div key={floor.id} className="kz-rb-floor">
-            <h4>{floor.name}</h4>
-            <div className="kz-rb-plan">
-              {floor.rooms.map((room) => (
-                <RoomTile
-                  key={room.id}
-                  room={room}
-                  t={t}
-                  selected={room.id === selectedId}
-                  onSelect={onSelect}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </section>
+      <RoomFloorPlan board={board} t={t} selectedId={selectedId} onSelect={onSelect} />
     </div>
-  );
-}
-
-function RoomTile({
-  room,
-  t,
-  selected,
-  onSelect,
-}: {
-  room: RoomBoardRoom;
-  t: RoomBoardText;
-  selected: boolean;
-  onSelect: (roomId: string) => void;
-}) {
-  const tone = roomStateTone(room.state);
-  const guests = room.guests.male + room.guests.female + room.guests.children;
-  let line = '';
-  if (room.current) {
-    const due = `${shortDate(room.current.to)} ${clockOf(room.current.plannedCheckOutAt)}`;
-    line =
-      room.state === 'OVERDUE' ? `${t.stateOverdue} · ${due}` : fill(t.outAtTime, { time: due });
-  } else if (room.nextBooking) {
-    line = room.freeUntil
-      ? fill(t.freeUntilDate, { date: formatDisplayDate(room.freeUntil) })
-      : t.stateReserved;
-  } else {
-    line = t.freeFromNow;
-  }
-  return (
-    <button
-      type="button"
-      className={`kz-rb-room kz-rb-room-${tone}${selected ? ' kz-rb-room-selected' : ''}`}
-      onClick={() => onSelect(room.id)}
-      aria-pressed={selected}
-      title={`${room.name} · ${stateText(t, room.state)}`}
-    >
-      <span className="kz-rb-room-name">{room.name}</span>
-      <span className="kz-rb-room-type">{room.roomTypeName}</span>
-      <span className="kz-rb-room-guests">
-        {guests > 0
-          ? fill(t.guestsInRoom, { count: guests })
-          : fill(t.sleeps, { count: room.capacity })}
-      </span>
-      <span className="kz-rb-room-line">{line}</span>
-    </button>
   );
 }

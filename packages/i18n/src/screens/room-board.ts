@@ -46,7 +46,8 @@ export const roomBoardCopy = defineCopy({
     stateOverdue: 'Overdue',
 
     floorsTitle: 'Floor plan',
-    floorsHelp: 'Each square is a room. Select one to see who is in it and when it is free.',
+    floorsHelp:
+      'Top floor first, like the building. Each card is a room: select one for details, or use the filters to light up the rooms you need.',
     noRooms: 'No rooms yet. Add the floors and rooms in Set up.',
     sleeps: 'Sleeps {count}',
     guestsInRoom: 'Guests: {count}',
@@ -98,6 +99,18 @@ export const roomBoardCopy = defineCopy({
     nothingToShow: 'No rooms match this room type.',
     todayMarker: 'Today',
     weekdayFormat: 'en-GB',
+
+    planFilterLabel: 'Show rooms that are',
+    planFilterAll: 'All rooms',
+    planSearch: 'Find a room',
+    planSearchPlaceholder: 'Room number',
+    planNoMatch: 'No rooms match these filters.',
+    planMatches: '{count} rooms lit up',
+    floorFree: '{free} of {rooms} free',
+    chipMen: 'M',
+    chipWomen: 'F',
+    chipChildren: 'C',
+    stayProgress: 'Stay {percent}% done',
   },
   ur: {
     loading: 'کمروں کا بورڈ لوڈ ہو رہا ہے',
@@ -145,7 +158,7 @@ export const roomBoardCopy = defineCopy({
 
     floorsTitle: 'منزلوں کا نقشہ',
     floorsHelp:
-      'ہر خانہ ایک کمرہ ہے۔ کسی کو منتخب کریں تاکہ دیکھ سکیں اس میں کون ہے اور وہ کب خالی ہوگا۔',
+      'اوپر کی منزل پہلے، عمارت کی طرح۔ ہر کارڈ ایک کمرہ ہے: تفصیل کے لیے اسے منتخب کریں، یا فلٹر سے مطلوبہ کمرے نمایاں کریں۔',
     noRooms: 'ابھی کوئی کمرہ نہیں۔ ترتیب میں منزلیں اور کمرے شامل کریں۔',
     sleeps: '{count} مہمانوں کی گنجائش',
     guestsInRoom: '{count} مہمان',
@@ -196,6 +209,18 @@ export const roomBoardCopy = defineCopy({
     nothingToShow: 'اس قسم کا کوئی کمرہ نہیں۔',
     todayMarker: 'آج',
     weekdayFormat: 'ur-PK',
+
+    planFilterLabel: 'ایسے کمرے دکھائیں جو',
+    planFilterAll: 'تمام کمرے',
+    planSearch: 'کمرہ تلاش کریں',
+    planSearchPlaceholder: 'کمرے کا نمبر',
+    planNoMatch: 'ان فلٹرز سے کوئی کمرہ نہیں ملا۔',
+    planMatches: '{count} کمرے نمایاں',
+    floorFree: '{rooms} میں سے {free} خالی',
+    chipMen: 'م',
+    chipWomen: 'خ',
+    chipChildren: 'ب',
+    stayProgress: 'قیام {percent}% گزر چکا',
   },
   ar: {
     loading: 'جارٍ تحميل لوحة الغرف',
@@ -242,7 +267,8 @@ export const roomBoardCopy = defineCopy({
     stateOverdue: 'تجاوزت الوقت',
 
     floorsTitle: 'مخطط الطوابق',
-    floorsHelp: 'كل مربع غرفة. اختر واحدًا لترى من فيه ومتى تتوفر.',
+    floorsHelp:
+      'الطابق العلوي أولًا مثل المبنى. كل بطاقة غرفة: اخترها للتفاصيل أو استخدم المرشحات لإبراز الغرف التي تحتاجها.',
     noRooms: 'لا توجد غرف بعد. أضف الطوابق والغرف من الإعداد.',
     sleeps: 'تتسع لـ {count}',
     guestsInRoom: '{count} نزلاء',
@@ -293,5 +319,17 @@ export const roomBoardCopy = defineCopy({
     nothingToShow: 'لا توجد غرف من هذا النوع.',
     todayMarker: 'اليوم',
     weekdayFormat: 'ar-SA',
+
+    planFilterLabel: 'إظهار الغرف التي هي',
+    planFilterAll: 'كل الغرف',
+    planSearch: 'ابحث عن غرفة',
+    planSearchPlaceholder: 'رقم الغرفة',
+    planNoMatch: 'لا توجد غرف تطابق هذه المرشحات.',
+    planMatches: 'تم إبراز {count} غرفة',
+    floorFree: '{free} من {rooms} شاغرة',
+    chipMen: 'ر',
+    chipWomen: 'ن',
+    chipChildren: 'أ',
+    stayProgress: 'انقضى {percent}% من الإقامة',
   },
 });
